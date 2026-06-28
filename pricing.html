@@ -1,0 +1,161 @@
+<!-- @dsCard group="Pages" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SciCo-Search — Pricing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=block" rel="stylesheet">
+<style>
+  :root{--red:#BA5757;--red-strong:#A23F3F;--btn:#68829e;--btn-strong:#586f87;--ink:#262730;--muted:#6B7280;--line:#E6E6E6;--slate:#8497B0;--bg-soft:#F8F9FA;}
+  *{box-sizing:border-box}html,body{margin:0}
+  body{font-family:"Source Sans 3","Source Sans Pro",-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
+       background:#fff;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:var(--red);text-decoration:none}
+  .mi{font-family:'Material Symbols Outlined';font-weight:normal;font-size:1.1em;line-height:1;white-space:nowrap;
+      -webkit-font-feature-settings:'liga';font-feature-settings:'liga';-webkit-font-smoothing:antialiased;vertical-align:-.16em;display:inline-block}
+
+  .logo{display:inline-flex;align-items:flex-start;font-weight:700;line-height:1}
+  .logo .sci{font-size:1.5em}.logo .badge{font-size:1em;color:#fff;background:var(--red);border-radius:4px;padding:.05em .3em;margin-left:.12em}
+  .logo .sup{font-size:.6em;color:var(--slate);margin-left:.18em;margin-top:-.05em;font-style:italic}
+
+  .page{max-width:1040px;margin:0 auto;padding:30px 24px 80px}
+  .top{display:flex;align-items:center;justify-content:space-between}
+  .newbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 13px;font-size:.88rem;cursor:pointer;color:var(--ink)}
+  .newbtn:hover{border-color:var(--red);color:var(--red)}
+
+  .head{text-align:center;margin:34px 0 8px}
+  .head h1{font-size:1.75rem;margin:0}
+  .head p{color:var(--muted);font-size:1rem;margin:8px auto 0;max-width:60ch}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:30px;align-items:start}
+  .card{border:1px solid var(--line);border-radius:14px;padding:24px 22px;display:flex;flex-direction:column;background:#fff}
+  .card.feat{border-color:var(--red);box-shadow:0 8px 30px rgba(186,87,87,.12);position:relative}
+  .ribbon{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--red);color:#fff;
+      font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:99px;padding:4px 12px}
+  .tname{font-size:1.15rem;font-weight:700}
+  .tsub{color:var(--muted);font-size:.86rem;margin-top:3px;min-height:2.4em}
+  .price{margin:14px 0 2px;display:flex;align-items:baseline;gap:5px}
+  .price .amt{font-size:2rem;font-weight:700}
+  .price .per{color:var(--muted);font-size:.9rem}
+  .cta{margin:18px 0 6px;display:block;width:100%;text-align:center;border-radius:9px;padding:11px 14px;
+      font-size:.95rem;font-weight:600;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  .cta:hover{border-color:var(--red);color:var(--red)}
+  .cta.primary{background:var(--btn);color:#fff;border-color:var(--btn)}.cta.primary:hover{background:var(--btn-strong);color:#fff}
+
+  .flab{font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:16px 0 8px}
+  ul{list-style:none;margin:0;padding:0}
+  li{display:flex;align-items:flex-start;gap:9px;font-size:.9rem;padding:6px 0;border-top:1px solid #f0f0f0}
+  li:first-child{border-top:0}
+  li .mi{font-size:1.1rem;margin-top:.05em;flex:0 0 auto}
+  li .yes{color:var(--red)}li .no{color:#cdd0d4}
+  li .txt{flex:1}
+  li .val{color:var(--ink);font-weight:600;white-space:nowrap}
+  li.off .txt{color:var(--muted)}
+  .inherit{display:flex;align-items:center;gap:8px;font-size:.9rem;font-weight:600;color:var(--ink);
+      background:var(--bg-soft);border-radius:9px;padding:10px 12px;margin-bottom:4px}
+  .inherit .mi{color:var(--red)}
+  .note{color:var(--muted);font-size:.82rem;margin-top:10px}
+
+  .foot{text-align:center;color:var(--muted);font-size:.86rem;margin-top:34px}
+  @media(max-width:860px){.grid{grid-template-columns:1fr;max-width:420px;margin-inline:auto}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="top">
+    <div class="logo" style="font-size:1.1rem"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></div>
+    <button class="newbtn" onclick="location.href='search.html'"><span class="mi">arrow_back</span> Back to app</button>
+  </div>
+
+  <div class="head">
+    <h1>Plans &amp; Pricing</h1>
+    <p>Start free. Upgrade for deep search, research-gap analysis, and writing tools. Cancel anytime.</p>
+  </div>
+
+  <div class="grid">
+
+    <!-- FREE -->
+    <div class="card">
+      <div class="tname">Free</div>
+      <div class="tsub">For getting started and everyday literature discovery.</div>
+      <div class="price"><span class="amt">$0</span><span class="per">/ forever</span></div>
+      <button class="cta">Current plan</button>
+      <div class="flab">What's included</div>
+      <ul>
+        <li><span class="mi yes">all_inclusive</span><span class="txt">Shallow search</span><span class="val">Unlimited</span></li>
+        <li><span class="mi yes">all_inclusive</span><span class="txt">Report generation</span><span class="val">Unlimited</span></li>
+        <li><span class="mi yes">check</span><span class="txt">Deep search</span><span class="val">3 / mo</span></li>
+        <li><span class="mi yes">check</span><span class="txt">Deep report generation</span><span class="val">3 / mo</span></li>
+        <li class="off"><span class="mi no">remove</span><span class="txt">PI profiling</span></li>
+        <li class="off"><span class="mi no">remove</span><span class="txt">Write article's introduction</span></li>
+        <li class="off"><span class="mi no">remove</span><span class="txt">Identify research gap</span></li>
+        <li class="off"><span class="mi no">remove</span><span class="txt">Refine hypothesis</span></li>
+      </ul>
+    </div>
+
+    <!-- INDIVIDUAL -->
+    <div class="card feat">
+      <div class="ribbon">Recommended</div>
+      <div class="tname">Individual</div>
+      <div class="tsub">For active researchers who need depth and writing tools.</div>
+      <div class="price"><span class="amt">$18</span><span class="per">/ month</span></div>
+      <button class="cta primary js-upgrade" data-plan="individual">Upgrade to Individual</button>
+      <div class="flab">Everything in Free, plus</div>
+      <ul>
+        <li><span class="mi yes">check</span><span class="txt">Deep search</span><span class="val">20 / mo</span></li>
+        <li><span class="mi yes">check</span><span class="txt">Deep report generation</span><span class="val">20 / mo</span></li>
+        <li><span class="mi yes">check</span><span class="txt">PI profiling</span><span class="val">On</span></li>
+        <li><span class="mi yes">check</span><span class="txt">Write article's introduction</span><span class="val">5 / mo</span></li>
+        <li><span class="mi yes">check</span><span class="txt">Identify research gap</span><span class="val">5 / mo</span></li>
+        <li><span class="mi yes">check</span><span class="txt">Refine hypothesis</span><span class="val">5 / mo</span></li>
+      </ul>
+    </div>
+
+    <!-- TEAM -->
+    <div class="card">
+      <div class="tname">Team</div>
+      <div class="tsub">For labs and groups — the full Individual toolkit for everyone.</div>
+      <div class="price"><span class="amt">$15</span><span class="per">/ member / month</span></div>
+      <button class="cta js-upgrade" data-plan="team">Create a team</button>
+      <div class="flab">For every member</div>
+      <div class="inherit"><span class="mi">groups</span> Everything in Individual, per seat</div>
+      <ul>
+        <li><span class="mi yes">check</span><span class="txt">Deep search</span><span class="val">20 / mo</span></li>
+        <li><span class="mi yes">check</span><span class="txt">Deep report generation</span><span class="val">20 / mo</span></li>
+        <li><span class="mi yes">check</span><span class="txt">PI profiling</span><span class="val">On</span></li>
+        <li><span class="mi yes">check</span><span class="txt">Writing &amp; analysis tools</span><span class="val">5 / mo</span></li>
+        <li><span class="mi yes">check</span><span class="txt">Centralized per-seat billing</span><span class="val"></span></li>
+      </ul>
+      <p class="note">Lower per-seat price than Individual. Add or remove members anytime.</p>
+    </div>
+
+  </div>
+
+  <p class="foot">All plans include unlimited shallow search and report generation. Quotas reset monthly. Prices in USD.</p>
+</div>
+
+<script src="js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseClient.js"></script>
+<script>
+  // Billing isn't wired yet (plans are provisioned manually). Anonymous users sign in first;
+  // signed-in users are routed to request an upgrade by email.
+  (function(){
+    document.querySelectorAll('.js-upgrade').forEach(function(b){
+      b.addEventListener('click', async function(){
+        const plan = b.dataset.plan || 'individual';
+        const user = window.SciCoAuth ? await window.SciCoAuth.getUser() : null;
+        if(!user){ window.SciCoAuth.signInWithGoogle(); return; }
+        window.location.href = 'mailto:contact@scicoagent.com'
+          + '?subject=' + encodeURIComponent('SciCo-Search upgrade: ' + plan)
+          + '&body=' + encodeURIComponent('Please upgrade my account (' + (user.email||'') + ') to the ' + plan + ' plan.');
+      });
+    });
+  })();
+</script>
+</body>
+</html>

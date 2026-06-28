@@ -1,0 +1,248 @@
+<!-- @dsCard group="Pages" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SciCo-Search — Publications</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=block" rel="stylesheet">
+<style>
+  :root{--red:#BA5757;--btn:#68829e;--btn-strong:#586f87;--ink:#262730;--muted:#6B7280;--line:#E6E6E6;--slate:#8497B0;}
+  *{box-sizing:border-box}html,body{margin:0}
+  body{font-family:"Source Sans 3","Source Sans Pro",-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);background:#fff;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .page{max-width:780px;margin:0 auto;padding:26px 24px 80px}
+  .mi{font-family:'Material Symbols Outlined';font-weight:normal;font-size:1.1em;line-height:1;white-space:nowrap;
+      -webkit-font-feature-settings:'liga';font-feature-settings:'liga';-webkit-font-smoothing:antialiased;vertical-align:-.16em;display:inline-block}
+  .logo{display:inline-flex;align-items:flex-start;font-weight:700;line-height:1}
+  .logo .sci{font-size:1.5em}.logo .badge{font-size:1em;color:#fff;background:var(--red);border-radius:4px;padding:.05em .3em;margin-left:.12em}
+  .logo .sup{font-size:.6em;color:var(--slate);margin-left:.18em;margin-top:-.05em;font-style:italic}
+
+  .top{display:flex;align-items:center;justify-content:space-between}
+  .newbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 13px;font-size:.88rem;cursor:pointer;color:var(--ink)}
+  .newbtn:hover{border-color:var(--btn);color:var(--btn)}
+
+  h1{font-size:1.35rem;margin:18px 0 4px}.q{font-style:italic}
+  .summary{color:var(--muted);font-size:.9rem}
+
+  .tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin:18px 0 0}
+  .tab{display:flex;align-items:center;gap:7px;padding:10px 0;font-size:.96rem;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab .mi{font-size:1.1rem}
+  .tab.active{color:var(--ink);font-weight:600;border-bottom-color:var(--red)}
+
+  .tools{display:flex;align-items:center;gap:14px;margin:16px 0 4px;color:var(--muted);font-size:.88rem;flex-wrap:wrap}
+  .tools select{border:1px solid var(--line);border-radius:6px;padding:5px 8px;color:var(--ink);font:inherit;font-size:.88rem}
+
+  .paper{padding:16px 0;border-bottom:1px solid var(--line)}
+  .ptitle{font-size:1.06rem;font-weight:600;color:var(--red)}.ptitle.low{color:var(--ink)}
+  .pmeta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 4px;color:var(--muted);font-size:.86rem;margin-top:5px}
+  .pmeta .mi{font-size:1.05rem;vertical-align:-.2em}
+  .pmeta .sep{margin:0 8px;color:#cfd2d6}
+  .pmeta b{color:var(--ink)}
+  .pactions{margin-top:8px;display:flex;gap:16px}
+  .pactions a{display:inline-flex;align-items:center;gap:5px;color:var(--slate);font-size:.84rem;cursor:pointer}
+  .pactions a:hover{color:var(--btn)}.pactions .mi{font-size:1.05rem}
+  .divider-note{color:var(--muted);font-size:.82rem;text-align:center;margin:20px 0 4px}
+  .paper.below{opacity:.6}
+
+  /* AI search logs — queries used, each expandable to its own results */
+  .logs{border:1px solid var(--line);border-radius:8px;margin:18px 0 4px;overflow:hidden}
+  .logs>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;
+      padding:11px 14px;font-size:.92rem;font-weight:600;color:var(--ink);background:var(--bg-soft,#F8F9FA)}
+  .logs>summary::-webkit-details-marker{display:none}
+  .logs>summary .chev{margin-left:auto;color:var(--muted);transition:transform .15s}
+  .logs[open]>summary .chev{transform:rotate(180deg)}
+  .logs .logs-body{padding:6px 14px 12px}
+  .logs .cap{color:var(--muted);font-size:.82rem;margin:4px 0 8px}
+  .qrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--line)}
+  .qstr{font-size:.9rem;color:var(--ink);flex:1;min-width:0}
+  .qbtn{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:var(--slate);cursor:pointer;
+      font:inherit;font-size:.8rem;background:#fff;border:1px solid var(--line);border-radius:99px;padding:4px 11px}
+  .qbtn:hover{border-color:var(--btn);color:var(--btn)}
+  .qbtn.active{border-color:var(--btn);color:#fff;background:var(--btn)}
+  .qbtn .mi{font-size:1rem}
+
+  /* Split layout: main panel + draggable divider + right results panel */
+  .layout{display:flex;align-items:stretch;min-height:100vh}
+  .main{flex:1;min-width:0}
+  .gutter{flex:0 0 7px;cursor:col-resize;position:sticky;top:0;height:100vh;display:none;
+      align-items:center;justify-content:center;background:var(--bg-soft,#F8F9FA);border-left:1px solid var(--line)}
+  .gutter::before{content:"";width:3px;height:34px;border-radius:99px;background:#cfd2d6}
+  .gutter:hover::before,.gutter.dragging::before{background:var(--red)}
+  body.resizing{cursor:col-resize;user-select:none}
+
+  /* Right sidebar: per-query results panel (lives in its own column) */
+  .rightbar{flex:0 0 var(--rb-w,380px);min-width:260px;max-width:70vw;background:#fff;
+      border-left:1px solid var(--line);position:sticky;top:0;height:100vh;
+      display:none;flex-direction:column}
+  .rightbar.show{display:flex}
+  .gutter.show{display:flex}
+  .rb-head{padding:16px 18px;border-bottom:1px solid var(--line)}
+  .rb-head .lab{font-size:.74rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:6px}
+  .rb-head .lab .mi{font-size:1rem}
+  .rb-q{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem;color:var(--ink);margin-top:7px;word-break:break-word}
+  .rb-count{color:var(--slate);font-size:.82rem;margin-top:6px}
+  .rb-close{position:absolute;top:12px;right:12px;border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:1.3rem;line-height:1}
+  .rb-close:hover{color:var(--red)}
+  .rb-body{padding:8px 18px 24px;overflow:auto}
+  .qres{padding:11px 0;border-bottom:1px solid var(--line)}
+  .qres a{color:var(--red);font-size:.92rem;font-weight:600}
+  .qres .meta{color:var(--muted);font-size:.8rem;margin-top:3px;display:flex;align-items:center;gap:5px}
+  .qres .meta b{color:var(--ink)}.qres .meta .mi{font-size:.95rem;vertical-align:-.18em}
+</style>
+</head>
+<body>
+<div class="layout">
+<div class="main">
+<div class="page">
+  <div class="top">
+    <div class="logo" style="font-size:1.1rem"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></div>
+    <button class="newbtn" onclick="location.href='search.html'"><span class="mi">add</span> New search</button>
+  </div>
+
+  <h1>Results for <span class="q" id="resQuery"></span></h1>
+  <div class="summary" id="resSummary">Loading results…</div>
+
+  <div class="tabs">
+    <div class="tab active"><span class="mi">description</span> Publications</div>
+    <div class="tab" id="tabMap"><span class="mi">hub</span> Topic Map</div>
+    <div class="tab" id="tabAuthors"><span class="mi">science</span> Authors</div>
+  </div>
+
+  <details class="logs">
+    <summary><span class="mi">manage_search</span> View AI Search Logs &amp; Queries Used <span class="mi chev">expand_more</span></summary>
+    <div class="logs-body">
+      <p class="cap">Queries executed &amp; papers collected — click a count to open that query's top matching papers in the side panel.</p>
+      <div id="qrows"></div>
+    </div>
+  </details>
+
+  <div class="tools">
+    <span>Sort by</span>
+    <select id="sortSel"><option value="ai">AI Score</option><option value="year">Year</option><option value="cite">Citations</option></select>
+    <span id="showCount"></span>
+  </div>
+
+  <div id="paperList"></div>
+</div>
+</div><!-- /.main -->
+
+<div class="gutter" id="gutter"></div>
+<aside class="rightbar" id="rightbar">
+  <div class="rb-head">
+    <button class="rb-close" id="rbClose" title="Close">&times;</button>
+    <div class="lab"><span class="mi">manage_search</span> Results for query</div>
+    <div class="rb-q" id="rbQuery"></div>
+    <div class="rb-count" id="rbCount"></div>
+  </div>
+  <div class="rb-body" id="rbBody"></div>
+</aside>
+</div><!-- /.layout -->
+
+<script src="js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/api.js"></script>
+<script>
+  let QDATA = [];               // per-query results, populated from the API
+  let PAPERS = [];              // all scored papers
+  let THRESHOLD = 0.72;
+  const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+
+  const bar=document.getElementById('rightbar'), gutter=document.getElementById('gutter');
+  function openPanel(i){
+    const d=QDATA[i]; if(!d) return;
+    document.getElementById('rbQuery').textContent=d.query;
+    document.getElementById('rbCount').textContent=d.count+" matching papers · top matches";
+    document.getElementById('rbBody').innerHTML=d.papers.map(p=>
+      `<div class="qres"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a><div class="meta">${esc(p.authors)}<span style="margin:0 7px;color:#cfd2d6">|</span>`+
+      `<span class="mi">event</span> ${esc(p.year)}<span style="margin:0 7px;color:#cfd2d6">|</span>`+
+      `<span class="mi">psychology</span> AI Score: <b>${Number(p.ai_score).toFixed(3)}</b></div></div>`).join('') || '<p class="cap">No matches for this query.</p>';
+    bar.classList.add('show'); gutter.classList.add('show');
+    document.querySelectorAll('.qbtn').forEach(b=>b.classList.toggle('active', b.dataset.q==String(i)));
+  }
+  function closePanel(){
+    bar.classList.remove('show'); gutter.classList.remove('show');
+    document.querySelectorAll('.qbtn').forEach(b=>b.classList.remove('active'));
+  }
+  document.getElementById('rbClose').addEventListener('click',closePanel);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanel();});
+
+  // Drag the gutter to resize the right panel
+  let dragging=false;
+  gutter.addEventListener('mousedown',e=>{dragging=true;gutter.classList.add('dragging');
+    document.body.classList.add('resizing');e.preventDefault();});
+  window.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    let w=window.innerWidth-e.clientX;
+    w=Math.max(260,Math.min(w,window.innerWidth*0.7));
+    document.documentElement.style.setProperty('--rb-w',w+'px');
+  });
+  window.addEventListener('mouseup',()=>{if(dragging){dragging=false;
+    gutter.classList.remove('dragging');document.body.classList.remove('resizing');}});
+
+  // --- Hydration from the API ---
+  const SID = new URLSearchParams(location.search).get('session');
+  document.getElementById('tabMap').onclick = ()=> location.href='results-topicmap.html'+(SID?`?session=${SID}`:'');
+  document.getElementById('tabAuthors').onclick = ()=> location.href='results-authors.html'+(SID?`?session=${SID}`:'');
+
+  function renderQrows(){
+    const host=document.getElementById('qrows');
+    host.innerHTML=QDATA.map((d,i)=>
+      `<div class="qrow"><span class="qstr">${esc(d.query)}</span>`+
+      `<button class="qbtn" data-q="${i}"><span class="mi">menu_book</span> ${d.count} papers</button></div>`).join('');
+    host.querySelectorAll('.qbtn').forEach(b=>b.addEventListener('click',()=>openPanel(+b.dataset.q)));
+  }
+  function paperHTML(p){
+    const low = Number(p.ai_score) < THRESHOLD;
+    return `<div class="paper${low?' below':''}">`+
+      `<div class="ptitle${low?' low':''}"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a></div>`+
+      `<div class="pmeta">${esc(p.authors)}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}`+
+      `<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}`+
+      `<span class="sep">|</span><span class="mi">psychology</span> AI Score: <b>${Number(p.ai_score).toFixed(3)}</b></div>`+
+      `<div class="pactions"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}><span class="mi">open_in_new</span> Open</a>`+
+      `<a><span class="mi">format_quote</span> Cite</a><a><span class="mi">bookmark_add</span> Save</a></div></div>`;
+  }
+  function renderPapers(){
+    const sort=document.getElementById('sortSel').value;
+    let list=PAPERS.slice();
+    if(sort==='year') list.sort((a,b)=>(b.year||0)-(a.year||0));
+    else if(sort==='cite') list.sort((a,b)=>(b.citation_count||0)-(a.citation_count||0));
+    else list.sort((a,b)=>(b.ai_score||0)-(a.ai_score||0));
+    const host=document.getElementById('paperList');
+    let html='', dividerShown=false;
+    for(const p of list){
+      if(sort==='ai' && !dividerShown && Number(p.ai_score)<THRESHOLD){
+        html+=`<div class="divider-note">— below ${THRESHOLD} match threshold —</div>`; dividerShown=true;
+      }
+      html+=paperHTML(p);
+    }
+    host.innerHTML = html || '<p class="cap">No papers found.</p>';
+  }
+  document.getElementById('sortSel').addEventListener('change', renderPapers);
+
+  async function hydrate(){
+    if(!SID){ document.getElementById('resSummary').textContent='No session specified.'; return; }
+    try{
+      const data = await window.SciCoAPI.getSession(SID);
+      const pub = data.publications||{};
+      THRESHOLD = pub.threshold || THRESHOLD;
+      PAPERS = pub.papers||[];
+      QDATA = data.query_logs||[];
+      document.getElementById('resQuery').textContent='"'+(data.base_query||'')+'"';
+      document.getElementById('resSummary').textContent=
+        `${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
+      document.getElementById('showCount').textContent=`· showing ${PAPERS.length}`;
+      renderQrows();
+      renderPapers();
+    }catch(err){
+      document.getElementById('resSummary').textContent =
+        err.code===401 ? 'Please sign in to view results.' : ('Could not load results ('+(err.message||'error')+').');
+    }
+  }
+  hydrate();
+</script>
+</body>
+</html>

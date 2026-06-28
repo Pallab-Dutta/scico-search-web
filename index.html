@@ -1,0 +1,310 @@
+<!-- @dsCard group="Pages" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SciCo-Search — Landing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#BA5757; --red-strong:#A23F3F; --red-soft:#F6E7E7;
+    --btn:#68829e; --btn-strong:#586f87;
+    --ink:#1A1A1A; --ink-2:#5A5F66; --ink-3:#8A8F96;
+    --slate:#8497B0; --slate-soft:#EEF1F6;
+    --bg:#FBFAF8; --surface:#FFFFFF; --line:#ECE9E4;
+    --shadow:0 1px 2px rgba(20,20,20,.04), 0 8px 24px rgba(20,20,20,.06);
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg);
+       -webkit-font-smoothing:antialiased;line-height:1.5}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 28px}
+
+  /* ---------- logo lockup ---------- */
+  .logo{display:inline-flex;align-items:flex-start;font-weight:800;letter-spacing:-.02em;line-height:1}
+  .logo .sci{font-size:1.5em;color:var(--ink)}
+  .logo .badge{font-size:1.06em;color:#fff;background:var(--red);border-radius:7px;
+       padding:.12em .34em;margin-left:.14em;box-shadow:0 2px 6px rgba(186,87,87,.35)}
+  .logo .sup{font-family:"Newsreader",serif;font-style:italic;font-weight:500;
+       font-size:.62em;color:var(--slate);margin-left:.22em;margin-top:-.1em}
+
+  /* ---------- nav ---------- */
+  header{position:sticky;top:0;z-index:20;background:rgba(251,250,248,.82);
+       backdrop-filter:saturate(160%) blur(12px);border-bottom:1px solid var(--line)}
+  nav{display:flex;align-items:center;justify-content:space-between;height:68px}
+  nav .links{display:flex;gap:30px;font-size:.92rem;font-weight:500;color:var(--ink-2)}
+  nav .links a:hover{color:var(--ink)}
+  .btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:.94rem;
+       border-radius:11px;padding:11px 18px;cursor:pointer;border:1px solid transparent;transition:.15s}
+  .btn-ghost{background:var(--surface);border-color:var(--line);color:var(--ink)}
+  .btn-ghost:hover{border-color:#d9d5cd}
+  .btn-primary{background:var(--btn);color:#fff;box-shadow:0 6px 16px rgba(104,130,158,.30)}
+  .btn-primary:hover{background:var(--btn-strong)}
+  .g-ico{width:17px;height:17px;display:inline-block}
+
+  /* ---------- hero ---------- */
+  .hero{padding:78px 0 30px;text-align:center}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;font-weight:600;
+       color:var(--red-strong);background:var(--red-soft);padding:7px 14px;border-radius:999px;
+       letter-spacing:.01em}
+  .hero h1{font-size:clamp(2.5rem,5.4vw,4rem);line-height:1.04;letter-spacing:-.035em;
+       font-weight:800;margin:26px auto 0;max-width:14ch}
+  .hero h1 .hl{color:var(--red)}
+  .hero p.sub{font-size:1.18rem;color:var(--ink-2);max-width:62ch;margin:22px auto 0}
+  .cta-row{display:flex;gap:14px;justify-content:center;margin-top:34px;flex-wrap:wrap}
+  .micro{margin-top:16px;font-size:.86rem;color:var(--ink-3)}
+  .micro b{color:var(--ink-2);font-weight:600}
+
+  /* ---------- product preview ---------- */
+  .stage{margin:54px auto 0;max-width:1000px;background:linear-gradient(180deg,#fff, #fcfbf9);
+       border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);overflow:hidden}
+  .stage .bar{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid var(--line);background:#fff}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .stage .omni{flex:1;margin-left:14px;height:30px;border-radius:8px;background:var(--slate-soft);
+       display:flex;align-items:center;padding:0 12px;font-size:.8rem;color:var(--ink-3)}
+  .stage .body{display:grid;grid-template-columns:1.05fr 1fr;gap:0}
+  .pane{padding:22px}
+  .pane.left{border-right:1px solid var(--line)}
+  .pane h4{margin:0 0 14px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .paper{padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:#fff}
+  .paper .t{font-weight:600;font-size:.92rem;color:var(--red);line-height:1.3}
+  .paper .m{font-size:.76rem;color:var(--ink-3);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap}
+  .score{margin-left:auto;font-weight:700;color:var(--ink);background:var(--red-soft);
+       border-radius:7px;padding:2px 8px;font-size:.74rem}
+  /* mini topic map */
+  .map{position:relative;height:230px;border-radius:14px;background:
+       radial-gradient(120px 120px at 30% 38%, rgba(186,87,87,.16), transparent 70%),
+       radial-gradient(120px 120px at 68% 64%, rgba(132,151,176,.20), transparent 70%),
+       radial-gradient(90px 90px at 74% 28%, rgba(106,153,120,.18), transparent 70%),
+       #fff;border:1px solid var(--line);overflow:hidden}
+  .pt{position:absolute;width:8px;height:8px;border-radius:50%;opacity:.92}
+  .legend{display:flex;gap:14px;margin-top:12px;font-size:.76rem;color:var(--ink-2);flex-wrap:wrap}
+  .key{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:10px;height:10px;border-radius:3px}
+
+  /* ---------- features ---------- */
+  section.features{padding:84px 0 10px}
+  .sec-head{text-align:center;max-width:60ch;margin:0 auto 46px}
+  .sec-head h2{font-size:2.2rem;letter-spacing:-.03em;margin:0}
+  .sec-head p{color:var(--ink-2);font-size:1.06rem;margin:14px 0 0}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+       padding:24px;box-shadow:var(--shadow)}
+  .card .ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;
+       background:var(--red-soft);color:var(--red-strong);font-size:20px;margin-bottom:16px}
+  .card h3{margin:0 0 8px;font-size:1.08rem;letter-spacing:-.01em}
+  .card p{margin:0;color:var(--ink-2);font-size:.93rem}
+  .card.alt .ic{background:var(--slate-soft);color:#54657f}
+
+  /* ---------- workflow ---------- */
+  section.flow{padding:84px 0}
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px}
+  .step{position:relative;padding:22px;border:1px solid var(--line);border-radius:14px;background:#fff}
+  .step .n{font-family:"Newsreader",serif;font-size:1.9rem;font-weight:600;color:var(--red);line-height:1}
+  .step h4{margin:12px 0 6px;font-size:1rem}
+  .step p{margin:0;font-size:.86rem;color:var(--ink-2)}
+
+  /* ---------- cta band ---------- */
+  .band{margin:30px auto 90px;background:linear-gradient(135deg,#2A2522,#1A1A1A);
+       border-radius:24px;padding:56px;text-align:center;color:#fff;box-shadow:var(--shadow)}
+  .band h2{font-size:2.1rem;letter-spacing:-.03em;margin:0 0 10px}
+  .band p{color:#C9C5BE;margin:0 auto 26px;max-width:52ch}
+  .band .btn-primary{box-shadow:0 8px 24px rgba(186,87,87,.45)}
+
+  footer{border-top:1px solid var(--line);padding:30px 0;color:var(--ink-3);font-size:.86rem}
+  footer .wrap{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+
+  @media(max-width:820px){
+    .stage .body,.grid,.steps{grid-template-columns:1fr}
+    .pane.left{border-right:0;border-bottom:1px solid var(--line)}
+    nav .links{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <nav>
+      <div class="logo"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></div>
+      <div class="links">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="pricing.html">Pricing</a>
+        <a href="#">Privacy</a>
+      </div>
+      <button class="btn btn-primary js-signin">
+        <svg class="g-ico" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.2h5.35c-.25 1.5-1.8 4.4-5.35 4.4-3.22 0-5.85-2.66-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 4.2 14.6 3.3 12 3.3 6.96 3.3 2.9 7.36 2.9 12.4S6.96 21.5 12 21.5c5.2 0 8.64-3.66 8.64-8.8 0-.6-.06-1.04-.16-1.6z"/></svg>
+        Sign in with Google
+      </button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">● Free to start · No API keys required</span>
+      <h1>Find the right <span class="hl">papers</span>, labs &amp; <span class="hl">PIs</span> for your niche.</h1>
+      <p class="sub">SciCo-Search is an AI research assistant that expands your topic into an optimized academic search, ranks the literature by how well it matches your intent, and maps the field so you can spot the research gaps.</p>
+      <div class="cta-row">
+        <button class="btn btn-primary js-signin">
+          <svg class="g-ico" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.2h5.35c-.25 1.5-1.8 4.4-5.35 4.4-3.22 0-5.85-2.66-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 4.2 14.6 3.3 12 3.3 6.96 3.3 2.9 7.36 2.9 12.4S6.96 21.5 12 21.5c5.2 0 8.64-3.66 8.64-8.8 0-.6-.06-1.04-.16-1.6z"/></svg>
+          Start free with Google
+        </button>
+        <button class="btn btn-ghost" onclick="location.href='pricing.html'">See plans &amp; pricing</button>
+      </div>
+      <p class="micro">Built by researchers, for researchers. <b>Your search history is saved to your account</b> so you can restore any session.</p>
+
+      <!-- product preview -->
+      <div class="stage">
+        <div class="bar">
+          <span class="dot" style="background:#F0625D"></span>
+          <span class="dot" style="background:#F6B73C"></span>
+          <span class="dot" style="background:#4FB969"></span>
+          <span class="omni">scico.search › "Flow matching for rare event sampling"</span>
+        </div>
+        <div class="body">
+          <div class="pane left">
+            <h4>Phase 1 · Ranked publications</h4>
+            <div class="paper">
+              <div class="t">Stochastic interpolants for rare-event transition paths</div>
+              <div class="m"><span>Albergo et&nbsp;al.</span><span>2024</span><span>· 142 cites</span><span class="score">0.91</span></div>
+            </div>
+            <div class="paper">
+              <div class="t">Flow-matching samplers for metastable molecular systems</div>
+              <div class="m"><span>Noé Lab</span><span>2023</span><span>· 88 cites</span><span class="score">0.87</span></div>
+            </div>
+            <div class="paper">
+              <div class="t">Importance sampling via continuous normalizing flows</div>
+              <div class="m"><span>Chen &amp; Duvenaud</span><span>2022</span><span>· 311 cites</span><span class="score">0.79</span></div>
+            </div>
+          </div>
+          <div class="pane">
+            <h4>Topic Map · clusters &amp; research gaps</h4>
+            <div class="map" id="map"></div>
+            <div class="legend">
+              <span class="key"><span class="swatch" style="background:#BA5757"></span>Generative samplers</span>
+              <span class="key"><span class="swatch" style="background:#8497B0"></span>Rare-event theory</span>
+              <span class="key"><span class="swatch" style="background:#6A9978"></span>MD simulation</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>Not keyword search. A research strategy.</h2>
+        <p>SciCo expands your intent into many optimized queries, then reads, scores and organizes the results by meaning.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="ic">✦</div>
+          <h3>AI query expansion</h3>
+          <p>Your topic becomes a set of optimized academic queries with synonyms and hypernyms — tune the <b>Query Entropy</b> to widen or narrow the net.</p>
+        </div>
+        <div class="card">
+          <div class="ic">◎</div>
+          <h3>AI relevance match</h3>
+          <p>Every paper is read and scored against your intent. The <b>AI Match</b> score ranks results by true conceptual overlap, not keyword overlap.</p>
+        </div>
+        <div class="card alt">
+          <div class="ic">⬡</div>
+          <h3>Topic Map &amp; research gaps</h3>
+          <p>An interactive map of the field groups papers into themed branches, with a mindmap that walks from the well-studied core out toward the under-explored frontier.</p>
+        </div>
+        <div class="card alt">
+          <div class="ic">⚲</div>
+          <h3>PI &amp; lab profiling</h3>
+          <p>Phase 2 deep-profiles the Principal Investigators behind the papers — recent output, lab focus, and fit for your research direction.</p>
+        </div>
+        <div class="card">
+          <div class="ic">↺</div>
+          <h3>Saved sessions</h3>
+          <p>Sign in with Google and every search is saved to your account. Restore any past session from the sidebar at any time.</p>
+        </div>
+        <div class="card">
+          <div class="ic">∞</div>
+          <h3>Free to start</h3>
+          <p>Unlimited shallow search and report generation, free forever. Upgrade for deep search, research-gap analysis and writing tools — <a href="pricing.html">see pricing</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="flow" id="how">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>From a sentence to a literature map in four steps</h2>
+      </div>
+      <div class="steps">
+        <div class="step"><div class="n">1</div><h4>Define your search</h4><p>Type a specific research interest and set the Query Entropy.</p></div>
+        <div class="step"><div class="n">2</div><h4>Auto-expand &amp; search</h4><p>The AI expands your topic into optimized queries and harvests the literature automatically.</p></div>
+        <div class="step"><div class="n">3</div><h4>Harvest &amp; rank</h4><p>Papers are retrieved and scored by how well they match your intent.</p></div>
+        <div class="step"><div class="n">✓</div><h4>Map &amp; profile</h4><p>Explore the Topic Map and deep-profile the labs behind the work.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="band">
+      <h2>Discover your literature. Identify your dream lab.</h2>
+      <p>Join researchers using SciCo-Search to navigate their field and find where their next contribution fits.</p>
+      <button class="btn btn-primary js-signin">
+        <svg class="g-ico" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.2h5.35c-.25 1.5-1.8 4.4-5.35 4.4-3.22 0-5.85-2.66-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 4.2 14.6 3.3 12 3.3 6.96 3.3 2.9 7.36 2.9 12.4S6.96 21.5 12 21.5c5.2 0 8.64-3.66 8.64-8.8 0-.6-.06-1.04-.16-1.6z"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="logo" style="font-size:.8rem"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></div>
+    <div>© 2026 SciCo-Search · A community-supported research tool · Privacy</div>
+  </div>
+</footer>
+
+<script src="js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseClient.js"></script>
+<script>
+  // Google sign-in; if already authenticated, jump straight to the app.
+  (function(){
+    document.querySelectorAll('.js-signin').forEach(function(b){
+      b.addEventListener('click', function(){
+        window.SciCoAuth.signInWithGoogle().catch(function(e){ console.error(e); });
+      });
+    });
+    if(window.SciCoAuth){
+      window.SciCoAuth.onChange(function(user){ if(user){ location.href='search.html'; } });
+    }
+  })();
+</script>
+<script>
+  // scatter the mini topic-map points into three clusters
+  (function(){
+    var map=document.getElementById('map');if(!map)return;
+    var clusters=[{x:30,y:38,c:'#BA5757'},{x:68,y:64,c:'#8497B0'},{x:74,y:28,c:'#6A9978'}];
+    clusters.forEach(function(cl){
+      for(var i=0;i<22;i++){
+        var a=Math.random()*6.28, r=Math.random()*Math.random()*15;
+        var d=document.createElement('div');d.className='pt';
+        d.style.left=(cl.x+Math.cos(a)*r)+'%';
+        d.style.top=(cl.y+Math.sin(a)*r*1.4)+'%';
+        d.style.background=cl.c;
+        d.style.opacity=(0.45+Math.random()*0.5).toFixed(2);
+        map.appendChild(d);
+      }
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!-- @dsCard group="Pages" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SciCo-Search — Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=block" rel="stylesheet">
+<style>
+  :root{--red:#BA5757;--red-strong:#A23F3F;--btn:#68829e;--btn-strong:#586f87;--ink:#262730;--muted:#6B7280;--line:#E6E6E6;--slate:#8497B0;--bg-soft:#F8F9FA;}
+  *{box-sizing:border-box}html,body{margin:0}
+  body{font-family:"Source Sans 3","Source Sans Pro",-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
+       background:#fff;line-height:1.6;-webkit-font-smoothing:antialiased;display:flex;min-height:100vh}
+  a{color:var(--red)}
+  .mi{font-family:'Material Symbols Outlined';font-weight:normal;font-size:1.15em;line-height:1;white-space:nowrap;
+      -webkit-font-feature-settings:'liga';font-feature-settings:'liga';-webkit-font-smoothing:antialiased;vertical-align:-.18em;display:inline-block}
+  .mi.fill{font-variation-settings:'FILL' 1}
+
+  .logo{display:inline-flex;align-items:flex-start;font-weight:700;line-height:1}
+  .logo .sci{font-size:1.5em}.logo .badge{font-size:1em;color:#fff;background:var(--red);border-radius:4px;padding:.05em .3em;margin-left:.12em}
+  .logo .sup{font-size:.6em;color:var(--slate);margin-left:.18em;margin-top:-.05em;font-style:italic}
+
+  aside{width:260px;flex:0 0 260px;background:var(--bg-soft);border-right:1px solid var(--line);padding:20px 16px;display:flex;flex-direction:column;gap:18px}
+  .email{font-size:.9rem;word-break:break-all}
+  .side-h{font-size:.8rem;font-weight:700;margin:0 0 6px;display:flex;align-items:center;gap:6px}
+  .side-h .mi{font-size:1.05rem;color:var(--muted)}
+  .session{display:block;padding:7px 8px;font-size:.88rem;color:var(--ink);border-radius:6px;cursor:pointer;text-decoration:none}
+  .session:hover{background:#eef0f2}
+  .session.active{color:var(--red);font-weight:600}
+  .session small{display:block;color:var(--muted);font-size:.74rem}
+  .rate{margin-top:auto;border-top:1px solid var(--line);padding-top:14px}
+  .stars .mi{color:#E3A52E;font-size:1.15rem}
+
+  main{flex:1;display:flex;flex-direction:column;align-items:center;padding:36px 24px 70px}
+  .col{width:100%;max-width:720px}
+  .biglogo{display:flex;justify-content:center;font-size:1.6rem;margin-bottom:22px}
+
+  .row{display:flex;gap:8px;align-items:center}
+  .row .field{flex:1;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:0 12px}
+  .row .field:focus-within{border-color:var(--red)}
+  .row .field .mi{color:var(--muted)}
+  .row input{flex:1;border:0;outline:0;padding:11px 0;font-size:1rem;color:var(--ink);background:transparent}
+  .pbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:11px 13px;font-size:.92rem;cursor:pointer;color:var(--ink);white-space:nowrap}
+  .pbtn:hover{border-color:var(--red)}
+  .submit{border:0;background:var(--btn);color:#fff;border-radius:8px;width:44px;height:44px;font-size:1.1rem;cursor:pointer}
+  .submit:hover{background:var(--btn-strong)}
+  .hint{color:var(--muted);font-size:.88rem;margin:10px 2px 0}
+
+  .params{margin-top:14px;border:1px solid var(--line);border-radius:8px;padding:14px}
+  .params .lab{font-size:.9rem;margin-bottom:10px}
+  .slider{position:relative;height:5px;border-radius:99px;background:#dfe2e6}
+  .slider .fill{position:absolute;left:0;top:0;bottom:0;width:58%;background:var(--red);border-radius:99px}
+  .slider .knob{position:absolute;left:58%;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid var(--red)}
+  .ends{display:flex;justify-content:space-between;color:var(--muted);font-size:.76rem;margin-top:6px}
+
+  hr{border:0;border-top:1px solid var(--line);margin:30px 0 22px}
+  h2{font-size:1.3rem;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:.92rem;margin:0 0 18px}
+  .q{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
+  .qn{color:var(--red);font-weight:700;width:20px;flex:0 0 20px}
+  .qmain{flex:1;min-width:0}
+  .qt{font-size:.98rem}
+  .qstr{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.78rem;color:var(--muted);margin-top:5px;word-break:break-word}
+  .qact{display:flex;gap:6px}
+  .mini{border:1px solid var(--line);background:#fff;border-radius:6px;width:30px;height:30px;cursor:pointer;color:var(--muted)}
+  .mini:hover{border-color:var(--red);color:var(--red)}
+  .q.dropped .qt{text-decoration:line-through;color:var(--muted)}.q.dropped{opacity:.6}
+  .proceed{display:flex;align-items:center;justify-content:space-between;margin-top:22px;gap:12px;flex-wrap:wrap}
+  .count{color:var(--muted);font-size:.88rem}
+  .go{display:inline-flex;align-items:center;gap:7px;border:0;background:var(--btn);color:#fff;border-radius:8px;padding:11px 20px;font-size:1rem;font-weight:600;cursor:pointer}
+  .go:hover{background:var(--btn-strong)}
+
+  /* Auto-search progress (no manual review step) */
+  .phase{display:flex;align-items:center;gap:12px;background:var(--bg-soft);border:1px solid var(--line);
+      border-left:5px solid var(--red);border-radius:8px;padding:14px 16px}
+  .phase .mi{color:var(--red);font-size:1.5rem}
+  .phase-t{font-weight:700;font-size:1.02rem}
+  .phase-s{color:var(--muted);font-size:.88rem;margin-top:1px}
+  .pbar{height:6px;border-radius:99px;background:#e7eaee;margin:14px 0 18px;overflow:hidden}
+  .pbar .pfill{height:100%;width:72%;background:var(--red);border-radius:99px}
+  .stats{border:1px solid var(--line);border-radius:8px;padding:6px 14px}
+  .stats-h{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:10px 0 6px}
+  .stat{display:flex;align-items:baseline;gap:9px;font-size:.9rem;padding:7px 0;border-top:1px solid #f0f0f0}
+  .stat .mi{font-size:1.1rem;flex:0 0 auto;vertical-align:-.16em}
+  .stat .ok{color:var(--red)}
+  .stat .qx{font-size:.9rem;color:var(--ink);flex:1;min-width:0}
+  .stat .cnt{color:var(--muted);font-size:.82rem;white-space:nowrap}
+  .stat.running{color:var(--muted)}
+  .stat .spin{color:var(--slate);animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  @media(max-width:820px){aside{display:none}}
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="logo" style="font-size:1.1rem"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></div>
+  <div class="email" id="userEmail">…</div>
+  <div>
+    <p class="side-h"><span class="mi">history</span> Past sessions</p>
+    <div id="sessionList"></div>
+  </div>
+  <div class="rate">
+    <p class="side-h"><span class="mi">star</span> Rate SciCo-Search</p>
+    <div class="stars"><span class="mi fill">star</span><span class="mi fill">star</span><span class="mi fill">star</span><span class="mi fill">star</span><span class="mi fill">star</span></div>
+  </div>
+</aside>
+
+<main>
+  <div class="col">
+    <div class="biglogo logo"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></div>
+
+    <div class="row">
+      <div class="field"><span class="mi">search</span><input id="q" placeholder="e.g. Flow matching for rare event sampling"/></div>
+      <button class="pbtn" id="paramsBtn">Parameters [θ]</button>
+      <button class="submit" id="go" title="Submit">✓</button>
+    </div>
+    <p class="hint" id="hint">Type a specific research interest, then click Submit.</p>
+
+    <div class="params">
+      <div class="lab"><b>Query Entropy</b> — conceptual diversity of the expansion</div>
+      <div class="slider"><div class="fill"></div><div class="knob"></div></div>
+      <div class="ends"><span>Narrow</span><span>Broad</span></div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:.9rem;cursor:pointer">
+        <input type="checkbox" id="deep"/> <b>Deep search</b> — wider harvest &amp; PI profiling <span style="color:var(--muted)">(counts toward your monthly quota)</span>
+      </label>
+    </div>
+
+    <hr/>
+
+    <div id="progress" style="display:none">
+      <div class="phase">
+        <span class="mi">travel_explore</span>
+        <div>
+          <div class="phase-t" id="phaseT">Starting…</div>
+          <div class="phase-s" id="phaseS"></div>
+        </div>
+      </div>
+
+      <div class="pbar"><div class="pfill" id="pfill" style="width:0"></div></div>
+
+      <div class="stats">
+        <div class="stats-h">Live query search statistics</div>
+        <div id="statRows"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/api.js"></script>
+<script>
+  const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+  const $ = id => document.getElementById(id);
+
+  // Require sign-in; otherwise bounce to the landing page.
+  window.SciCoAuth.onChange(async (user)=>{
+    if(!user){ location.href='index.html'; return; }
+    $('userEmail').textContent = user.email || '';
+    loadSessions();
+  });
+
+  async function loadSessions(){
+    try{
+      const { sessions } = await window.SciCoAPI.listSessions();
+      $('sessionList').innerHTML = (sessions||[]).map(s=>
+        `<a class="session" href="results-publications.html?session=${encodeURIComponent(s.id)}">${esc(s.base_query||'(untitled)')}</a>`
+      ).join('') || '<small style="color:var(--muted)">No past searches yet.</small>';
+    }catch(_){ /* ignore */ }
+  }
+
+  function statRow(msg, running){
+    const icon = running ? '<span class="mi spin">progress_activity</span>' : '<span class="mi ok">check</span>';
+    return `<div class="stat${running?' running':''}">${icon}<span class="qx">${esc(msg)}</span></div>`;
+  }
+
+  let running=false;
+  async function runSearch(){
+    if(running) return;
+    const q = $('q').value.trim();
+    if(!q){ $('hint').textContent='Please enter a research interest.'; return; }
+    running=true;
+    const depth = $('deep').checked ? 'deep' : 'shallow';
+    $('progress').style.display='block';
+    $('statRows').innerHTML = statRow('Submitting your search…', true);
+    $('phaseT').textContent='Phase 1 · Harvesting best literature';
+    $('phaseS').textContent='Original focus: '+q;
+
+    let rows = [];
+    try{
+      const { job_id } = await window.SciCoAPI.search(q, { depth });
+      let sessionId=null;
+      await window.SciCoAPI.streamJob(job_id, {
+        onEvent(type, data){
+          if(type==='phase'){
+            $('phaseT').textContent = 'Phase 1 · ' + (data.label||'');
+            if(data.focus) $('phaseS').textContent='Original focus: '+data.focus;
+            $('statRows').innerHTML = rows.map(r=>statRow(r)).join('') + statRow(data.label+'…', true);
+          } else if(type==='query_stat'){
+            rows.push(data.message||'');
+            $('statRows').innerHTML = rows.map(r=>statRow(r)).join('');
+          } else if(type==='preview'){
+            const pct = data.total ? Math.min(95, Math.round(100*data.scored/data.total)) : 30;
+            $('pfill').style.width = pct+'%';
+            $('statRows').innerHTML = rows.map(r=>statRow(r)).join('') +
+              statRow(`Reading & scoring papers — ${data.passed} passed the relevance cutoff so far`, true);
+          } else if(type==='done'){
+            sessionId = data.session_id; $('pfill').style.width='100%';
+          } else if(type==='error'){
+            $('statRows').innerHTML += statRow('Search failed: '+(data.message||'error'));
+          }
+        }
+      });
+      if(sessionId) location.href='results-publications.html?session='+encodeURIComponent(sessionId);
+      else running=false;
+    }catch(err){
+      running=false;
+      if(err.code===402 || err.code===429){
+        const d=err.detail||{};
+        $('statRows').innerHTML = statRow(
+          d.error==='quota_exceeded'
+            ? `Monthly deep-search limit reached (${d.used}/${d.limit}). Upgrade for more.`
+            : 'Deep search is a premium feature. Upgrade to enable it.');
+        $('hint').innerHTML = 'See <a href="pricing.html">plans &amp; pricing</a>.';
+      } else if(err.code===401){
+        location.href='index.html';
+      } else {
+        $('statRows').innerHTML = statRow('Could not start search ('+(err.message||'error')+').');
+      }
+    }
+  }
+  $('go').addEventListener('click', runSearch);
+  $('q').addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
+</script>
+</body>
+</html>
