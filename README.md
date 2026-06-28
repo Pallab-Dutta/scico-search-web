@@ -10,4 +10,4 @@ This repository hosts the public web client only. All rights are reserved: no
 license is granted to use, copy, modify, distribute, or create derivative works
 from any part of this software. See [`LICENSE`](LICENSE).
 
-Inquiries: contact@productwatch.io
+Inquiries: contact@scicoagent.com
