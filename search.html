@@ -122,7 +122,12 @@
 
     <div class="params">
       <div class="lab"><b>Query Entropy</b> — conceptual diversity of the expansion</div>
-      <div class="slider"><div class="fill"></div><div class="knob"></div></div>
+      <div class="slider" style="position:relative">
+        <div class="fill" id="entropyFill"></div><div class="knob" id="entropyKnob"></div>
+        <input type="range" id="entropy" min="0" max="100" value="40"
+               aria-label="Query entropy"
+               style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);width:100%;height:24px;opacity:0;margin:0;cursor:pointer"/>
+      </div>
       <div class="ends"><span>Narrow</span><span>Broad</span></div>
       <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:.9rem;cursor:pointer">
         <input type="checkbox" id="deep"/> <b>Deep search</b> — wider harvest &amp; PI profiling <span style="color:var(--muted)">(counts toward your monthly quota)</span>
@@ -179,6 +184,11 @@
     return `<div class="stat${running?' running':''}">${icon}<span class="qx">${esc(msg)}</span></div>`;
   }
 
+  // Query Entropy slider → creativity (0..1)
+  const entropy = $('entropy');
+  function syncEntropy(){ const v=+entropy.value; $('entropyFill').style.width=v+'%'; $('entropyKnob').style.left=v+'%'; }
+  entropy.addEventListener('input', syncEntropy); syncEntropy();
+
   let running=false;
   async function runSearch(){
     if(running) return;
@@ -186,6 +196,7 @@
     if(!q){ $('hint').textContent='Please enter a research interest.'; return; }
     running=true;
     const depth = $('deep').checked ? 'deep' : 'shallow';
+    const creativity = (+entropy.value)/100;
     $('progress').style.display='block';
     $('statRows').innerHTML = statRow('Submitting your search…', true);
     $('phaseT').textContent='Phase 1 · Harvesting best literature';
@@ -193,7 +204,7 @@
 
     let rows = [];
     try{
-      const { job_id } = await window.SciCoAPI.search(q, { depth });
+      const { job_id } = await window.SciCoAPI.search(q, { depth, creativity });
       let sessionId=null;
       await window.SciCoAPI.streamJob(job_id, {
         onEvent(type, data){
