@@ -1,0 +1,352 @@
+<!-- @dsCard group="Pages" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SciCo-Search — Results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=block" rel="stylesheet">
+<link href="css/shell.css" rel="stylesheet">
+<style>
+  /* ---------- Publications ---------- */
+  .logs{border:1px solid var(--line);border-radius:8px;margin:14px 0 4px;overflow:hidden}
+  .logs>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:11px 14px;font-size:.92rem;font-weight:600;color:var(--ink);background:var(--bg-soft)}
+  .logs>summary::-webkit-details-marker{display:none}
+  .logs>summary .chev{margin-left:auto;color:var(--muted);transition:transform .15s}
+  .logs[open]>summary .chev{transform:rotate(180deg)}
+  .logs .logs-body{padding:6px 14px 12px}
+  .logs .cap{color:var(--muted);font-size:.82rem;margin:4px 0 8px}
+  .qrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--line)}
+  .qstr{font-size:.9rem;color:var(--ink);flex:1;min-width:0}
+  .qbtn{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:var(--slate);cursor:pointer;font:inherit;font-size:.8rem;background:#fff;border:1px solid var(--line);border-radius:99px;padding:4px 11px}
+  .qbtn:hover{border-color:var(--btn);color:var(--btn)}
+  .qbtn.active{border-color:var(--btn);color:#fff;background:var(--btn)}
+  .qbtn .mi{font-size:1rem}
+  .tools{display:flex;align-items:center;gap:14px;margin:16px 0 4px;color:var(--muted);font-size:.88rem;flex-wrap:wrap}
+  .tools select{border:1px solid var(--line);border-radius:6px;padding:5px 8px;color:var(--ink);font:inherit;font-size:.88rem}
+  .paper{padding:16px 0;border-bottom:1px solid var(--line)}
+  .ptitle{font-size:1.06rem;font-weight:600;color:var(--red)}.ptitle.low{color:var(--ink)}
+  .pmeta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 4px;color:var(--muted);font-size:.86rem;margin-top:5px}
+  .pmeta .mi{font-size:1.05rem;vertical-align:-.2em}.pmeta .sep{margin:0 8px;color:#cfd2d6}.pmeta b{color:var(--ink)}
+  .pactions{margin-top:8px;display:flex;gap:16px}
+  .pactions a{display:inline-flex;align-items:center;gap:5px;color:var(--slate);font-size:.84rem;cursor:pointer}
+  .pactions a:hover{color:var(--btn)}.pactions .mi{font-size:1.05rem}
+  .divider-note{color:var(--muted);font-size:.82rem;text-align:center;margin:20px 0 4px}
+  .paper.below{opacity:.6}
+
+  /* ---------- Right per-query panel + drag ---------- */
+  .gutter{flex:0 0 7px;cursor:col-resize;position:sticky;top:0;height:100vh;display:none;align-items:center;justify-content:center;background:var(--bg-soft);border-left:1px solid var(--line)}
+  .gutter::before{content:"";width:3px;height:34px;border-radius:99px;background:#cfd2d6}
+  .gutter:hover::before,.gutter.dragging::before{background:var(--red)}
+  body.resizing{cursor:col-resize;user-select:none}
+  .rightbar{flex:0 0 var(--rb-w,380px);min-width:260px;max-width:70vw;background:#fff;border-left:1px solid var(--line);position:sticky;top:0;height:100vh;display:none;flex-direction:column}
+  .rightbar.show{display:flex}.gutter.show{display:flex}
+  .rb-head{padding:16px 18px;border-bottom:1px solid var(--line);position:relative}
+  .rb-head .lab{font-size:.74rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:6px}
+  .rb-head .lab .mi{font-size:1rem}
+  .rb-q{font-size:.92rem;color:var(--ink);margin-top:7px;word-break:break-word}
+  .rb-count{color:var(--slate);font-size:.82rem;margin-top:6px}
+  .rb-close{position:absolute;top:12px;right:12px;border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:1.3rem;line-height:1}
+  .rb-close:hover{color:var(--red)}
+  .rb-body{padding:8px 18px 24px;overflow:auto}
+  .qres{padding:11px 0;border-bottom:1px solid var(--line)}
+  .qres a{color:var(--red);font-size:.92rem;font-weight:600}
+  .qres .meta{color:var(--muted);font-size:.8rem;margin-top:3px;display:flex;align-items:center;gap:5px}
+  .qres .meta b{color:var(--ink)}.qres .meta .mi{font-size:.95rem;vertical-align:-.18em}
+
+  /* ---------- Authors ---------- */
+  .sub-h{color:var(--muted);font-size:.9rem;margin:14px 0 8px;max-width:72ch}
+  .pi{padding:18px 0;border-bottom:1px solid var(--line)}
+  .pi-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .pi-name{font-size:1.1rem;font-weight:600;color:var(--red);display:inline-flex;align-items:center;gap:7px}
+  .verified{color:var(--slate);font-size:.82rem;display:inline-flex;align-items:center;gap:3px}.verified .mi{font-size:1rem}
+  .fit{font-size:.86rem;white-space:nowrap}.fit b{font-size:1.05rem}
+  .inst{color:var(--muted);font-size:.88rem;margin-top:3px}
+  .metrics{color:var(--muted);font-size:.84rem;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+  .metrics .mi{font-size:1rem;vertical-align:-.18em}.metrics b{color:var(--ink)}.metrics .sep{margin:0 8px;color:#cfd2d6}
+  .lab{margin-top:10px}.lab-h{font-size:.78rem;font-weight:700;margin-bottom:4px}
+  .pubrow{font-size:.88rem;padding:3px 0}.pubrow .yr{color:var(--muted);font-style:italic;margin-right:8px}
+  .pubrow .m{color:var(--red);font-size:.78rem;margin-left:6px}
+
+  /* ---------- Topic Map (visual preview) ---------- */
+  #pane-topicmap{--c1:#BA5757;--c2:#8497B0;--c3:#6A9978;--c4:#C98A3E;--ink2:#5A5F66;--ink3:#8A8F96;--slate-soft:#EEF1F6;--shadow:0 1px 2px rgba(20,20,20,.04),0 8px 24px rgba(20,20,20,.06)}
+  .maphead{margin:16px 0 14px}.maphead h2{font-size:1.15rem;margin:0}
+  .maphead p{margin:6px 0 0;color:var(--ink2);font-size:.9rem;max-width:64ch}
+  .legend-top{display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--ink2);margin-top:10px}
+  .key{display:inline-flex;align-items:center;gap:7px}.sw{width:11px;height:11px;border-radius:4px}
+  .panels{display:grid;grid-template-columns:minmax(300px,1fr) 1.1fr;gap:18px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .panel .ph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);display:flex;justify-content:space-between;align-items:center}
+  .mind{padding:12px 16px 18px}
+  .branch{margin-bottom:8px;border-radius:12px;border:1px solid transparent}
+  .branch.sel{background:var(--red-soft);border-color:#eccccc}
+  .bhead{display:flex;align-items:center;gap:10px;padding:10px 11px;cursor:pointer;border-radius:12px}
+  .bhead:hover{background:#faf8f5}
+  .bdot{width:13px;height:13px;border-radius:4px;flex:0 0 13px}.bhead b{font-size:.96rem}.bhead .n{margin-left:auto;font-size:.74rem;color:var(--ink3)}
+  .subs{padding:2px 12px 6px 32px}
+  .sub{position:relative;padding:7px 0 7px 16px;font-size:.86rem;color:var(--ink2)}
+  .sub .lbl{font-weight:600;color:var(--ink)}.sub .meta{font-size:.74rem;color:var(--ink3)}
+  .densitybar{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:8px}
+  .sub.gap{color:var(--red-strong)}
+  .gap-tag{display:inline-flex;align-items:center;gap:5px;font-size:.64rem;font-weight:700;letter-spacing:.05em;color:var(--red-strong);border:1px dashed var(--red);border-radius:99px;padding:2px 8px;margin-left:8px}
+  .core-tag{font-size:.62rem;font-weight:700;letter-spacing:.05em;color:#4d5b70;background:var(--slate-soft);border-radius:99px;padding:2px 8px;margin-left:8px}
+  .proj{position:relative;aspect-ratio:1/1;margin:14px;border-radius:14px;border:1px solid var(--line);overflow:hidden;
+    background:radial-gradient(150px 150px at 30% 36%,rgba(186,87,87,.16),transparent 68%),radial-gradient(160px 160px at 66% 62%,rgba(132,151,176,.18),transparent 68%),radial-gradient(120px 120px at 74% 26%,rgba(106,153,120,.18),transparent 68%),radial-gradient(120px 120px at 28% 74%,rgba(201,138,62,.15),transparent 68%),#fff}
+  .pt{position:absolute;width:9px;height:9px;border-radius:50%}
+  .star{position:absolute;left:48%;top:50%;transform:translate(-50%,-50%);color:var(--ink);font-size:18px}
+  .gaparc{position:absolute;border:2px dashed rgba(186,87,87,.55);border-radius:50%}
+  .proj-foot{display:flex;justify-content:space-between;align-items:center;padding:0 16px 14px;font-size:.78rem;color:var(--ink3);flex-wrap:wrap;gap:8px}
+  .cbar{display:flex;align-items:center;gap:8px}.cbar .grad{width:120px;height:8px;border-radius:99px;background:linear-gradient(90deg,#FBFAF8,#8497B0,#BA5757)}
+  @media(max-width:760px){.panels{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <button class="sb-expand" id="sbExpand" title="Show sidebar"><span class="mi">chevron_right</span></button>
+
+  <main class="main">
+    <div class="content">
+      <div class="chead">
+        <div>
+          <h1 class="rtitle">Results for <span class="q" id="resQuery"></span></h1>
+          <div class="summary" id="resSummary">Loading results…</div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" data-tab="publications"><span class="mi">description</span> Publications</div>
+        <div class="tab" data-tab="topicmap"><span class="mi">hub</span> Topic Map</div>
+        <div class="tab" data-tab="authors"><span class="mi">science</span> Authors</div>
+      </div>
+
+      <!-- ===== PUBLICATIONS ===== -->
+      <section class="tabpane show" id="pane-publications">
+        <details class="logs">
+          <summary><span class="mi">manage_search</span> View AI Search Logs &amp; Queries Used <span class="mi chev">expand_more</span></summary>
+          <div class="logs-body">
+            <p class="cap">Queries executed &amp; papers collected — click a count to open that query's top matching papers in the side panel.</p>
+            <div id="qrows"></div>
+          </div>
+        </details>
+        <div class="tools">
+          <span>Sort by</span>
+          <select id="sortSel"><option value="ai">AI Score</option><option value="year">Year</option><option value="cite">Citations</option></select>
+          <span id="showCount"></span>
+        </div>
+        <div id="paperList"></div>
+      </section>
+
+      <!-- ===== TOPIC MAP (visual preview) ===== -->
+      <section class="tabpane" id="pane-topicmap">
+        <div class="maphead">
+          <h2>Topic Map &amp; Research Gaps</h2>
+          <p>Each branch is a sub-area of the field. Sub-branches run from the well-studied core outward — the last is the under-explored <b>research-gap frontier</b>.</p>
+          <div class="legend-top">
+            <span class="key"><span class="sw" style="background:var(--c1)"></span>Generative samplers</span>
+            <span class="key"><span class="sw" style="background:var(--c2)"></span>Rare-event theory</span>
+            <span class="key"><span class="sw" style="background:var(--c3)"></span>MD &amp; metastability</span>
+            <span class="key"><span class="sw" style="background:var(--c4)"></span>Optimal transport</span>
+          </div>
+        </div>
+        <div class="panels">
+          <div class="panel">
+            <div class="ph"><span>Research-gap mindmap</span><span>4 branches</span></div>
+            <div class="mind">
+              <div class="branch sel">
+                <div class="bhead"><span class="bdot" style="background:var(--c1)"></span><b>Generative samplers</b><span class="n">14 papers</span></div>
+                <div class="subs">
+                  <div class="sub"><span class="lbl">Flow-matching Boltzmann generators</span><span class="core-tag">CORE</span><span class="densitybar" style="width:54px;background:var(--c1)"></span><div class="meta">most-studied · 8 papers</div></div>
+                  <div class="sub"><span class="lbl">Stochastic interpolant transition paths</span><span class="densitybar" style="width:34px;background:var(--c1);opacity:.7"></span><div class="meta">emerging · 4 papers</div></div>
+                  <div class="sub gap"><span class="lbl">Amortized rare-event control</span><span class="gap-tag">◇ RESEARCH GAP</span><div class="meta">under-explored · 2 papers</div></div>
+                </div>
+              </div>
+              <div class="branch">
+                <div class="bhead"><span class="bdot" style="background:var(--c2)"></span><b>Rare-event theory</b><span class="n">9 papers</span></div>
+                <div class="subs">
+                  <div class="sub"><span class="lbl">Transition path theory &amp; committors</span><span class="core-tag">CORE</span><span class="densitybar" style="width:50px;background:var(--c2)"></span><div class="meta">most-studied · 5 papers</div></div>
+                  <div class="sub gap"><span class="lbl">Learned reaction coordinates from flows</span><span class="gap-tag">◇ RESEARCH GAP</span><div class="meta">under-explored · 1 paper</div></div>
+                </div>
+              </div>
+              <div class="branch">
+                <div class="bhead"><span class="bdot" style="background:var(--c3)"></span><b>MD &amp; metastability</b><span class="n">9 papers</span></div>
+                <div class="subs">
+                  <div class="sub"><span class="lbl">Enhanced-sampling MD (metadynamics)</span><span class="core-tag">CORE</span><span class="densitybar" style="width:48px;background:var(--c3)"></span><div class="meta">most-studied · 6 papers</div></div>
+                  <div class="sub gap"><span class="lbl">ML-accelerated metastable kinetics</span><span class="gap-tag">◇ RESEARCH GAP</span><div class="meta">under-explored · 3 papers</div></div>
+                </div>
+              </div>
+              <div class="branch">
+                <div class="bhead"><span class="bdot" style="background:var(--c4)"></span><b>Optimal transport</b><span class="n">6 papers</span></div>
+                <div class="subs">
+                  <div class="sub"><span class="lbl">Schrödinger-bridge samplers</span><span class="core-tag">CORE</span><span class="densitybar" style="width:40px;background:var(--c4)"></span><div class="meta">most-studied · 4 papers</div></div>
+                  <div class="sub gap"><span class="lbl">OT for rare-event reweighting</span><span class="gap-tag">◇ RESEARCH GAP</span><div class="meta">under-explored · 2 papers</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="ph"><span>Map of the field</span><span>38 papers</span></div>
+            <div class="proj" id="proj"><div class="star" title="your query">✦</div><div class="gaparc" style="left:14%;top:18%;width:120px;height:120px"></div></div>
+            <div class="proj-foot"><span>Each point is a paper · closer points are more closely related</span><span class="cbar">less studied <span class="grad"></span> populated</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== AUTHORS ===== -->
+      <section class="tabpane" id="pane-authors">
+        <p class="sub-h">Deep-profiles of the PIs behind your top-matched papers — recent lab output and a Fit score for how well their direction overlaps your query.</p>
+        <div id="piStatus" class="sub-h"></div>
+        <div id="piList"></div>
+      </section>
+    </div>
+  </main>
+
+  <div class="gutter" id="gutter"></div>
+  <aside class="rightbar" id="rightbar">
+    <div class="rb-head">
+      <button class="rb-close" id="rbClose" title="Close">&times;</button>
+      <div class="lab"><span class="mi">manage_search</span> Results for query</div>
+      <div class="rb-q" id="rbQuery"></div>
+      <div class="rb-count" id="rbCount"></div>
+    </div>
+    <div class="rb-body" id="rbBody"></div>
+  </aside>
+</div>
+
+<script src="js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/api.js"></script>
+<script src="js/shell.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+  const params = new URLSearchParams(location.search);
+  const SID = params.get('session');
+
+  Shell.init(SID);
+
+  // ---------- Tab switching (no reload) ----------
+  let topicInit=false, authorsInit=false;
+  function setTab(name){
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+    document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('show', p.id==='pane-'+name));
+    if(name!=='publications') closePanel();
+    const u=new URL(location); u.searchParams.set('tab', name); history.replaceState(null,'',u);
+    if(name==='topicmap' && !topicInit){ initTopic(); topicInit=true; }
+    if(name==='authors' && !authorsInit){ startAuthors(); authorsInit=true; }
+  }
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setTab(t.dataset.tab)));
+
+  // ---------- Publications ----------
+  let QDATA=[], PAPERS=[], THRESHOLD=0.72;
+  const bar=$('rightbar'), gutter=$('gutter');
+  function openPanel(i){
+    const d=QDATA[i]; if(!d) return;
+    $('rbQuery').textContent=d.query;
+    $('rbCount').textContent=d.count+" matching papers · top matches";
+    $('rbBody').innerHTML=d.papers.map(p=>
+      `<div class="qres"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a>`+
+      `<div class="meta">${esc(p.authors)}<span style="margin:0 7px;color:#cfd2d6">|</span><span class="mi">event</span> ${esc(p.year)}`+
+      `<span style="margin:0 7px;color:#cfd2d6">|</span><span class="mi">psychology</span> AI Score: <b>${Number(p.ai_score).toFixed(3)}</b></div></div>`
+    ).join('') || '<p class="cap">No matches for this query.</p>';
+    bar.classList.add('show'); gutter.classList.add('show');
+    document.querySelectorAll('.qbtn').forEach(b=>b.classList.toggle('active', b.dataset.q===String(i)));
+  }
+  function closePanel(){ bar.classList.remove('show'); gutter.classList.remove('show'); document.querySelectorAll('.qbtn').forEach(b=>b.classList.remove('active')); }
+  $('rbClose').addEventListener('click',closePanel);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanel();});
+  let dragging=false;
+  gutter.addEventListener('mousedown',e=>{dragging=true;gutter.classList.add('dragging');document.body.classList.add('resizing');e.preventDefault();});
+  window.addEventListener('mousemove',e=>{ if(!dragging)return; let w=window.innerWidth-e.clientX; w=Math.max(260,Math.min(w,window.innerWidth*0.7)); document.documentElement.style.setProperty('--rb-w',w+'px'); });
+  window.addEventListener('mouseup',()=>{if(dragging){dragging=false;gutter.classList.remove('dragging');document.body.classList.remove('resizing');}});
+
+  function renderQrows(){
+    const host=$('qrows');
+    host.innerHTML=QDATA.map((d,i)=>`<div class="qrow"><span class="qstr">${esc(d.query)}</span><button class="qbtn" data-q="${i}"><span class="mi">menu_book</span> ${d.count} papers</button></div>`).join('');
+    host.querySelectorAll('.qbtn').forEach(b=>b.addEventListener('click',()=>openPanel(+b.dataset.q)));
+  }
+  function paperHTML(p){
+    const low=Number(p.ai_score)<THRESHOLD;
+    return `<div class="paper${low?' below':''}"><div class="ptitle${low?' low':''}"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a></div>`+
+      `<div class="pmeta">${esc(p.authors)}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}<span class="sep">|</span><span class="mi">psychology</span> AI Score: <b>${Number(p.ai_score).toFixed(3)}</b></div>`+
+      `<div class="pactions"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}><span class="mi">open_in_new</span> Open</a><a><span class="mi">format_quote</span> Cite</a><a><span class="mi">bookmark_add</span> Save</a></div></div>`;
+  }
+  function renderPapers(){
+    const sort=$('sortSel').value; let list=PAPERS.slice();
+    if(sort==='year') list.sort((a,b)=>(b.year||0)-(a.year||0));
+    else if(sort==='cite') list.sort((a,b)=>(b.citation_count||0)-(a.citation_count||0));
+    else list.sort((a,b)=>(b.ai_score||0)-(a.ai_score||0));
+    let html='', divider=false;
+    for(const p of list){ if(sort==='ai' && !divider && Number(p.ai_score)<THRESHOLD){ html+=`<div class="divider-note">— below ${THRESHOLD} match threshold —</div>`; divider=true; } html+=paperHTML(p); }
+    $('paperList').innerHTML=html || '<p class="cap">No papers found.</p>';
+  }
+  $('sortSel').addEventListener('change', renderPapers);
+
+  // ---------- Topic Map (visual mock) ----------
+  function initTopic(){
+    const proj=$('proj'); if(!proj) return;
+    const cl=[{x:30,y:36,c:'#BA5757',n:14},{x:66,y:62,c:'#8497B0',n:9},{x:74,y:26,c:'#6A9978',n:9},{x:28,y:74,c:'#C98A3E',n:6}];
+    cl.forEach(k=>{ for(let i=0;i<k.n*1.6;i++){ const a=Math.random()*6.28, r=Math.random()*Math.sqrt(Math.random())*13;
+      const d=document.createElement('div'); d.className='pt'; d.style.left=(k.x+Math.cos(a)*r)+'%'; d.style.top=(k.y+Math.sin(a)*r*1.3)+'%';
+      d.style.background=k.c; d.style.opacity=(0.5+Math.random()*0.45).toFixed(2);
+      if(i===0){d.style.width='12px';d.style.height='12px';d.style.boxShadow='0 0 0 3px rgba(255,255,255,.8), 0 0 0 4px '+k.c;}
+      proj.appendChild(d); } });
+  }
+
+  // ---------- Authors ----------
+  const fmt=n=>(Number(n)||0).toLocaleString();
+  function piHTML(a){
+    const recent=(a.recent||[]).map(r=>`<div class="pubrow"><span class="yr">${esc(r.year)}</span>${esc(r.title)}<span class="m">match ${Number(r.match).toFixed(2)}</span></div>`).join('');
+    const verified=a.verified?' <span class="verified"><span class="mi">verified</span> ORCID</span>':'';
+    const site=a.website?`<a href="${esc(a.website)}" target="_blank" rel="noopener"><span class="mi">public</span> Website</a>`:'';
+    return `<div class="pi"><div class="pi-head"><span class="pi-name">${esc(a.name)}${verified}</span><span class="fit">Fit <b>${a.fit}%</b></span></div>`+
+      `<div class="inst">${esc(a.institution)}</div>`+
+      `<div class="metrics"><span class="mi">article</span> <b>${fmt(a.publications)}</b> publications<span class="sep">|</span><span class="mi">trending_up</span> <b>${fmt(a.citations)}</b> citations<span class="sep">|</span>h-index <b>${a.h_index}</b></div>`+
+      (recent?`<div class="lab"><div class="lab-h">Recent lab publications</div>${recent}</div>`:'')+
+      `<div class="pactions">${site}<a><span class="mi">mail</span> Contact</a><a><span class="mi">bookmark_add</span> Shortlist</a></div></div>`;
+  }
+  function renderAuthors(authors){
+    if(!authors||!authors.length){ $('piStatus').textContent='No principal investigators passed the relevance threshold.'; return; }
+    $('piStatus').textContent=''; $('piList').innerHTML=authors.map(piHTML).join('');
+  }
+  async function startAuthors(){
+    if(!SID){ $('piStatus').textContent='No session specified.'; return; }
+    try{
+      let data=await window.SciCoAPI.getSession(SID);
+      if(data.authors!==null){ renderAuthors(data.authors); return; }
+      try{ const me=await window.SciCoAPI.me(); if((me.quotas.pi_profiling||{}).limit===0){ $('piStatus').innerHTML='PI &amp; lab profiling is a premium feature. <a href="pricing.html">See plans &amp; pricing</a> to unlock it.'; return; } }catch(_){}
+      $('piStatus').textContent='Deep-profiling principal investigators…';
+      const { job_id }=await window.SciCoAPI.profileAuthors(SID);
+      await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('piStatus').textContent=d.message; } });
+      data=await window.SciCoAPI.getSession(SID);
+      renderAuthors(data.authors);
+    }catch(err){
+      if(err.code===402){ $('piStatus').innerHTML='PI &amp; lab profiling is a premium feature. <a href="pricing.html">See plans &amp; pricing</a> to unlock it.'; }
+      else if(err.code===401){ location.href='index.html'; }
+      else { $('piStatus').textContent='Could not load profiles ('+(err.message||'error')+').'; }
+    }
+  }
+
+  // ---------- Initial load ----------
+  async function hydrate(){
+    if(!SID){ $('resSummary').textContent='No session specified.'; return; }
+    try{
+      const data=await window.SciCoAPI.getSession(SID);
+      const pub=data.publications||{};
+      THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[];
+      $('resQuery').textContent='"'+(data.base_query||'')+'"';
+      $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
+      $('showCount').textContent=`· showing ${PAPERS.length}`;
+      renderQrows(); renderPapers();
+    }catch(err){
+      $('resSummary').textContent = err.code===401 ? 'Please sign in to view results.' : ('Could not load results ('+(err.message||'error')+').');
+    }
+  }
+  hydrate();
+  const initialTab=params.get('tab'); if(initialTab && initialTab!=='publications') setTab(initialTab);
+</script>
+</body>
+</html>
