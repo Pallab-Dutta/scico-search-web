@@ -2,8 +2,8 @@
    Fill these in for your deployment. Safe to expose: the Supabase anon key is public by design
    (RLS protects data); the service-role key lives only on the backend. */
 window.SCICO_CONFIG = {
-  // Hugging Face Space API base, e.g. "https://your-name-scico-search.hf.space".
-  API_BASE: "https://pallab-dutta-1997-scicosearch.hf.space",
+  // Hugging Face Space API base
+  API_BASE: "https://pallab-dutta-1997-scico-search-api.hf.space",
 
   // Supabase project.
   SUPABASE_URL: "https://gjwhhdlocxxycczlsfgy.supabase.co",
