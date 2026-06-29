@@ -8,11 +8,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=block" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link href="css/shell.css" rel="stylesheet">
 <style>
   /* Center the whole search block vertically in the panel (margin:auto), like Streamlit. */
   .searchcol{width:100%;max-width:680px;margin:auto;padding:32px 24px}
-  .biglogo{display:flex;justify-content:center;font-size:1.6rem;margin-bottom:22px}
+  .biglogo{display:flex;justify-content:center;font-size:2rem;margin-bottom:26px}
   /* Search field — mirrors the Streamlit layout: label, full-width input, then a
      [Parameters] | caption | ✓ row. */
   .qlabel{font-size:.95rem;font-weight:600;color:var(--ink);margin:0 2px 6px}
@@ -71,7 +72,7 @@
 
   <main class="main">
     <div class="searchcol">
-      <div class="biglogo logo"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></div>
+      <div class="biglogo logo scico-logo">SciCo Search</div>
 
       <label class="qlabel" for="q">Define your target research area:</label>
       <div class="field"><span class="mi">search</span><input id="q" placeholder="E.g., Flow matching for rare event sampling..."/></div>
@@ -114,6 +115,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/api.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="js/logo.js"></script>
 <script src="js/shell.js"></script>
 <script>
   const $ = id => document.getElementById(id);

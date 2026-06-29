@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <style>
   :root{
     --red:#BA5757; --red-strong:#A23F3F; --red-soft:#F6E7E7;
@@ -130,7 +131,7 @@
 <header>
   <div class="wrap">
     <nav>
-      <div class="logo"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></div>
+      <div class="logo scico-logo" style="font-size:1.35rem">SciCo Search</div>
       <div class="links">
         <a href="#features">Features</a>
         <a href="#how">How it works</a>
@@ -267,11 +268,13 @@
 
 <footer>
   <div class="wrap">
-    <div class="logo" style="font-size:.8rem"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></div>
+    <div class="logo scico-logo" style="font-size:.8rem">SciCo Search</div>
     <div>© 2026 SciCo-Search · A community-supported research tool · Privacy</div>
   </div>
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="js/logo.js"></script>
 <script src="js/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabaseClient.js"></script>

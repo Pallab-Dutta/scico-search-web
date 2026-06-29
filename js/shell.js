@@ -7,7 +7,7 @@
   function sidebarHTML() {
     return `
       <div class="sb-top">
-        <a class="logo" href="search.html" style="font-size:1.05rem"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></a>
+        <a class="logo scico-logo" href="search.html" style="font-size:1.05rem">SciCo Search</a>
         <button class="sb-toggle" id="sbToggle" title="Hide sidebar"><span class="mi">chevron_left</span></button>
       </div>
 
@@ -42,6 +42,7 @@
       const host = document.getElementById("sidebar");
       if (!host) return;
       host.innerHTML = sidebarHTML();
+      if (window.SciCoLogo) window.SciCoLogo.renderAll(host);  // render the LaTeX wordmark in the sidebar
 
       // Collapse state (persisted, like the Streamlit sidebar).
       if (localStorage.getItem("sb_collapsed") === "1") document.body.classList.add("sb-collapsed");
