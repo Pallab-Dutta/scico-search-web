@@ -39,6 +39,15 @@
         num_queries: opts.num_queries || 4,
       });
     },
+    cite(paper) {
+      return req("POST", "/cite", {
+        title: paper.title || "",
+        display_authors: paper.authors || paper.display_authors || "",
+        author_name: paper.author_name || "",
+        year: String(paper.year == null ? "" : paper.year),
+        link: paper.link || "",
+      });
+    },
     getSession(id) { return req("GET", "/sessions/" + encodeURIComponent(id)); },
     listSessions() { return req("GET", "/sessions"); },
     profileAuthors(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/authors"); },

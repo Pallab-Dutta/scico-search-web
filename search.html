@@ -12,17 +12,25 @@
 <style>
   .searchcol{width:100%;max-width:720px;margin:0 auto;padding:42px 24px 70px}
   .biglogo{display:flex;justify-content:center;font-size:1.6rem;margin-bottom:22px}
-  .row{display:flex;gap:8px;align-items:center}
-  .row .field{flex:1;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:0 12px}
-  .row .field:focus-within{border-color:var(--red)}
-  .row .field .mi{color:var(--muted)}
-  .row input{flex:1;border:0;outline:0;padding:11px 0;font-size:1rem;color:var(--ink);background:transparent}
-  .pbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:11px 13px;font-size:.92rem;cursor:pointer;color:var(--ink);white-space:nowrap}
+  /* Search field — mirrors the Streamlit layout: label, full-width input, then a
+     [Parameters] | caption | ✓ row. */
+  .qlabel{font-size:.95rem;font-weight:600;color:var(--ink);margin:0 2px 6px}
+  .field{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:0 12px;background:#fff}
+  .field:focus-within{border-color:var(--red)}
+  .field .mi{color:var(--muted)}
+  .field input{flex:1;border:0;outline:0;padding:12px 0;font-size:1rem;color:var(--ink);background:transparent}
+  .ctrlrow{display:flex;align-items:flex-end;gap:14px;margin-top:12px}
+  .popwrap{position:relative;flex:2}
+  .pbtn{width:100%;border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 13px;font-size:.92rem;cursor:pointer;color:var(--ink);white-space:nowrap}
   .pbtn:hover{border-color:var(--red)}
-  .submit{border:0;background:var(--btn);color:#fff;border-radius:8px;width:44px;height:44px;font-size:1.1rem;cursor:pointer}
-  .submit:hover{background:var(--btn-strong)}
+  .cap-scope{flex:5;color:var(--muted);font-size:.86rem;padding-bottom:9px}
+  .gocol{flex:2;display:flex;justify-content:flex-end}
+  .submit{border:1px solid var(--line);background:#fff;color:var(--red);border-radius:8px;padding:9px 0;width:50%;font-size:1.15rem;font-weight:700;line-height:1;cursor:pointer}
+  .submit:hover{border-color:var(--red);background:var(--bg-soft)}
   .hint{color:var(--muted);font-size:.88rem;margin:10px 2px 0}
-  .params{margin-top:14px;border:1px solid var(--line);border-radius:8px;padding:14px}
+  /* Parameters popover */
+  .params{position:absolute;left:0;bottom:calc(100% + 8px);width:320px;max-width:78vw;z-index:40;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 28px rgba(20,20,20,.14);padding:16px;display:none}
+  .params.open{display:block}
   .params .lab{font-size:.9rem;margin-bottom:10px}
   .slider{position:relative;height:5px;border-radius:99px;background:#dfe2e6}
   .slider .fill{position:absolute;left:0;top:0;bottom:0;width:40%;background:var(--red);border-radius:99px}
@@ -53,25 +61,29 @@
     <div class="searchcol">
       <div class="biglogo logo"><span class="sci">SciCo</span><span class="badge">Search</span><span class="sup">[1‑3,✓]</span></div>
 
-      <div class="row">
-        <div class="field"><span class="mi">search</span><input id="q" placeholder="e.g. Flow matching for rare event sampling"/></div>
-        <button class="pbtn" id="paramsBtn">Parameters [θ]</button>
-        <button class="submit" id="go" title="Submit">✓</button>
+      <label class="qlabel" for="q">Define your target research area:</label>
+      <div class="field"><span class="mi">search</span><input id="q" placeholder="E.g., Flow matching for rare event sampling..."/></div>
+
+      <div class="ctrlrow">
+        <div class="popwrap">
+          <button class="pbtn" id="paramsBtn" type="button">Parameters [θ]</button>
+          <div class="params" id="paramsPop">
+            <div class="lab"><b>Query Entropy</b> — conceptual variety of the expansion</div>
+            <div class="slider" style="position:relative">
+              <div class="fill" id="entropyFill"></div><div class="knob" id="entropyKnob"></div>
+              <input type="range" id="entropy" min="0" max="100" value="40" aria-label="Query entropy"
+                     style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);width:100%;height:24px;opacity:0;margin:0;cursor:pointer"/>
+            </div>
+            <div class="ends"><span>Narrow</span><span>Broad</span></div>
+            <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:.9rem;cursor:pointer">
+              <input type="checkbox" id="deep"/> <b>Deep search</b> — wider harvest &amp; PI profiling <span style="color:var(--muted)">(counts toward your monthly quota)</span>
+            </label>
+          </div>
+        </div>
+        <div class="cap-scope">← Adjust research scope to find relevant literatures.</div>
+        <div class="gocol"><button class="submit" id="go" type="button" title="Submit your topic to start the search">✓</button></div>
       </div>
       <p class="hint" id="hint">Type a specific research interest, then click Submit.</p>
-
-      <div class="params">
-        <div class="lab"><b>Query Entropy</b> — conceptual diversity of the expansion</div>
-        <div class="slider" style="position:relative">
-          <div class="fill" id="entropyFill"></div><div class="knob" id="entropyKnob"></div>
-          <input type="range" id="entropy" min="0" max="100" value="40" aria-label="Query entropy"
-                 style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);width:100%;height:24px;opacity:0;margin:0;cursor:pointer"/>
-        </div>
-        <div class="ends"><span>Narrow</span><span>Broad</span></div>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:.9rem;cursor:pointer">
-          <input type="checkbox" id="deep"/> <b>Deep search</b> — wider harvest &amp; PI profiling <span style="color:var(--muted)">(counts toward your monthly quota)</span>
-        </label>
-      </div>
 
       <hr/>
 
@@ -102,6 +114,12 @@
   const entropy = $('entropy');
   function syncEntropy(){ const v=+entropy.value; $('entropyFill').style.width=v+'%'; $('entropyKnob').style.left=v+'%'; }
   entropy.addEventListener('input', syncEntropy); syncEntropy();
+
+  // Parameters popover toggle (matches the Streamlit "Parameters [θ]" popover)
+  const paramsPop=$('paramsPop'), paramsBtn=$('paramsBtn');
+  paramsBtn.addEventListener('click', e=>{ e.stopPropagation(); paramsPop.classList.toggle('open'); });
+  document.addEventListener('click', e=>{ if(!paramsPop.contains(e.target) && e.target!==paramsBtn) paramsPop.classList.remove('open'); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') paramsPop.classList.remove('open'); });
 
   function statRow(msg, running){
     const icon = running ? '<span class="mi spin">progress_activity</span>' : '<span class="mi ok">check</span>';

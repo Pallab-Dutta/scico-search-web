@@ -33,8 +33,14 @@
   .pactions{margin-top:8px;display:flex;gap:16px}
   .pactions a{display:inline-flex;align-items:center;gap:5px;color:var(--slate);font-size:.84rem;cursor:pointer}
   .pactions a:hover{color:var(--btn)}.pactions .mi{font-size:1.05rem}
-  .divider-note{color:var(--muted);font-size:.82rem;text-align:center;margin:20px 0 4px}
   .paper.below{opacity:.6}
+  /* Cite popover (mirrors the Streamlit 'Cite' dropdown) */
+  .cite-pop{position:absolute;z-index:50;min-width:190px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px rgba(20,20,20,.14);padding:8px}
+  .cite-pop .cap{color:var(--muted);font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:4px 6px}
+  .cite-pop a.fmt{display:flex;align-items:center;gap:7px;padding:8px 9px;border-radius:7px;color:var(--ink);font-size:.88rem;cursor:pointer;text-decoration:none}
+  .cite-pop a.fmt:hover{background:var(--bg-soft);color:var(--btn)}
+  .cite-pop a.fmt .mi{font-size:1.05rem;color:var(--slate)}
+  .cite-pop .loading{padding:9px;color:var(--muted);font-size:.86rem}
 
   /* ---------- Right per-query panel + drag ---------- */
   .gutter{flex:0 0 7px;cursor:col-resize;position:sticky;top:0;height:100vh;display:none;align-items:center;justify-content:center;background:var(--bg-soft);border-left:1px solid var(--line)}
@@ -268,22 +274,56 @@
     host.innerHTML=QDATA.map((d,i)=>`<div class="qrow"><span class="qstr">${esc(d.query)}</span><button class="qbtn" data-q="${i}"><span class="mi">menu_book</span> ${d.count} papers</button></div>`).join('');
     host.querySelectorAll('.qbtn').forEach(b=>b.addEventListener('click',()=>openPanel(+b.dataset.q)));
   }
-  function paperHTML(p){
-    const low=Number(p.ai_score)<THRESHOLD;
-    return `<div class="paper${low?' below':''}"><div class="ptitle${low?' low':''}"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a></div>`+
+  let SHOWN=[];
+  function paperHTML(p,i){
+    return `<div class="paper"><div class="ptitle"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a></div>`+
       `<div class="pmeta">${esc(p.authors)}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}<span class="sep">|</span><span class="mi">psychology</span> AI Score: <b>${Number(p.ai_score).toFixed(3)}</b></div>`+
-      `<div class="pactions"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}><span class="mi">open_in_new</span> Open</a><a><span class="mi">format_quote</span> Cite</a><a><span class="mi">bookmark_add</span> Save</a></div></div>`;
+      `<div class="pactions"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}><span class="mi">open_in_new</span> Open</a>`+
+      `<a class="cite-btn" data-i="${i}"><span class="mi">format_quote</span> Cite</a></div></div>`;
   }
   function renderPapers(){
-    const sort=$('sortSel').value; let list=PAPERS.slice();
+    closeCite();
+    const sort=$('sortSel').value;
+    // Only show papers at or above the match threshold.
+    let list=PAPERS.filter(p=>Number(p.ai_score)>=THRESHOLD);
     if(sort==='year') list.sort((a,b)=>(b.year||0)-(a.year||0));
     else if(sort==='cite') list.sort((a,b)=>(b.citation_count||0)-(a.citation_count||0));
     else list.sort((a,b)=>(b.ai_score||0)-(a.ai_score||0));
-    let html='', divider=false;
-    for(const p of list){ if(sort==='ai' && !divider && Number(p.ai_score)<THRESHOLD){ html+=`<div class="divider-note">— below ${THRESHOLD} match threshold —</div>`; divider=true; } html+=paperHTML(p); }
-    $('paperList').innerHTML=html || '<p class="cap">No papers found.</p>';
+    SHOWN=list;
+    $('paperList').innerHTML = list.map((p,i)=>paperHTML(p,i)).join('') || '<p class="cap">No papers found.</p>';
+    $('paperList').querySelectorAll('.cite-btn').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();openCite(el,SHOWN[+el.dataset.i]);}));
+    $('showCount').textContent='· showing '+list.length;
   }
   $('sortSel').addEventListener('change', renderPapers);
+
+  // ---------- Cite popover (downloads each format, like Streamlit) ----------
+  let citePop=null;
+  function closeCite(){ if(citePop){ citePop.remove(); citePop=null; } }
+  document.addEventListener('click',e=>{ if(citePop && !citePop.contains(e.target) && !e.target.closest('.cite-btn')) closeCite(); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeCite(); });
+  async function openCite(anchor, paper){
+    if(citePop && citePop.dataset.for===anchor.dataset.i){ closeCite(); return; }
+    closeCite();
+    citePop=document.createElement('div');
+    citePop.className='cite-pop'; citePop.dataset.for=anchor.dataset.i;
+    citePop.innerHTML='<div class="loading">Building citations…</div>';
+    document.body.appendChild(citePop);
+    const r=anchor.getBoundingClientRect();
+    citePop.style.top=(window.scrollY+r.bottom+6)+'px';
+    citePop.style.left=(window.scrollX+r.left)+'px';
+    try{
+      const { formats }=await window.SciCoAPI.cite(paper);
+      let html='<div class="cap">Download as</div>';
+      for(const k of ['bibtex','endnote','ris','csl','cff']){
+        const f=formats[k]; if(!f) continue;
+        const url=URL.createObjectURL(new Blob([f.text||''], {type:f.mime||'text/plain'}));
+        html+=`<a class="fmt" href="${url}" download="${esc(f.filename)}"><span class="mi">download</span> ${esc(f.label)}</a>`;
+      }
+      if(citePop) citePop.innerHTML=html;
+    }catch(err){
+      if(citePop) citePop.innerHTML='<div class="loading">'+(err.code===401?'Please sign in.':'Could not build citation.')+'</div>';
+    }
+  }
 
   // ---------- Topic Map (visual mock) ----------
   function initTopic(){
