@@ -10,22 +10,23 @@
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=block" rel="stylesheet">
 <link href="css/shell.css" rel="stylesheet">
 <style>
-  .searchcol{width:100%;max-width:720px;margin:0 auto;padding:42px 24px 70px}
+  /* Center the whole search block vertically in the panel (margin:auto), like Streamlit. */
+  .searchcol{width:100%;max-width:680px;margin:auto;padding:32px 24px}
   .biglogo{display:flex;justify-content:center;font-size:1.6rem;margin-bottom:22px}
   /* Search field — mirrors the Streamlit layout: label, full-width input, then a
      [Parameters] | caption | ✓ row. */
   .qlabel{font-size:.95rem;font-weight:600;color:var(--ink);margin:0 2px 6px}
-  .field{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:0 12px;background:#fff}
+  .field{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:0 14px;background:#fff}
   .field:focus-within{border-color:var(--red)}
   .field .mi{color:var(--muted)}
-  .field input{flex:1;border:0;outline:0;padding:12px 0;font-size:1rem;color:var(--ink);background:transparent}
+  .field input{flex:1;border:0;outline:0;padding:13px 0;font-size:1rem;color:var(--ink);background:transparent}
   .ctrlrow{display:flex;align-items:flex-end;gap:14px;margin-top:12px}
   .popwrap{position:relative;flex:2}
-  .pbtn{width:100%;border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 13px;font-size:.92rem;cursor:pointer;color:var(--ink);white-space:nowrap}
+  .pbtn{width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 13px;font-size:.92rem;cursor:pointer;color:var(--ink);white-space:nowrap}
   .pbtn:hover{border-color:var(--red)}
   .cap-scope{flex:5;color:var(--muted);font-size:.86rem;padding-bottom:9px}
   .gocol{flex:2;display:flex;justify-content:flex-end}
-  .submit{border:1px solid var(--line);background:#fff;color:var(--red);border-radius:8px;padding:9px 0;width:50%;font-size:1.15rem;font-weight:700;line-height:1;cursor:pointer}
+  .submit{border:1px solid var(--line);background:#fff;color:var(--red);border-radius:10px;padding:9px 0;width:50%;font-size:1.15rem;font-weight:700;line-height:1;cursor:pointer}
   .submit:hover{border-color:var(--red);background:var(--bg-soft)}
   .hint{color:var(--muted);font-size:.88rem;margin:10px 2px 0}
   /* Parameters popover */

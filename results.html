@@ -37,10 +37,23 @@
   /* Cite popover (mirrors the Streamlit 'Cite' dropdown) */
   .cite-pop{position:absolute;z-index:50;min-width:190px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px rgba(20,20,20,.14);padding:8px}
   .cite-pop .cap{color:var(--muted);font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:4px 6px}
-  .cite-pop a.fmt{display:flex;align-items:center;gap:7px;padding:8px 9px;border-radius:7px;color:var(--ink);font-size:.88rem;cursor:pointer;text-decoration:none}
+  .cite-pop a.fmt{flex:1;display:flex;align-items:center;gap:7px;padding:8px 9px;border-radius:7px;color:var(--ink);font-size:.88rem;cursor:pointer;text-decoration:none}
   .cite-pop a.fmt:hover{background:var(--bg-soft);color:var(--btn)}
   .cite-pop a.fmt .mi{font-size:1.05rem;color:var(--slate)}
   .cite-pop .loading{padding:9px;color:var(--muted);font-size:.86rem}
+  .cite-pop .fmt-row{display:flex;align-items:center;gap:2px}
+  .cite-pop .star{display:inline-flex;align-items:center;padding:7px;border-radius:7px;cursor:pointer;color:var(--muted)}
+  .cite-pop .star:hover{background:var(--bg-soft);color:var(--red)}
+  .cite-pop .star.on{color:var(--red)}
+  .cite-pop .star .mi{font-size:1.05rem}
+  .cite-pop .cite-def{display:flex;align-items:center;gap:6px;font-size:.83rem;color:var(--ink);padding:4px 6px 9px;margin-bottom:4px;border-bottom:1px solid var(--line)}
+  .cite-pop .cite-def b{color:var(--ink)}
+  .cite-pop .cite-clear{margin-left:auto;color:var(--slate);cursor:pointer;font-size:.8rem}
+  .cite-pop .cite-clear:hover{color:var(--red)}
+  /* Cite action: format hint + caret shown only once a default is set */
+  .pactions .cite-fmt{color:var(--muted)}
+  .pactions .cite-caret{display:none}
+  .pactions .cite-caret .mi{font-size:1.05rem}
 
   /* ---------- Right per-query panel + drag ---------- */
   .gutter{flex:0 0 7px;cursor:col-resize;position:sticky;top:0;height:100vh;display:none;align-items:center;justify-content:center;background:var(--bg-soft);border-left:1px solid var(--line)}
@@ -279,7 +292,8 @@
     return `<div class="paper"><div class="ptitle"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a></div>`+
       `<div class="pmeta">${esc(p.authors)}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}<span class="sep">|</span><span class="mi">psychology</span> AI Score: <b>${Number(p.ai_score).toFixed(3)}</b></div>`+
       `<div class="pactions"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}><span class="mi">open_in_new</span> Open</a>`+
-      `<a class="cite-btn" data-i="${i}"><span class="mi">format_quote</span> Cite</a></div></div>`;
+      `<a class="cite-btn" data-i="${i}"><span class="mi">format_quote</span> Cite<span class="cite-fmt"></span></a>`+
+      `<a class="cite-caret" data-i="${i}" title="Citation options"><span class="mi">expand_more</span></a></div></div>`;
   }
   function renderPapers(){
     closeCite();
@@ -291,35 +305,83 @@
     else list.sort((a,b)=>(b.ai_score||0)-(a.ai_score||0));
     SHOWN=list;
     $('paperList').innerHTML = list.map((p,i)=>paperHTML(p,i)).join('') || '<p class="cap">No papers found.</p>';
-    $('paperList').querySelectorAll('.cite-btn').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();openCite(el,SHOWN[+el.dataset.i]);}));
+    $('paperList').querySelectorAll('.cite-btn').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();citeMain(el,SHOWN[+el.dataset.i]);}));
+    $('paperList').querySelectorAll('.cite-caret').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();openCite(el,SHOWN[+el.dataset.i]);}));
+    refreshCiteLabels();
     $('showCount').textContent='· showing '+list.length;
   }
   $('sortSel').addEventListener('change', renderPapers);
 
-  // ---------- Cite popover (downloads each format, like Streamlit) ----------
+  // ---------- Cite (downloads each format, with a remembered default — like Streamlit) ----------
+  const CITE_KEY='scico_cite_default';
+  const CITE_FMTS=['bibtex','endnote','ris','csl','cff'];
+  const CITE_LABELS={bibtex:'BibTeX',endnote:'EndNote',ris:'RIS',csl:'CSL-JSON',cff:'CITATION.cff'};
+  const citeCache=new Map();
+  function getCiteDefault(){ try{ return localStorage.getItem(CITE_KEY)||''; }catch(_){ return ''; } }
+  function setCiteDefault(v){ try{ if(v) localStorage.setItem(CITE_KEY,v); else localStorage.removeItem(CITE_KEY); }catch(_){} refreshCiteLabels(); }
+  function refreshCiteLabels(){
+    const def=getCiteDefault();
+    document.querySelectorAll('.paper .cite-fmt').forEach(s=>{ s.textContent = def?(' · '+CITE_LABELS[def]):''; });
+    document.querySelectorAll('.paper .cite-caret').forEach(c=>{ c.style.display = def?'inline-flex':'none'; });
+  }
+  async function fetchCite(paper){
+    const k=paper.link||paper.title||'';
+    if(citeCache.has(k)) return citeCache.get(k);
+    const { formats }=await window.SciCoAPI.cite(paper);
+    citeCache.set(k, formats); return formats;
+  }
+  function downloadFmt(f){
+    const url=URL.createObjectURL(new Blob([f.text||''], {type:f.mime||'text/plain'}));
+    const a=document.createElement('a'); a.href=url; a.download=f.filename||'citation.txt';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  }
+
   let citePop=null;
   function closeCite(){ if(citePop){ citePop.remove(); citePop=null; } }
-  document.addEventListener('click',e=>{ if(citePop && !citePop.contains(e.target) && !e.target.closest('.cite-btn')) closeCite(); });
+  document.addEventListener('click',e=>{ if(citePop && !citePop.contains(e.target) && !e.target.closest('.cite-btn') && !e.target.closest('.cite-caret')) closeCite(); });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeCite(); });
+
+  // Main Cite action: download default directly if one is set, else open the chooser.
+  async function citeMain(anchor, paper){
+    const def=getCiteDefault();
+    if(!def){ openCite(anchor, paper); return; }
+    try{ const formats=await fetchCite(paper); const f=formats[def]; if(f) downloadFmt(f); else openCite(anchor, paper); }
+    catch(err){ if(err.code===401){ location.href='index.html'; } else openCite(anchor, paper); }
+  }
+
+  function positionCite(anchor){
+    const r=anchor.getBoundingClientRect();
+    citePop.style.top=(window.scrollY+r.bottom+6)+'px';
+    citePop.style.left=(window.scrollX+r.left)+'px';
+  }
+  function renderCitePop(formats){
+    if(!citePop) return;
+    const def=getCiteDefault();
+    let html='';
+    if(def) html+=`<div class="cite-def">Default: <b>${esc(CITE_LABELS[def]||def)}</b><a class="cite-clear">Clear</a></div>`;
+    html+='<div class="cap">Download as · ☆ sets default</div>';
+    for(const k of CITE_FMTS){
+      const f=formats[k]; if(!f) continue;
+      const on = k===def;
+      const url=URL.createObjectURL(new Blob([f.text||''], {type:f.mime||'text/plain'}));
+      html+=`<div class="fmt-row"><a class="fmt" href="${url}" download="${esc(f.filename)}"><span class="mi">download</span> ${esc(f.label)}</a>`+
+        `<a class="star${on?' on':''}" data-k="${k}" title="${on?'Default format':'Set as default'}"><span class="mi">${on?'star':'star_border'}</span></a></div>`;
+    }
+    citePop.innerHTML=html;
+    citePop.querySelectorAll('.star').forEach(s=>s.addEventListener('click',e=>{ e.preventDefault(); const k=s.dataset.k; setCiteDefault(getCiteDefault()===k?'':k); renderCitePop(formats); }));
+    const clr=citePop.querySelector('.cite-clear'); if(clr) clr.addEventListener('click',e=>{ e.preventDefault(); setCiteDefault(''); renderCitePop(formats); });
+  }
   async function openCite(anchor, paper){
     if(citePop && citePop.dataset.for===anchor.dataset.i){ closeCite(); return; }
     closeCite();
     citePop=document.createElement('div');
     citePop.className='cite-pop'; citePop.dataset.for=anchor.dataset.i;
     citePop.innerHTML='<div class="loading">Building citations…</div>';
-    document.body.appendChild(citePop);
-    const r=anchor.getBoundingClientRect();
-    citePop.style.top=(window.scrollY+r.bottom+6)+'px';
-    citePop.style.left=(window.scrollX+r.left)+'px';
+    document.body.appendChild(citePop); positionCite(anchor);
     try{
-      const { formats }=await window.SciCoAPI.cite(paper);
-      let html='<div class="cap">Download as</div>';
-      for(const k of ['bibtex','endnote','ris','csl','cff']){
-        const f=formats[k]; if(!f) continue;
-        const url=URL.createObjectURL(new Blob([f.text||''], {type:f.mime||'text/plain'}));
-        html+=`<a class="fmt" href="${url}" download="${esc(f.filename)}"><span class="mi">download</span> ${esc(f.label)}</a>`;
-      }
-      if(citePop) citePop.innerHTML=html;
+      const formats=await fetchCite(paper);
+      renderCitePop(formats); positionCite(anchor);
     }catch(err){
       if(citePop) citePop.innerHTML='<div class="loading">'+(err.code===401?'Please sign in.':'Could not build citation.')+'</div>';
     }
