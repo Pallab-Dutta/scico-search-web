@@ -284,7 +284,8 @@
   }
   let SHOWN=[];
   function paperHTML(p,i){
-    return `<div class="paper"><div class="ptitle"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a></div>`+
+    const low=Number(p.ai_score)<THRESHOLD;
+    return `<div class="paper${low?' below':''}"><div class="ptitle${low?' low':''}"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a></div>`+
       `<div class="pmeta">${esc(p.authors)}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}<span class="sep">|</span><span class="mi">psychology</span> AI Score: <b>${Number(p.ai_score).toFixed(3)}</b></div>`+
       `<div class="pactions"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}><span class="mi">open_in_new</span> Open</a>`+
       `<a class="cite-btn" data-i="${i}"><span class="mi">format_quote</span> Cite<span class="cite-fmt"></span></a>`+
@@ -293,8 +294,8 @@
   function renderPapers(){
     closeCite();
     const sort=$('sortSel').value;
-    // Only show papers at or above the match threshold.
-    let list=PAPERS.filter(p=>Number(p.ai_score)>=THRESHOLD);
+    // Show all papers (below-cutoff ones are just dimmed, no divider label).
+    let list=PAPERS.slice();
     if(sort==='year') list.sort((a,b)=>(b.year||0)-(a.year||0));
     else if(sort==='cite') list.sort((a,b)=>(b.citation_count||0)-(a.citation_count||0));
     else list.sort((a,b)=>(b.ai_score||0)-(a.ai_score||0));
