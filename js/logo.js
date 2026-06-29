@@ -3,9 +3,11 @@
    Any element with class "scico-logo" is filled in; its font-size controls the rendered size.
    Reusable so the sidebar (shell.js) and static pages share one source of truth. */
 (function () {
-  // Mirrors app4deployment.py: $$\mathbf{SciCo\,}_{\Large\boxed{\color{red}{\text{Search}}}}^{\large\mathbf{[1-3,\checkmark]}}$$
-  // (global \Huge dropped so each placement scales by its CSS font-size; brand red instead of plain red).
-  const TEX = "\\mathbf{SciCo\\,}_{\\Large\\boxed{\\color{#BA5757}{\\text{Search}}}}^{\\large\\mathbf{[1\\text{-}3,\\checkmark]}}";
+  // Based on app4deployment.py's $$\mathbf{SciCo\,}_{\boxed{\color{red}{\text{Search}}}}^{\mathbf{[1-3,\checkmark]}}$$
+  // The \Large/\large size bumps on the scripts are dropped so "SciCo" reads largest and the
+  // boxed "Search" subscript + [1-3,✓] superscript render at their natural (smaller) script size.
+  // No global size command, so each placement scales by its element's CSS font-size; brand red.
+  const TEX = "\\mathbf{SciCo\\,}_{\\boxed{\\color{#BA5757}{\\text{Search}}}}^{\\mathbf{[1\\text{-}3,\\checkmark]}}";
 
   function whenKatex(cb) {
     if (window.katex) return cb();
