@@ -360,13 +360,13 @@
     const def=getCiteDefault();
     let html='';
     if(def) html+=`<div class="cite-def">Default: <b>${esc(CITE_LABELS[def]||def)}</b><a class="cite-clear">Clear</a></div>`;
-    html+='<div class="cap">Download as · ☆ sets default</div>';
+    html+='<div class="cap">Download as &middot; tap the star to set a default</div>';
     for(const k of CITE_FMTS){
       const f=formats[k]; if(!f) continue;
       const on = k===def;
       const url=URL.createObjectURL(new Blob([f.text||''], {type:f.mime||'text/plain'}));
       html+=`<div class="fmt-row"><a class="fmt" href="${url}" download="${esc(f.filename)}"><span class="mi">download</span> ${esc(f.label)}</a>`+
-        `<a class="star${on?' on':''}" data-k="${k}" title="${on?'Default format':'Set as default'}"><span class="mi">${on?'star':'star_border'}</span></a></div>`;
+        `<a class="star${on?' on':''}" data-k="${k}" title="${on?'Default format — tap to clear':'Set as default'}"><span class="mi${on?' fill':''}">star</span></a></div>`;
     }
     citePop.innerHTML=html;
     citePop.querySelectorAll('.star').forEach(s=>s.addEventListener('click',e=>{ e.preventDefault(); const k=s.dataset.k; setCiteDefault(getCiteDefault()===k?'':k); renderCitePop(formats); }));
