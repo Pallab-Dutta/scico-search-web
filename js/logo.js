@@ -10,17 +10,22 @@
   // --logo-sub / --logo-sup CSS variables below (handy for trial-and-error in DevTools).
   const TEX = "\\mathbf{SciCo\\,}_{\\htmlClass{logo-sub}{\\boxed{\\color{#BA5757}{\\text{Search}}}}}^{\\htmlClass{logo-sup}{\\mathbf{[1\\text{-}3,\\checkmark]}}}";
 
-  // Size knobs for the sub/superscript (em = relative to their natural script size; 1em = unchanged).
+  // Size/position knobs for the sub/superscript. *_SIZE is em relative to natural script size
+  // (1em = unchanged). *_Y is a vertical nudge (negative raises, positive lowers) to re-center a
+  // script after resizing — KaTeX fixes the baseline at the original size, so shrinking drops it.
   // Tweak live in DevTools by editing these vars on the .scico-logo element, then tell me the values.
-  const SUB_SIZE = "1em";   // boxed "Search" subscript
-  const SUP_SIZE = "1em";   // [1-3,✓] superscript
+  const SUB_SIZE = "0.65em";  // boxed "Search" subscript
+  const SUB_Y    = "0em";     // raise/lower "Search" (try negatives like -0.12em to raise)
+  const SUP_SIZE = "1em";     // [1-3,✓] superscript
+  const SUP_Y    = "0em";     // raise/lower [1-3,✓]
   if (!document.getElementById("scico-logo-style")) {
     const st = document.createElement("style");
     st.id = "scico-logo-style";
     st.textContent =
-      ".scico-logo{--logo-sub:" + SUB_SIZE + ";--logo-sup:" + SUP_SIZE + "}" +
-      ".scico-logo .logo-sub{font-size:var(--logo-sub)}" +
-      ".scico-logo .logo-sup{font-size:var(--logo-sup)}";
+      ".scico-logo{--logo-sub:" + SUB_SIZE + ";--logo-sub-y:" + SUB_Y +
+        ";--logo-sup:" + SUP_SIZE + ";--logo-sup-y:" + SUP_Y + "}" +
+      ".scico-logo .logo-sub{font-size:var(--logo-sub);position:relative;top:var(--logo-sub-y,0em)}" +
+      ".scico-logo .logo-sup{font-size:var(--logo-sup);position:relative;top:var(--logo-sup-y,0em)}";
     (document.head || document.documentElement).appendChild(st);
   }
 
