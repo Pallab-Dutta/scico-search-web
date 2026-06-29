@@ -15,7 +15,7 @@
   // script after resizing — KaTeX fixes the baseline at the original size, so shrinking drops it.
   // Tweak live in DevTools by editing these vars on the .scico-logo element, then tell me the values.
   const SUB_SIZE = "0.65em";  // boxed "Search" subscript
-  const SUB_Y    = "0em";     // raise/lower "Search" (try negatives like -0.12em to raise)
+  const SUB_Y    = "-0.65em";  // raise "Search" back to a standard subscript position
   const SUP_SIZE = "1em";     // [1-3,✓] superscript
   const SUP_Y    = "0em";     // raise/lower [1-3,✓]
   if (!document.getElementById("scico-logo-style")) {
