@@ -41,14 +41,10 @@
   .cite-pop a.fmt:hover{background:var(--bg-soft);color:var(--btn)}
   .cite-pop a.fmt .mi{font-size:1.05rem;color:var(--slate)}
   .cite-pop .loading{padding:9px;color:var(--muted);font-size:.86rem}
-  .cite-pop .fmt-row{display:flex;align-items:center;gap:2px}
-  .cite-pop .star{display:inline-flex;align-items:center;justify-content:center;min-width:30px;padding:7px;border-radius:7px;cursor:pointer;color:var(--slate);font-size:1.15rem;line-height:1}
-  .cite-pop .star:hover{background:var(--bg-soft);color:var(--red)}
-  .cite-pop .star.on{color:var(--red)}
-  .cite-pop .cite-def{display:flex;align-items:center;gap:6px;font-size:.83rem;color:var(--ink);padding:4px 6px 9px;margin-bottom:4px;border-bottom:1px solid var(--line)}
-  .cite-pop .cite-def b{color:var(--ink)}
-  .cite-pop .cite-clear{margin-left:auto;color:var(--slate);cursor:pointer;font-size:.8rem}
-  .cite-pop .cite-clear:hover{color:var(--red)}
+  .cite-pop .fmt-row{display:flex;align-items:center;gap:8px}
+  .cite-pop .setdef{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:99px;padding:3px 10px;font-size:.74rem;font-weight:600;color:var(--slate);cursor:pointer;white-space:nowrap}
+  .cite-pop .setdef:hover{border-color:var(--red);color:var(--red)}
+  .cite-pop .setdef.on{background:var(--red);border-color:var(--red);color:#fff}
   /* Cite action: format hint + caret shown only once a default is set */
   .pactions .cite-fmt{color:var(--muted)}
   .pactions .cite-caret{display:none}
@@ -357,19 +353,16 @@
   function renderCitePop(formats){
     if(!citePop) return;
     const def=getCiteDefault();
-    let html='';
-    if(def) html+=`<div class="cite-def">Default: <b>${esc(CITE_LABELS[def]||def)}</b><a class="cite-clear">Clear</a></div>`;
-    html+='<div class="cap">Download as &middot; tap the star to set a default</div>';
+    let html='<div class="cap">Click a format to download &middot; set one as your default</div>';
     for(const k of CITE_FMTS){
       const f=formats[k]; if(!f) continue;
       const on = k===def;
       const url=URL.createObjectURL(new Blob([f.text||''], {type:f.mime||'text/plain'}));
       html+=`<div class="fmt-row"><a class="fmt" href="${url}" download="${esc(f.filename)}"><span class="mi">download</span> ${esc(f.label)}</a>`+
-        `<a class="star${on?' on':''}" data-k="${k}" title="${on?'Default format — tap to clear':'Set as default'}">${on?'★':'☆'}</a></div>`;
+        `<a class="setdef${on?' on':''}" data-k="${k}" title="${on?'This is your default — click to clear':'Make this your default format'}">${on?'✓ Default':'Set default'}</a></div>`;
     }
     citePop.innerHTML=html;
-    citePop.querySelectorAll('.star').forEach(s=>s.addEventListener('click',e=>{ e.preventDefault(); const k=s.dataset.k; setCiteDefault(getCiteDefault()===k?'':k); renderCitePop(formats); }));
-    const clr=citePop.querySelector('.cite-clear'); if(clr) clr.addEventListener('click',e=>{ e.preventDefault(); setCiteDefault(''); renderCitePop(formats); });
+    citePop.querySelectorAll('.setdef').forEach(s=>s.addEventListener('click',e=>{ e.preventDefault(); const k=s.dataset.k; setCiteDefault(getCiteDefault()===k?'':k); renderCitePop(formats); }));
   }
   async function openCite(anchor, paper){
     if(citePop && citePop.dataset.for===anchor.dataset.i){ closeCite(); return; }
