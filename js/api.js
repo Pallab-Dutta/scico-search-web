@@ -51,6 +51,7 @@
     getSession(id) { return req("GET", "/sessions/" + encodeURIComponent(id)); },
     listSessions() { return req("GET", "/sessions"); },
     profileAuthors(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/authors"); },
+    expand(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/expand"); },
 
     /* Stream a job's SSE events. handlers: {onEvent(type,data), onError(err)} */
     async streamJob(jobId, handlers) {

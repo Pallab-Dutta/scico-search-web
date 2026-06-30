@@ -35,6 +35,18 @@
   .pactions a{display:inline-flex;align-items:center;gap:5px;color:var(--slate);font-size:.84rem;cursor:pointer}
   .pactions a:hover{color:var(--btn)}.pactions .mi{font-size:1.05rem}
   .paper.below{opacity:.6}
+  /* "See more" / "Get more" pagination controls (mirror the Streamlit buttons) */
+  .morewrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin:22px 0 4px}
+  .morebtn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:#fff;
+    border-radius:10px;padding:10px 20px;font:inherit;font-size:.92rem;font-weight:600;color:var(--ink);cursor:pointer}
+  .morebtn:hover:not(:disabled){border-color:var(--red);color:var(--red)}
+  .morebtn:disabled{opacity:.6;cursor:default}
+  .morebtn.getmore{color:var(--red);border-color:var(--red-soft)}
+  .morebtn.getmore:hover:not(:disabled){background:var(--bg-soft)}
+  .morebtn .mi{font-size:1.15rem}
+  .morebtn .spin{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .morenote{color:var(--muted);font-size:.82rem;text-align:center}
   /* Cite popover (mirrors the Streamlit 'Cite' dropdown) */
   .cite-pop{position:absolute;z-index:50;min-width:190px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px rgba(20,20,20,.14);padding:8px}
   .cite-pop .cap{color:var(--muted);font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:4px 6px}
@@ -152,6 +164,7 @@
           <span id="showCount"></span>
         </div>
         <div id="paperList"></div>
+        <div id="moreWrap" class="morewrap"></div>
       </section>
 
       <!-- ===== TOPIC MAP (visual preview) ===== -->
@@ -294,20 +307,73 @@
       `<a class="cite-btn" data-i="${i}"><span class="mi">format_quote</span> Cite<span class="cite-fmt"></span></a>`+
       `<a class="cite-caret" data-i="${i}" title="Citation options"><span class="mi">expand_more</span></a></div></div>`;
   }
+  // Adaptive pagination (mirrors the Streamlit logic):
+  //  - >10 papers above threshold  -> show 10, then "See More Results" reveals +5 each click.
+  //  - <=10 above threshold (all shown) -> "Get More Results" expands the search (backend).
+  let VISIBLE=10;        // how many papers are currently revealed (>10-passed case)
+  let EXPANDING=false;   // a Get More request is in flight
   function renderPapers(){
     closeCite();
     const sort=$('sortSel').value;
-    // Show all papers (below-cutoff ones are just dimmed, no divider label).
+    // Sort all papers (below-cutoff ones are just dimmed, no divider label).
     let list=PAPERS.slice();
     if(sort==='year') list.sort((a,b)=>(b.year||0)-(a.year||0));
     else if(sort==='cite') list.sort((a,b)=>(b.citation_count||0)-(a.citation_count||0));
     else list.sort((a,b)=>(b.ai_score||0)-(a.ai_score||0));
-    SHOWN=list;
-    $('paperList').innerHTML = list.map((p,i)=>paperHTML(p,i)).join('') || '<p class="cap">No papers found.</p>';
+
+    const passed=PAPERS.filter(p=>Number(p.ai_score)>=THRESHOLD).length;
+    let showCount, showSeeMore;
+    if(passed<=10){ showCount=10; showSeeMore=false; }
+    else { showCount=VISIBLE; showSeeMore=VISIBLE<passed; }
+
+    SHOWN=list.slice(0, showCount);
+    $('paperList').innerHTML = SHOWN.map((p,i)=>paperHTML(p,i)).join('') || '<p class="cap">No papers found.</p>';
     $('paperList').querySelectorAll('.cite-btn').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();citeMain(el,SHOWN[+el.dataset.i]);}));
     $('paperList').querySelectorAll('.cite-caret').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();openCite(el,SHOWN[+el.dataset.i]);}));
     refreshCiteLabels();
-    $('showCount').textContent='· showing '+list.length;
+    $('showCount').textContent=`· showing ${SHOWN.length} of ${PAPERS.length}`;
+    renderMore(showSeeMore, passed);
+  }
+
+  function renderMore(showSeeMore, passed){
+    const host=$('moreWrap');
+    if(!PAPERS.length){ host.innerHTML=''; return; }
+    if(showSeeMore){
+      host.innerHTML=`<button class="morebtn" id="seeMoreBtn"><span class="mi">expand_more</span> See More Results</button>`+
+        `<div class="morenote">${SHOWN.length} of ${passed} relevant papers shown</div>`;
+      $('seeMoreBtn').addEventListener('click',()=>{ VISIBLE+=5; renderPapers(); });
+    } else {
+      const busy=EXPANDING;
+      host.innerHTML=`<button class="morebtn getmore" id="getMoreBtn"${busy?' disabled':''}>`+
+        (busy?`<span class="mi spin">progress_activity</span> Getting more results…`:`<span class="mi">sync</span> Get More Results`)+`</button>`+
+        `<div class="morenote" id="moreNote">${busy?'Expanding your most relevant query to find deeper matches…':'All relevant papers are shown. Expand the search for deeper matches.'}</div>`;
+      if(!busy) $('getMoreBtn').addEventListener('click', getMore);
+    }
+  }
+
+  async function getMore(){
+    if(EXPANDING || !SID) return;
+    EXPANDING=true; renderPapers();
+    const note=$('moreNote');
+    try{
+      const { job_id } = await window.SciCoAPI.expand(SID);
+      await window.SciCoAPI.streamJob(job_id, {
+        onEvent(type, d){
+          if((type==='phase'||type==='query_stat') && note){ note.textContent=(d.label||d.message||''); }
+        }
+      });
+      // Re-fetch the session with the freshly appended papers and re-render from the top.
+      VISIBLE=10;
+      const data=await window.SciCoAPI.getSession(SID);
+      const pub=data.publications||{};
+      THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[];
+      $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
+      EXPANDING=false;
+      renderQrows(); renderPapers();
+    }catch(err){
+      EXPANDING=false; renderPapers();
+      if($('moreNote')) $('moreNote').textContent = err.code===401 ? 'Please sign in again.' : ('Could not get more results ('+(err.message||'error')+').');
+    }
   }
   $('sortSel').addEventListener('change', renderPapers);
 
@@ -434,10 +500,9 @@
     try{
       const data=await window.SciCoAPI.getSession(SID);
       const pub=data.publications||{};
-      THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[];
+      THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[]; VISIBLE=10;
       $('resQuery').textContent='"'+(data.base_query||'')+'"';
       $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
-      $('showCount').textContent=`· showing ${PAPERS.length}`;
       renderQrows(); renderPapers();
     }catch(err){
       $('resSummary').textContent = err.code===401 ? 'Please sign in to view results.' : ('Could not load results ('+(err.message||'error')+').');
