@@ -122,14 +122,18 @@
   .proj{position:relative;aspect-ratio:1/1;margin:14px;border-radius:14px;border:1px solid var(--line);overflow:hidden;background:#fff}
   .projcanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   .pt{position:absolute;width:9px;height:9px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 1px rgba(255,255,255,.9)}
-  .cbar-v{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.6rem;color:var(--ink2);background:rgba(255,255,255,.8);padding:5px 6px;border-radius:8px;box-shadow:0 1px 3px rgba(20,20,20,.12)}
-  .cb-strip{width:9px;height:64px;border-radius:99px;background:linear-gradient(to top,#FBFAF8,#8497B0,#BA5757);border:1px solid var(--line)}
-  .gapmark{position:absolute;transform:translate(-50%,-50%);color:var(--red-strong);font-size:19px;font-weight:700;line-height:1;text-shadow:0 0 3px #fff,0 0 4px #fff,0 0 4px #fff;pointer-events:none}
+  .cbar-h{display:flex;align-items:center;gap:9px;margin:0 14px 8px;font-size:.68rem;color:var(--ink2)}
+  .cbar-h .cb-title{font-weight:600;white-space:nowrap;color:var(--ink)}
+  .cb-strip-h{flex:1;height:9px;border-radius:99px;background:linear-gradient(to right,#FBFAF8,#8497B0,#BA5757);border:1px solid var(--line)}
+  .gapmark{position:absolute;transform:translate(-50%,-50%);color:var(--red-strong);font-size:19px;font-weight:700;line-height:1;text-shadow:0 0 3px #fff,0 0 4px #fff,0 0 4px #fff;cursor:pointer;pointer-events:auto;transition:transform .1s}
+  .gapmark:hover{transform:translate(-50%,-50%) scale(1.3)}
   .gaps-sec{margin-top:16px}
   .gaps-h{font-size:.88rem;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:7px;margin:0 0 10px}
   .gaps-h .mi{font-size:1.05rem;color:var(--red-strong)}
   .gaps-h.muted{color:var(--ink3);font-weight:500}.gaps-h.muted .mi{color:var(--c3)}
   .gapcard{border:1px dashed var(--red);background:var(--red-soft);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .gapcard.flash{animation:gapflash 1.5s ease}
+  @keyframes gapflash{0%,100%{box-shadow:none;background:var(--red-soft)}22%{box-shadow:0 0 0 3px var(--red);background:#fff}}
   .gaptitle{font-size:.9rem;color:var(--ink);font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .gapex{font-size:.78rem;color:var(--ink3);margin-top:5px}
   .star{position:absolute;left:48%;top:50%;transform:translate(-50%,-50%);color:var(--ink);font-size:18px}
@@ -193,7 +197,8 @@
           <div class="panel">
             <div class="ph"><span>Map of the field</span><span id="pointCount"></span></div>
             <div class="proj" id="proj"></div>
-            <div class="proj-foot"><span>Each point is a paper · closer points are more related · the colour contour shows paper density (dense = well-studied, sparse = potential gaps) · ◇ marks a research-gap valley</span></div>
+            <div class="cbar-h"><span class="cb-title">research frequency</span><span>sparse</span><span class="cb-strip-h"></span><span>dense</span></div>
+            <div class="proj-foot"><span>Each point is a paper · closer points are more related · ◇ marks a research-gap valley (click it to jump to the gap)</span></div>
           </div>
         </div>
         <div id="gapSection" class="gaps-sec"></div>
@@ -438,8 +443,9 @@
   // ---------- Topic Map (real data: 2D projection + research-gap mindmap) ----------
   const TOPIC_COLORS=['#BA5757','#8497B0','#6A9978','#C98A3E','#7E6BA8','#4C9AA6','#B07A4C','#5E874F','#A85C8A','#5578A8'];
   const topicColor=i=>TOPIC_COLORS[((i%TOPIC_COLORS.length)+TOPIC_COLORS.length)%TOPIC_COLORS.length];
-  const TOPIC_PAD=0.09;  // margin around extreme points so edge points stay visible (matches the contour)
-  const topicPos=v=>TOPIC_PAD+Math.max(0,Math.min(1,v))*(1-2*TOPIC_PAD);  // [0,1] -> [PAD,1-PAD]
+  // Point margin is baked into the backend coords now, so the frontend maps [0,1] straight to the
+  // full canvas — the density field fills the map edge-to-edge while papers stay inset.
+  const topicPos=v=>Math.max(0,Math.min(1,v));
 
   // Sequential colormap (cream -> slate -> red) matching the colorbar strip.
   function _cmap(t){
@@ -448,21 +454,21 @@
     let a,b,f; if(t<0.5){a=A;b=B;f=t/0.5;}else{a=B;b=C;f=(t-0.5)/0.5;}
     return [Math.round(a[0]+(b[0]-a[0])*f),Math.round(a[1]+(b[1]-a[1])*f),Math.round(a[2]+(b[2]-a[2])*f)];
   }
-  // Draw the backend density field (grid[row=y][col=x], values 0..1) as a banded colour contour.
-  // Using the SAME field the mindmap gaps come from, so contour and gaps agree by construction.
+  // Draw the backend density field (grid[row=y][col=x], values 0..1) as a CONTINUOUS colour map,
+  // bilinearly interpolated and filling the whole canvas edge-to-edge. Same field the mindmap gaps
+  // come from, so contour and gaps agree by construction.
   function drawFieldContour(canvas, grid){
     const W=canvas.width,H=canvas.height,ctx=canvas.getContext('2d');
     if(!grid||!grid.length){ ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H); return; }
-    const G=grid.length, LEVELS=8, img=ctx.createImageData(W,H), inv=1/(1-2*TOPIC_PAD);
-    for(let y=0;y<H;y++){ const ny=((y/H)-TOPIC_PAD)*inv;   // canvas pixel -> normalized [0,1]
-      for(let x=0;x<W;x++){ const nx=((x/W)-TOPIC_PAD)*inv;
-        let t=0;
-        if(nx>=0&&nx<=1&&ny>=0&&ny<=1){
-          const gi=Math.min(G-1,Math.max(0,Math.round(ny*(G-1)))), gj=Math.min(G-1,Math.max(0,Math.round(nx*(G-1))));
-          t=(grid[gi]&&grid[gi][gj])||0;
-        }
-        t=Math.round(t*LEVELS)/LEVELS;  // quantize -> contour bands
-        const col=_cmap(t), i=(y*W+x)*4; img.data[i]=col[0]; img.data[i+1]=col[1]; img.data[i+2]=col[2]; img.data[i+3]=255; } }
+    const G=grid.length, img=ctx.createImageData(W,H);
+    for(let y=0;y<H;y++){
+      const gy=(y/(H-1))*(G-1), r0=Math.floor(gy), r1=Math.min(G-1,r0+1), fy=gy-r0;
+      for(let x=0;x<W;x++){
+        const gx=(x/(W-1))*(G-1), c0=Math.floor(gx), c1=Math.min(G-1,c0+1), fx=gx-c0;
+        const t=(grid[r0][c0]*(1-fx)+grid[r0][c1]*fx)*(1-fy)+(grid[r1][c0]*(1-fx)+grid[r1][c1]*fx)*fy;
+        const col=_cmap(t), i=(y*W+x)*4; img.data[i]=col[0]; img.data[i+1]=col[1]; img.data[i+2]=col[2]; img.data[i+3]=255;
+      }
+    }
     ctx.putImageData(img,0,0);
   }
 
@@ -505,10 +511,10 @@
     const gaps=tm.gaps||[];
     $('gapSection').innerHTML = gaps.length ? (
       '<div class="gaps-h"><span class="mi">lightbulb</span> Research gaps — under-explored bridges between studied areas</div>'+
-      gaps.map(g=>{
+      gaps.map((g,gi)=>{
         const ex=(g.examples||[]).filter(Boolean).slice(0,4).map(esc).join(' · ');
-        return `<div class="gapcard"><div class="gaptitle"><span class="gap-tag">◇ RESEARCH GAP</span> ${esc(g.label||'Between two clusters')}</div>`+
-               (ex?`<div class="gapex">Flanking work: ${ex}</div>`:'')+`</div>`;
+        return `<div class="gapcard" id="gapcard-${gi}"><div class="gaptitle"><span class="gap-tag">◇ RESEARCH GAP</span> ${esc(g.label||'Between two clusters')}</div>`+
+               (ex?`<div class="gapex">Nearby work: ${ex}</div>`:'')+`</div>`;
       }).join('')
     ) : '<div class="gaps-h muted"><span class="mi">check_circle</span> No prominent low-density gap between clusters — coverage is fairly uniform.</div>';
 
@@ -524,18 +530,24 @@
       d.style.background=topicColor(p.cluster); d.style.opacity=(0.5+0.45*(p.score||0)).toFixed(2);
       proj.appendChild(d);
     });
-    // Mark each research-gap valley on the map.
-    (tm.gaps||[]).forEach(g=>{
-      const m=document.createElement('div'); m.className='gapmark'; m.title=g.label||'research gap'; m.textContent='◇';
-      m.style.left=(topicPos(g.x)*100)+'%'; m.style.top=(topicPos(g.y)*100)+'%'; proj.appendChild(m);
+    // Mark each research-gap valley on the map; click a marker to jump to its gap card.
+    (tm.gaps||[]).forEach((g,gi)=>{
+      const m=document.createElement('div'); m.className='gapmark'; m.textContent='◇';
+      m.title=(g.label||'research gap')+' — click to view';
+      m.style.left=(topicPos(g.x)*100)+'%'; m.style.top=(topicPos(g.y)*100)+'%';
+      m.addEventListener('click',()=>focusGap(gi));
+      proj.appendChild(m);
     });
     const star=document.createElement('div'); star.className='star'; star.title='your query'; star.textContent='✦';
     const qx=tm.query&&tm.query.x!=null?tm.query.x:0.5, qy=tm.query&&tm.query.y!=null?tm.query.y:0.5;
     star.style.left=(topicPos(qx)*100)+'%'; star.style.top=(topicPos(qy)*100)+'%';
     proj.appendChild(star);
-    const cbar=document.createElement('div'); cbar.className='cbar-v';
-    cbar.innerHTML='<span>dense</span><span class="cb-strip" title="paper density"></span><span>sparse</span>';
-    proj.appendChild(cbar);
+  }
+
+  function focusGap(i){
+    const el=document.getElementById('gapcard-'+i); if(!el) return;
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');  // restart the flash
   }
 
   async function startTopic(){
