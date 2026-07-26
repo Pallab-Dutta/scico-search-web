@@ -7,7 +7,7 @@
 <title>Eratosthenes · SciCoagent</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cutive+Mono&family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <style>
   :root{
@@ -37,7 +37,8 @@
   /* ---------- nav ---------- */
   header{position:sticky;top:0;z-index:20;background:rgba(251,250,248,.82);
        backdrop-filter:saturate(160%) blur(12px);border-bottom:1px solid var(--line)}
-  nav{display:flex;align-items:center;justify-content:space-between;height:68px}
+  nav{display:flex;align-items:center;gap:28px;height:68px}
+  nav .logo{margin-right:auto}
   nav .links{display:flex;gap:30px;font-size:.92rem;font-weight:500;color:var(--ink-2)}
   nav .links a:hover{color:var(--ink)}
   .btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:.94rem;
@@ -53,8 +54,8 @@
   .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;font-weight:600;
        color:var(--red-strong);background:var(--red-soft);padding:7px 14px;border-radius:999px;
        letter-spacing:.01em}
-  .hero h1{font-size:clamp(2.5rem,5.4vw,4rem);line-height:1.04;letter-spacing:-.035em;
-       font-weight:800;margin:26px auto 0;max-width:14ch}
+  .hero h1{font-family:"Cutive Mono",monospace;font-size:clamp(1.7rem,4.6vw,3.1rem);line-height:1.22;
+       letter-spacing:-.01em;font-weight:400;margin:26px auto 0;max-width:24ch}
   .hero h1 .hl{color:var(--red)}
   .hero p.sub{font-size:1.18rem;color:var(--ink-2);max-width:62ch;margin:22px auto 0}
   .hero-points{list-style:none;max-width:60ch;margin:24px auto 6px;padding:0;text-align:left;display:grid;gap:13px}
@@ -140,8 +141,8 @@
         <a href="#features">Features</a>
         <a href="#how">How it works</a>
         <!-- Pricing hidden for now (MVP). To restore: re-add <a href="pricing.html">Pricing</a> here,
-             the hero "See plans & pricing" button, and the features "see pricing" link. See NOTES below. -->
-        <a href="#">Privacy</a>
+             the hero "See plans & pricing" button, and the features "see pricing" link. See NOTES below.
+             Privacy link intentionally removed. -->
       </div>
       <button class="btn btn-primary js-signin">
         <svg class="g-ico" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.2h5.35c-.25 1.5-1.8 4.4-5.35 4.4-3.22 0-5.85-2.66-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 4.2 14.6 3.3 12 3.3 6.96 3.3 2.9 7.36 2.9 12.4S6.96 21.5 12 21.5c5.2 0 8.64-3.66 8.64-8.8 0-.6-.06-1.04-.16-1.6z"/></svg>
@@ -155,7 +156,7 @@
   <section class="hero">
     <div class="wrap">
       <span class="eyebrow">● An AI scientist co-agent for scientific discovery</span>
-      <h1>Sustainably automate <span class="hl">scientific R&amp;D loops</span></h1>
+      <h1>Reduce trial &amp; errors in<br><span class="hl">scientific R&amp;D loops</span></h1>
       <p class="sub"><b>SciCoagent</b> is building an ecosystem of AI scientist co-agents that sustainably accelerate research across gap identification, experiment design, and academic writing, by minimizing trial &amp; error. <b>Eratosthenes</b>, named after the ancient Greek polymath and chief librarian of the Library of Alexandria, is the persona for discovery:</p>
       <ul class="hero-points">
         <li><span class="hp-n">1</span><div><b>Closest existing work.</b> Surface the nearest publications &amp; patents around any scientific hypothesis.</div></li>
