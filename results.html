@@ -271,7 +271,7 @@
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setTab(t.dataset.tab)));
 
   // ---------- Publications ----------
-  let QDATA=[], PAPERS=[], THRESHOLD=0.72;
+  let QDATA=[], PAPERS=[], THRESHOLD=0.65;  // fallback == MIN_PAPER_SIMILARITY; backend overrides via pub.threshold
   const bar=$('rightbar'), gutter=$('gutter');
   function openPanel(i){
     const d=QDATA[i]; if(!d) return;
@@ -319,7 +319,9 @@
     let list=PAPERS.slice();
     if(sort==='year') list.sort((a,b)=>(b.year||0)-(a.year||0));
     else if(sort==='cite') list.sort((a,b)=>(b.citation_count||0)-(a.citation_count||0));
-    else list.sort((a,b)=>(b.ai_score||0)-(a.ai_score||0));
+    // "AI Score" sort uses the recency-nudged score (parity with the Streamlit rank_key); red
+    // membership still keys off raw ai_score vs THRESHOLD, so recency only reorders the reds.
+    else list.sort((a,b)=>((b.ai_score_ranked??b.ai_score)||0)-((a.ai_score_ranked??a.ai_score)||0));
 
     const passed=PAPERS.filter(p=>Number(p.ai_score)>=THRESHOLD).length;
     let showCount, showSeeMore;
