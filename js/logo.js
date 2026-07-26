@@ -20,9 +20,11 @@
     const st = document.createElement("style");
     st.id = "scico-logo-style";
     // Self-contained so it overrides any leftover `.logo` lockup rules (font, weight, padding).
+    // Note: no `display` here — the two spans are inline text, and setting display would override
+    // each placement's own layout (e.g. .biglogo's centered flex over the search bar).
     st.textContent =
       ".scico-logo{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;font-weight:700;" +
-        "letter-spacing:-.02em;line-height:1;white-space:nowrap;padding:0;display:inline-flex;align-items:baseline}" +
+        "letter-spacing:-.02em;line-height:1;white-space:nowrap;padding:0}" +
       ".scico-logo .era-a{color:" + ERA_COLOR + "}" +
       ".scico-logo .era-b{color:" + REST_COLOR + "}";
     (document.head || document.documentElement).appendChild(st);
