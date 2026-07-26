@@ -7,7 +7,7 @@
   function sidebarHTML() {
     return `
       <div class="sb-top">
-        <a class="logo scico-logo" href="search.html" style="font-size:1.05rem">SciCo Search</a>
+        <a class="logo scico-logo" href="search.html" style="font-size:1.05rem">Eratosthenes</a>
         <button class="sb-toggle" id="sbToggle" title="Hide sidebar"><span class="mi">chevron_left</span></button>
       </div>
 

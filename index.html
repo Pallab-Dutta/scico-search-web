@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>SciCo-Search — Landing</title>
+<title>Eratosthenes — SciCoagent</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
@@ -57,6 +57,10 @@
        font-weight:800;margin:26px auto 0;max-width:14ch}
   .hero h1 .hl{color:var(--red)}
   .hero p.sub{font-size:1.18rem;color:var(--ink-2);max-width:62ch;margin:22px auto 0}
+  .hero-points{list-style:none;max-width:60ch;margin:24px auto 6px;padding:0;text-align:left;display:grid;gap:13px}
+  .hero-points li{display:flex;gap:13px;align-items:flex-start;font-size:1.04rem;color:var(--ink-2);line-height:1.5}
+  .hero-points .hp-n{flex:0 0 26px;height:26px;border-radius:50%;background:var(--red);color:#fff;font-weight:700;font-size:.85rem;display:inline-flex;align-items:center;justify-content:center;margin-top:2px}
+  .hero-points b{color:var(--ink)}
   .cta-row{display:flex;gap:14px;justify-content:center;margin-top:34px;flex-wrap:wrap}
   .micro{margin-top:16px;font-size:.86rem;color:var(--ink-3)}
   .micro b{color:var(--ink-2);font-weight:600}
@@ -131,11 +135,12 @@
 <header>
   <div class="wrap">
     <nav>
-      <div class="logo scico-logo" style="font-size:1.35rem">SciCo Search</div>
+      <div class="logo scico-logo" style="font-size:1.35rem">Eratosthenes</div>
       <div class="links">
         <a href="#features">Features</a>
         <a href="#how">How it works</a>
-        <a href="pricing.html">Pricing</a>
+        <!-- Pricing hidden for now (MVP). To restore: re-add <a href="pricing.html">Pricing</a> here,
+             the hero "See plans & pricing" button, and the features "see pricing" link. See NOTES below. -->
         <a href="#">Privacy</a>
       </div>
       <button class="btn btn-primary js-signin">
@@ -149,15 +154,19 @@
 <main>
   <section class="hero">
     <div class="wrap">
-      <span class="eyebrow">● Free to start · No API keys required</span>
-      <h1>Find the right <span class="hl">papers</span>, labs &amp; <span class="hl">PIs</span> for your niche.</h1>
-      <p class="sub">SciCo-Search is an AI research assistant that expands your topic into an optimized academic search, ranks the literature by how well it matches your intent, and maps the field so you can spot the research gaps.</p>
+      <span class="eyebrow">● An AI scientist co-agent for scientific discovery</span>
+      <h1>Find the closest prior work &amp; the <span class="hl">research gaps</span> around any hypothesis.</h1>
+      <p class="sub"><b>SciCoagent</b> is building an ecosystem of AI scientist co-agents that sustainably accelerate research — gap identification, experiment design, and academic writing — by minimizing trial &amp; error. <b>Eratosthenes</b>, named after the ancient Greek polymath and chief librarian of the Library of Alexandria, is the persona for discovery:</p>
+      <ul class="hero-points">
+        <li><span class="hp-n">1</span><div><b>Closest existing work.</b> Surface the nearest publications &amp; patents around any scientific hypothesis.</div></li>
+        <li><span class="hp-n">2</span><div><b>Automated research-gap discovery.</b> Efficiently and automatically identify the research gaps around any topic in academic R&amp;D.</div></li>
+        <li><span class="hp-n">3</span><div><b>A feasible path to close it.</b> Hypothesize the most sustainable, feasible timeline to solve the gap — minimizing trial &amp; error.</div></li>
+      </ul>
       <div class="cta-row">
         <button class="btn btn-primary js-signin">
           <svg class="g-ico" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.2h5.35c-.25 1.5-1.8 4.4-5.35 4.4-3.22 0-5.85-2.66-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 4.2 14.6 3.3 12 3.3 6.96 3.3 2.9 7.36 2.9 12.4S6.96 21.5 12 21.5c5.2 0 8.64-3.66 8.64-8.8 0-.6-.06-1.04-.16-1.6z"/></svg>
           Start free with Google
         </button>
-        <button class="btn btn-ghost" onclick="location.href='pricing.html'">See plans &amp; pricing</button>
       </div>
       <p class="micro">Built by researchers, for researchers. <b>Your search history is saved to your account</b> so you can restore any session.</p>
 
@@ -234,7 +243,10 @@
         <div class="card">
           <div class="ic">∞</div>
           <h3>Free to start</h3>
-          <p>Unlimited shallow search and report generation, free forever. Upgrade for deep search, research-gap analysis and writing tools — <a href="pricing.html">see pricing</a>.</p>
+          <!-- NOTES (pricing hidden for MVP): when re-enabling pricing, restore the "see pricing" link
+               below (<a href="pricing.html">see pricing</a>), the Pricing nav link, and the hero
+               "See plans & pricing" button. -->
+          <p>Unlimited shallow search and report generation, free to start — plus deep search, automated research-gap analysis and lab/PI profiling.</p>
         </div>
       </div>
     </div>
@@ -256,8 +268,8 @@
 
   <div class="wrap">
     <div class="band">
-      <h2>Discover your literature. Identify your dream lab.</h2>
-      <p>Join researchers using SciCo-Search to navigate their field and find where their next contribution fits.</p>
+      <h2>Find the prior work. Spot the gap. Plan the path.</h2>
+      <p>Join researchers using Eratosthenes to map their field and find where their next contribution fits.</p>
       <button class="btn btn-primary js-signin">
         <svg class="g-ico" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.2h5.35c-.25 1.5-1.8 4.4-5.35 4.4-3.22 0-5.85-2.66-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 4.2 14.6 3.3 12 3.3 6.96 3.3 2.9 7.36 2.9 12.4S6.96 21.5 12 21.5c5.2 0 8.64-3.66 8.64-8.8 0-.6-.06-1.04-.16-1.6z"/></svg>
         Sign in with Google
@@ -268,8 +280,8 @@
 
 <footer>
   <div class="wrap">
-    <div class="logo scico-logo" style="font-size:.8rem">SciCo Search</div>
-    <div>© 2026 SciCo-Search · A community-supported research tool · Privacy</div>
+    <div class="logo scico-logo" style="font-size:.8rem">Eratosthenes</div>
+    <div>© 2026 Eratosthenes · part of the SciCoagent ecosystem · A research tool · Privacy</div>
   </div>
 </footer>
 
