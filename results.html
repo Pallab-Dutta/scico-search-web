@@ -124,6 +124,14 @@
   .pt{position:absolute;width:9px;height:9px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 1px rgba(255,255,255,.9)}
   .cbar-v{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.6rem;color:var(--ink2);background:rgba(255,255,255,.8);padding:5px 6px;border-radius:8px;box-shadow:0 1px 3px rgba(20,20,20,.12)}
   .cb-strip{width:9px;height:64px;border-radius:99px;background:linear-gradient(to top,#FBFAF8,#8497B0,#BA5757);border:1px solid var(--line)}
+  .gapmark{position:absolute;transform:translate(-50%,-50%);color:var(--red-strong);font-size:19px;font-weight:700;line-height:1;text-shadow:0 0 3px #fff,0 0 4px #fff,0 0 4px #fff;pointer-events:none}
+  .gaps-sec{margin-top:16px}
+  .gaps-h{font-size:.88rem;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:7px;margin:0 0 10px}
+  .gaps-h .mi{font-size:1.05rem;color:var(--red-strong)}
+  .gaps-h.muted{color:var(--ink3);font-weight:500}.gaps-h.muted .mi{color:var(--c3)}
+  .gapcard{border:1px dashed var(--red);background:var(--red-soft);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .gaptitle{font-size:.9rem;color:var(--ink);font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .gapex{font-size:.78rem;color:var(--ink3);margin-top:5px}
   .star{position:absolute;left:48%;top:50%;transform:translate(-50%,-50%);color:var(--ink);font-size:18px}
   .gaparc{position:absolute;border:2px dashed rgba(186,87,87,.55);border-radius:50%}
   .proj-foot{display:flex;justify-content:space-between;align-items:center;padding:0 16px 14px;font-size:.78rem;color:var(--ink3);flex-wrap:wrap;gap:8px}
@@ -185,9 +193,10 @@
           <div class="panel">
             <div class="ph"><span>Map of the field</span><span id="pointCount"></span></div>
             <div class="proj" id="proj"></div>
-            <div class="proj-foot"><span>Each point is a paper · closer points are more related · the colour contour shows paper density (dense = well-studied, sparse = potential gaps)</span></div>
+            <div class="proj-foot"><span>Each point is a paper · closer points are more related · the colour contour shows paper density (dense = well-studied, sparse = potential gaps) · ◇ marks a research-gap valley</span></div>
           </div>
         </div>
+        <div id="gapSection" class="gaps-sec"></div>
       </section>
 
       <!-- ===== AUTHORS ===== -->
@@ -439,22 +448,21 @@
     let a,b,f; if(t<0.5){a=A;b=B;f=t/0.5;}else{a=B;b=C;f=(t-0.5)/0.5;}
     return [Math.round(a[0]+(b[0]-a[0])*f),Math.round(a[1]+(b[1]-a[1])*f),Math.round(a[2]+(b[2]-a[2])*f)];
   }
-  // Kernel-density estimate of paper positions -> banded colour contour on a canvas.
-  function drawFieldContour(canvas, points){
+  // Draw the backend density field (grid[row=y][col=x], values 0..1) as a banded colour contour.
+  // Using the SAME field the mindmap gaps come from, so contour and gaps agree by construction.
+  function drawFieldContour(canvas, grid){
     const W=canvas.width,H=canvas.height,ctx=canvas.getContext('2d');
-    if(!points.length){ return; }
-    const px=v=>topicPos(v)*W, py=v=>topicPos(v)*H;
-    const P=points.map(p=>[px(p.x),py(p.y)]);
-    const h=0.12*Math.min(W,H), inv=1/(2*h*h), step=3;
-    const cols=Math.ceil(W/step), rows=Math.ceil(H/step), dens=new Float32Array(cols*rows);
-    let maxD=0;
-    for(let r=0;r<rows;r++){ const y=r*step; for(let c=0;c<cols;c++){ const x=c*step; let d=0;
-      for(let k=0;k<P.length;k++){ const dx=x-P[k][0],dy=y-P[k][1]; d+=Math.exp(-(dx*dx+dy*dy)*inv); }
-      dens[r*cols+c]=d; if(d>maxD)maxD=d; } }
-    const LEVELS=8, img=ctx.createImageData(W,H);
-    for(let y=0;y<H;y++){ const r=Math.min(rows-1,(y/step)|0); for(let x=0;x<W;x++){ const c=Math.min(cols-1,(x/step)|0);
-      let t=maxD>0?dens[r*cols+c]/maxD:0; t=Math.round(t*LEVELS)/LEVELS;  // quantize -> contour bands
-      const col=_cmap(t), i=(y*W+x)*4; img.data[i]=col[0]; img.data[i+1]=col[1]; img.data[i+2]=col[2]; img.data[i+3]=255; } }
+    if(!grid||!grid.length){ ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H); return; }
+    const G=grid.length, LEVELS=8, img=ctx.createImageData(W,H), inv=1/(1-2*TOPIC_PAD);
+    for(let y=0;y<H;y++){ const ny=((y/H)-TOPIC_PAD)*inv;   // canvas pixel -> normalized [0,1]
+      for(let x=0;x<W;x++){ const nx=((x/W)-TOPIC_PAD)*inv;
+        let t=0;
+        if(nx>=0&&nx<=1&&ny>=0&&ny<=1){
+          const gi=Math.min(G-1,Math.max(0,Math.round(ny*(G-1)))), gj=Math.min(G-1,Math.max(0,Math.round(nx*(G-1))));
+          t=(grid[gi]&&grid[gi][gj])||0;
+        }
+        t=Math.round(t*LEVELS)/LEVELS;  // quantize -> contour bands
+        const col=_cmap(t), i=(y*W+x)*4; img.data[i]=col[0]; img.data[i+1]=col[1]; img.data[i+2]=col[2]; img.data[i+3]=255; } }
     ctx.putImageData(img,0,0);
   }
 
@@ -474,38 +482,52 @@
     $('legendTop').innerHTML = clusters.map(c=>
       `<span class="key"><span class="sw" style="background:${topicColor(c.id)}"></span>${esc(c.theme||('Cluster '+(c.id+1)))}</span>`).join('');
 
-    // Mindmap: one branch per cluster; bands run dense core -> under-explored gap.
+    // Mindmap: one branch per topic; sub-nodes are density REGIMES (core / emerging / frontier),
+    // with honest, variable counts. Research gaps are the valleys, shown separately below.
+    const REGIME={core:{tag:'<span class="core-tag">CORE</span>',kind:'most-studied',op:1},
+                  emerging:{tag:'',kind:'emerging',op:.72},
+                  frontier:{tag:'<span class="core-tag" style="color:#9a6a3a;background:#f2e9dc">FRONTIER</span>',kind:'least-studied',op:.5}};
     $('branchCount').textContent = clusters.length+(clusters.length===1?' branch':' branches');
     $('mindHost').innerHTML = clusters.map((c,ci)=>{
-      const col=topicColor(c.id);
-      const maxBand=Math.max(1,...(c.bands||[]).map(b=>b.count||0));
-      const subs=(c.bands||[]).map((b,bi)=>{
-        const last=bi===c.bands.length-1, w=Math.max(8,Math.round(54*(b.count||0)/maxBand));
-        const tag = b.is_gap ? '<span class="gap-tag">◇ RESEARCH GAP</span>'
-                  : bi===0 ? '<span class="core-tag">CORE</span>'
-                  : `<span class="densitybar" style="width:${w}px;background:${col};opacity:.7"></span>`;
-        const bar = (!b.is_gap && bi===0) ? `<span class="densitybar" style="width:${w}px;background:${col}"></span>` : '';
-        const kind = b.is_gap ? 'under-explored' : (bi===0 ? 'most-studied' : 'emerging');
-        const n=b.count||0;
-        return `<div class="sub${b.is_gap?' gap':''}"><span class="lbl">${esc(b.label||('Sub-area '+(bi+1)))}</span>${tag}${bar}`+
-               `<div class="meta">${kind} · ${n} paper${n===1?'':'s'}</div></div>`;
+      const col=topicColor(c.id), maxBand=Math.max(1,...(c.bands||[]).map(b=>b.count||0));
+      const subs=(c.bands||[]).map(b=>{
+        const R=REGIME[b.regime]||REGIME.core, w=Math.max(8,Math.round(54*(b.count||0)/maxBand)), n=b.count||0;
+        return `<div class="sub"><span class="lbl">${esc(b.label||R.kind)}</span>${R.tag}`+
+               `<span class="densitybar" style="width:${w}px;background:${col};opacity:${R.op}"></span>`+
+               `<div class="meta">${R.kind} · ${n} paper${n===1?'':'s'}</div></div>`;
       }).join('');
       return `<div class="branch${ci===0?' sel':''}">`+
         `<div class="bhead"><span class="bdot" style="background:${col}"></span><b>${esc(c.theme||('Cluster '+(c.id+1)))}</b><span class="n">${c.count} paper${c.count===1?'':'s'}</span></div>`+
         `<div class="subs">${subs}</div></div>`;
     }).join('');
 
+    // Research gaps = low-density valleys between topics (from the same field as the contour).
+    const gaps=tm.gaps||[];
+    $('gapSection').innerHTML = gaps.length ? (
+      '<div class="gaps-h"><span class="mi">lightbulb</span> Research gaps — under-explored bridges between studied areas</div>'+
+      gaps.map(g=>{
+        const ex=(g.examples||[]).filter(Boolean).slice(0,4).map(esc).join(' · ');
+        return `<div class="gapcard"><div class="gaptitle"><span class="gap-tag">◇ RESEARCH GAP</span> ${esc(g.label||'Between two clusters')}</div>`+
+               (ex?`<div class="gapex">Flanking work: ${ex}</div>`:'')+`</div>`;
+      }).join('')
+    ) : '<div class="gaps-h muted"><span class="mi">check_circle</span> No prominent low-density gap between clusters — coverage is fairly uniform.</div>';
+
     // Density contour (colormap) behind the papers, with a margin so edge points stay visible.
     $('pointCount').textContent = tm.points.length+' papers';
     const proj=$('proj'); proj.innerHTML='';
     const cv=document.createElement('canvas'); cv.className='projcanvas'; cv.width=320; cv.height=320;
     proj.appendChild(cv);
-    drawFieldContour(cv, tm.points);
+    drawFieldContour(cv, tm.grid);   // same density field the mindmap gaps come from
     tm.points.forEach(p=>{
       const d=document.createElement('div'); d.className='pt'; d.title=p.title||'';
       d.style.left=(topicPos(p.x)*100).toFixed(2)+'%'; d.style.top=(topicPos(p.y)*100).toFixed(2)+'%';
       d.style.background=topicColor(p.cluster); d.style.opacity=(0.5+0.45*(p.score||0)).toFixed(2);
       proj.appendChild(d);
+    });
+    // Mark each research-gap valley on the map.
+    (tm.gaps||[]).forEach(g=>{
+      const m=document.createElement('div'); m.className='gapmark'; m.title=g.label||'research gap'; m.textContent='◇';
+      m.style.left=(topicPos(g.x)*100)+'%'; m.style.top=(topicPos(g.y)*100)+'%'; proj.appendChild(m);
     });
     const star=document.createElement('div'); star.className='star'; star.title='your query'; star.textContent='✦';
     const qx=tm.query&&tm.query.x!=null?tm.query.x:0.5, qy=tm.query&&tm.query.y!=null?tm.query.y:0.5;
