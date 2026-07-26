@@ -50,6 +50,7 @@
     },
     getSession(id) { return req("GET", "/sessions/" + encodeURIComponent(id)); },
     listSessions() { return req("GET", "/sessions"); },
+    deleteSession(id) { return req("DELETE", "/sessions/" + encodeURIComponent(id)); },
     profileAuthors(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/authors"); },
     expand(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/expand"); },
 

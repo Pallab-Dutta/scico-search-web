@@ -81,9 +81,30 @@
         const { sessions } = await window.SciCoAPI.listSessions();
         host.innerHTML = (sessions || []).map(s => {
           const active = s.id === Shell.activeSession ? " active" : "";
-          return `<a class="session${active}" href="results.html?session=${encodeURIComponent(s.id)}">${esc(s.base_query || "(untitled)")}</a>`;
+          const label = esc(s.base_query || "(untitled)");
+          return `<div class="session-row">` +
+            `<a class="session${active}" href="results.html?session=${encodeURIComponent(s.id)}">${label}</a>` +
+            `<button class="session-del" type="button" data-id="${esc(s.id)}" title="Delete this session" aria-label="Delete session"><span class="mi">delete</span></button>` +
+          `</div>`;
         }).join("") || '<small style="color:var(--muted)">No past searches yet.</small>';
+        host.querySelectorAll(".session-del").forEach(btn => {
+          btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            Shell.deleteSession(e.currentTarget.getAttribute("data-id"));
+          });
+        });
       } catch (_) { /* sidebar history is best-effort */ }
+    },
+
+    async deleteSession(id) {
+      if (!id) return;
+      if (!window.confirm("Delete this search session? This can't be undone.")) return;
+      try {
+        await window.SciCoAPI.deleteSession(id);
+      } catch (_) { /* a reload below will reflect the true server state either way */ }
+      // If the deleted session is the one on screen, its content is gone — start fresh.
+      if (id === Shell.activeSession) { location.href = "search.html"; return; }
+      Shell.loadSessions();
     },
   };
 
