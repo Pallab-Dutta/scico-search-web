@@ -464,13 +464,27 @@
   function drawFieldContour(canvas, grid){
     const W=canvas.width,H=canvas.height,ctx=canvas.getContext('2d');
     if(!grid||!grid.length){ ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H); return; }
-    const G=grid.length, img=ctx.createImageData(W,H);
+    const G=grid.length, img=ctx.createImageData(W,H), data=img.data, T=new Float32Array(W*H);
+    // 1) continuous filled colormap (bilinear) + remember density per pixel
     for(let y=0;y<H;y++){
       const gy=(y/(H-1))*(G-1), r0=Math.floor(gy), r1=Math.min(G-1,r0+1), fy=gy-r0;
       for(let x=0;x<W;x++){
         const gx=(x/(W-1))*(G-1), c0=Math.floor(gx), c1=Math.min(G-1,c0+1), fx=gx-c0;
         const t=(grid[r0][c0]*(1-fx)+grid[r0][c1]*fx)*(1-fy)+(grid[r1][c0]*(1-fx)+grid[r1][c1]*fx)*fy;
-        const col=_cmap(t), i=(y*W+x)*4; img.data[i]=col[0]; img.data[i+1]=col[1]; img.data[i+2]=col[2]; img.data[i+3]=255;
+        T[y*W+x]=t; const col=_cmap(t), i=(y*W+x)*4; data[i]=col[0]; data[i+1]=col[1]; data[i+2]=col[2]; data[i+3]=255;
+      }
+    }
+    // 2) iso-contour lines: faded blackish where the quantized density level changes
+    const LEVELS=6, LINE=[58,60,66], A=0.42, band=v=>Math.floor(Math.min(0.999999,Math.max(0,v))*LEVELS);
+    for(let y=0;y<H;y++){
+      for(let x=0;x<W;x++){
+        const i=y*W+x, b=band(T[i]);
+        if((x+1<W && band(T[i+1])!==b) || (y+1<H && band(T[i+W])!==b)){
+          const j=i*4;
+          data[j]=Math.round(data[j]*(1-A)+LINE[0]*A);
+          data[j+1]=Math.round(data[j+1]*(1-A)+LINE[1]*A);
+          data[j+2]=Math.round(data[j+2]*(1-A)+LINE[2]*A);
+        }
       }
     }
     ctx.putImageData(img,0,0);
