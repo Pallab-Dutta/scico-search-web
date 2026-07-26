@@ -172,51 +172,17 @@
         <div class="maphead">
           <h2>Topic Map &amp; Research Gaps</h2>
           <p>Each branch is a sub-area of the field. Sub-branches run from the well-studied core outward — the last is the under-explored <b>research-gap frontier</b>.</p>
-          <div class="legend-top">
-            <span class="key"><span class="sw" style="background:var(--c1)"></span>Generative samplers</span>
-            <span class="key"><span class="sw" style="background:var(--c2)"></span>Rare-event theory</span>
-            <span class="key"><span class="sw" style="background:var(--c3)"></span>MD &amp; metastability</span>
-            <span class="key"><span class="sw" style="background:var(--c4)"></span>Optimal transport</span>
-          </div>
+          <div class="legend-top" id="legendTop"></div>
         </div>
-        <div class="panels">
+        <div id="topicStatus" class="sub-h"></div>
+        <div class="panels" id="topicPanels" style="display:none">
           <div class="panel">
-            <div class="ph"><span>Research-gap mindmap</span><span>4 branches</span></div>
-            <div class="mind">
-              <div class="branch sel">
-                <div class="bhead"><span class="bdot" style="background:var(--c1)"></span><b>Generative samplers</b><span class="n">14 papers</span></div>
-                <div class="subs">
-                  <div class="sub"><span class="lbl">Flow-matching Boltzmann generators</span><span class="core-tag">CORE</span><span class="densitybar" style="width:54px;background:var(--c1)"></span><div class="meta">most-studied · 8 papers</div></div>
-                  <div class="sub"><span class="lbl">Stochastic interpolant transition paths</span><span class="densitybar" style="width:34px;background:var(--c1);opacity:.7"></span><div class="meta">emerging · 4 papers</div></div>
-                  <div class="sub gap"><span class="lbl">Amortized rare-event control</span><span class="gap-tag">◇ RESEARCH GAP</span><div class="meta">under-explored · 2 papers</div></div>
-                </div>
-              </div>
-              <div class="branch">
-                <div class="bhead"><span class="bdot" style="background:var(--c2)"></span><b>Rare-event theory</b><span class="n">9 papers</span></div>
-                <div class="subs">
-                  <div class="sub"><span class="lbl">Transition path theory &amp; committors</span><span class="core-tag">CORE</span><span class="densitybar" style="width:50px;background:var(--c2)"></span><div class="meta">most-studied · 5 papers</div></div>
-                  <div class="sub gap"><span class="lbl">Learned reaction coordinates from flows</span><span class="gap-tag">◇ RESEARCH GAP</span><div class="meta">under-explored · 1 paper</div></div>
-                </div>
-              </div>
-              <div class="branch">
-                <div class="bhead"><span class="bdot" style="background:var(--c3)"></span><b>MD &amp; metastability</b><span class="n">9 papers</span></div>
-                <div class="subs">
-                  <div class="sub"><span class="lbl">Enhanced-sampling MD (metadynamics)</span><span class="core-tag">CORE</span><span class="densitybar" style="width:48px;background:var(--c3)"></span><div class="meta">most-studied · 6 papers</div></div>
-                  <div class="sub gap"><span class="lbl">ML-accelerated metastable kinetics</span><span class="gap-tag">◇ RESEARCH GAP</span><div class="meta">under-explored · 3 papers</div></div>
-                </div>
-              </div>
-              <div class="branch">
-                <div class="bhead"><span class="bdot" style="background:var(--c4)"></span><b>Optimal transport</b><span class="n">6 papers</span></div>
-                <div class="subs">
-                  <div class="sub"><span class="lbl">Schrödinger-bridge samplers</span><span class="core-tag">CORE</span><span class="densitybar" style="width:40px;background:var(--c4)"></span><div class="meta">most-studied · 4 papers</div></div>
-                  <div class="sub gap"><span class="lbl">OT for rare-event reweighting</span><span class="gap-tag">◇ RESEARCH GAP</span><div class="meta">under-explored · 2 papers</div></div>
-                </div>
-              </div>
-            </div>
+            <div class="ph"><span>Research-gap mindmap</span><span id="branchCount"></span></div>
+            <div class="mind" id="mindHost"></div>
           </div>
           <div class="panel">
-            <div class="ph"><span>Map of the field</span><span>38 papers</span></div>
-            <div class="proj" id="proj"><div class="star" title="your query">✦</div><div class="gaparc" style="left:14%;top:18%;width:120px;height:120px"></div></div>
+            <div class="ph"><span>Map of the field</span><span id="pointCount"></span></div>
+            <div class="proj" id="proj"></div>
             <div class="proj-foot"><span>Each point is a paper · closer points are more closely related</span><span class="cbar">less studied <span class="grad"></span> populated</span></div>
           </div>
         </div>
@@ -259,13 +225,13 @@
   Shell.init(SID);
 
   // ---------- Tab switching (no reload) ----------
-  let topicInit=false, authorsInit=false;
+  let topicInit=false, authorsInit=false, TOPIC=null;
   function setTab(name){
     document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
     document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('show', p.id==='pane-'+name));
     if(name!=='publications') closePanel();
     const u=new URL(location); u.searchParams.set('tab', name); history.replaceState(null,'',u);
-    if(name==='topicmap' && !topicInit){ initTopic(); topicInit=true; }
+    if(name==='topicmap' && !topicInit){ startTopic(); topicInit=true; }
     if(name==='authors' && !authorsInit){ startAuthors(); authorsInit=true; }
   }
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setTab(t.dataset.tab)));
@@ -375,6 +341,7 @@
       const data=await window.SciCoAPI.getSession(SID);
       const pub=data.publications||{};
       THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[];
+      TOPIC=null; topicInit=false;  // Get More changed the paper set; recompute the map on next open
       $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
       EXPANDING=false;
       renderQrows(); renderPapers();
@@ -457,15 +424,73 @@
     }
   }
 
-  // ---------- Topic Map (visual mock) ----------
-  function initTopic(){
-    const proj=$('proj'); if(!proj) return;
-    const cl=[{x:30,y:36,c:'#BA5757',n:14},{x:66,y:62,c:'#8497B0',n:9},{x:74,y:26,c:'#6A9978',n:9},{x:28,y:74,c:'#C98A3E',n:6}];
-    cl.forEach(k=>{ for(let i=0;i<k.n*1.6;i++){ const a=Math.random()*6.28, r=Math.random()*Math.sqrt(Math.random())*13;
-      const d=document.createElement('div'); d.className='pt'; d.style.left=(k.x+Math.cos(a)*r)+'%'; d.style.top=(k.y+Math.sin(a)*r*1.3)+'%';
-      d.style.background=k.c; d.style.opacity=(0.5+Math.random()*0.45).toFixed(2);
-      if(i===0){d.style.width='12px';d.style.height='12px';d.style.boxShadow='0 0 0 3px rgba(255,255,255,.8), 0 0 0 4px '+k.c;}
-      proj.appendChild(d); } });
+  // ---------- Topic Map (real data: 2D projection + research-gap mindmap) ----------
+  const TOPIC_COLORS=['#BA5757','#8497B0','#6A9978','#C98A3E','#7E6BA8','#4C9AA6','#B07A4C','#5E874F','#A85C8A','#5578A8'];
+  const topicColor=i=>TOPIC_COLORS[((i%TOPIC_COLORS.length)+TOPIC_COLORS.length)%TOPIC_COLORS.length];
+
+  function renderTopic(tm){
+    const status=$('topicStatus'), panels=$('topicPanels');
+    if(!tm || !(tm.points||[]).length){
+      panels.style.display='none';
+      status.textContent = tm && tm.n_points!=null && tm.n_points<3
+        ? 'Not enough papers in this session to build a topic map.'
+        : 'No topic map available for this session yet.';
+      return;
+    }
+    status.textContent=''; panels.style.display='';
+    const clusters=tm.clusters||[];
+
+    // Legend (one swatch per themed cluster).
+    $('legendTop').innerHTML = clusters.map(c=>
+      `<span class="key"><span class="sw" style="background:${topicColor(c.id)}"></span>${esc(c.theme||('Cluster '+(c.id+1)))}</span>`).join('');
+
+    // Mindmap: one branch per cluster; bands run dense core -> under-explored gap.
+    $('branchCount').textContent = clusters.length+(clusters.length===1?' branch':' branches');
+    $('mindHost').innerHTML = clusters.map((c,ci)=>{
+      const col=topicColor(c.id);
+      const maxBand=Math.max(1,...(c.bands||[]).map(b=>b.count||0));
+      const subs=(c.bands||[]).map((b,bi)=>{
+        const last=bi===c.bands.length-1, w=Math.max(8,Math.round(54*(b.count||0)/maxBand));
+        const tag = b.is_gap ? '<span class="gap-tag">◇ RESEARCH GAP</span>'
+                  : bi===0 ? '<span class="core-tag">CORE</span>'
+                  : `<span class="densitybar" style="width:${w}px;background:${col};opacity:.7"></span>`;
+        const bar = (!b.is_gap && bi===0) ? `<span class="densitybar" style="width:${w}px;background:${col}"></span>` : '';
+        const kind = b.is_gap ? 'under-explored' : (bi===0 ? 'most-studied' : 'emerging');
+        const n=b.count||0;
+        return `<div class="sub${b.is_gap?' gap':''}"><span class="lbl">${esc(b.label||('Sub-area '+(bi+1)))}</span>${tag}${bar}`+
+               `<div class="meta">${kind} · ${n} paper${n===1?'':'s'}</div></div>`;
+      }).join('');
+      return `<div class="branch${ci===0?' sel':''}">`+
+        `<div class="bhead"><span class="bdot" style="background:${col}"></span><b>${esc(c.theme||('Cluster '+(c.id+1)))}</b><span class="n">${c.count} paper${c.count===1?'':'s'}</span></div>`+
+        `<div class="subs">${subs}</div></div>`;
+    }).join('');
+
+    // Scatter: each paper a dot colored by cluster, positioned by normalized [0,1] coords.
+    $('pointCount').textContent = tm.points.length+' papers';
+    const proj=$('proj');
+    proj.innerHTML = tm.points.map(p=>{
+      const op=(0.45+0.5*(p.score||0)).toFixed(2);
+      return `<div class="pt" title="${esc(p.title||'')}" style="left:${(p.x*100).toFixed(2)}%;top:${(p.y*100).toFixed(2)}%;background:${topicColor(p.cluster)};opacity:${op}"></div>`;
+    }).join('');
+    const star=document.createElement('div'); star.className='star'; star.title='your query'; star.textContent='✦';
+    star.style.left=((tm.query&&tm.query.x!=null?tm.query.x:0.5)*100)+'%';
+    star.style.top=((tm.query&&tm.query.y!=null?tm.query.y:0.5)*100)+'%';
+    proj.appendChild(star);
+  }
+
+  async function startTopic(){
+    if(!SID){ $('topicStatus').textContent='No session specified.'; return; }
+    try{
+      if(TOPIC){ renderTopic(TOPIC); return; }          // already computed / cached on the session
+      $('topicStatus').textContent='Building the topic map & research gaps…';
+      const { job_id }=await window.SciCoAPI.topicMap(SID);
+      await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('topicStatus').textContent=d.message; } });
+      const data=await window.SciCoAPI.getSession(SID);
+      TOPIC=data.topic_map||null;
+      renderTopic(TOPIC);
+    }catch(err){
+      $('topicStatus').textContent = err.code===401 ? 'Please sign in again.' : ('Could not build the topic map ('+(err.message||'error')+').');
+    }
   }
 
   // ---------- Authors ----------
@@ -510,6 +535,7 @@
       try{ const me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
       const pub=data.publications||{};
       THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[]; VISIBLE=10;
+      TOPIC=data.topic_map||null;  // render instantly if already cached on the session
       $('resQuery').textContent='"'+(data.base_query||'')+'"';
       $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
       renderQrows(); renderPapers();
