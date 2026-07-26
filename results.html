@@ -136,6 +136,9 @@
   @keyframes gapflash{0%,100%{box-shadow:none;background:var(--red-soft)}22%{box-shadow:0 0 0 3px var(--red);background:#fff}}
   .gaptitle{font-size:.9rem;color:var(--ink);font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .gapex{font-size:.78rem;color:var(--ink3);margin-top:5px}
+  .spin{display:inline-block;animation:spin 1s linear infinite;vertical-align:-.2em}
+  .loadwrap{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:.9rem}
+  .loadwrap .mi{color:var(--slate)}
   .star{position:absolute;left:48%;top:50%;transform:translate(-50%,-50%);color:var(--ink);font-size:18px}
   .gaparc{position:absolute;border:2px dashed rgba(186,87,87,.55);border-radius:50%}
   .proj-foot{display:flex;justify-content:space-between;align-items:center;padding:0 16px 14px;font-size:.78rem;color:var(--ink3);flex-wrap:wrap;gap:8px}
@@ -165,7 +168,7 @@
 
       <!-- ===== PUBLICATIONS ===== -->
       <section class="tabpane show" id="pane-publications">
-        <details class="logs">
+        <details class="logs" id="logsSection">
           <summary><span class="mi">manage_search</span> View AI Search Logs &amp; Queries Used <span class="mi chev">expand_more</span></summary>
           <div class="logs-body">
             <p class="cap">Queries executed &amp; papers collected — click a count to open that query's top matching papers in the side panel.</p>
@@ -235,6 +238,7 @@
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+  const loadHTML = m => '<span class="loadwrap"><span class="mi spin">progress_activity</span> '+esc(m)+'</span>';
   const params = new URLSearchParams(location.search);
   const SID = params.get('session');
 
@@ -554,9 +558,9 @@
     if(!SID){ $('topicStatus').textContent='No session specified.'; return; }
     try{
       if(TOPIC){ renderTopic(TOPIC); return; }          // already computed / cached on the session
-      $('topicStatus').textContent='Building the topic map & research gaps…';
+      $('topicStatus').innerHTML=loadHTML('Building the topic map & research gaps…');
       const { job_id }=await window.SciCoAPI.topicMap(SID);
-      await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('topicStatus').textContent=d.message; } });
+      await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('topicStatus').innerHTML=loadHTML(d.message); } });
       const data=await window.SciCoAPI.getSession(SID);
       TOPIC=data.topic_map||null;
       renderTopic(TOPIC);
@@ -587,9 +591,9 @@
       let data=await window.SciCoAPI.getSession(SID);
       if(data.authors!==null){ renderAuthors(data.authors); return; }
       try{ const me=await window.SciCoAPI.me(); if((me.quotas.pi_profiling||{}).limit===0){ $('piStatus').innerHTML='PI &amp; lab profiling is a premium feature. <a href="pricing.html">See plans &amp; pricing</a> to unlock it.'; return; } }catch(_){}
-      $('piStatus').textContent='Deep-profiling principal investigators…';
+      $('piStatus').innerHTML=loadHTML('Deep-profiling principal investigators…');
       const { job_id }=await window.SciCoAPI.profileAuthors(SID);
-      await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('piStatus').textContent=d.message; } });
+      await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('piStatus').innerHTML=loadHTML(d.message); } });
       data=await window.SciCoAPI.getSession(SID);
       renderAuthors(data.authors);
     }catch(err){
@@ -605,6 +609,8 @@
     try{
       const data=await window.SciCoAPI.getSession(SID);
       try{ const me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
+      // Query internals (expanded queries + Boolean relaxation) are for admins only.
+      if(!IS_ADMIN && $('logsSection')) $('logsSection').style.display='none';
       const pub=data.publications||{};
       THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[]; VISIBLE=10;
       TOPIC=data.topic_map||null;  // render instantly if already cached on the session

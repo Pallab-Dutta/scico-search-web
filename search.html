@@ -63,6 +63,11 @@
   .stat .qx{font-size:.9rem;color:var(--ink);flex:1;min-width:0}
   .stat.running{color:var(--muted)}.stat .spin{color:var(--slate);animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
+  #liveWrap{margin-top:14px}
+  .lp{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid #f0f0f0;font-size:.88rem;animation:fadein .3s ease}
+  .lp-t{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+  .lp-m{color:var(--muted);font-size:.8rem;white-space:nowrap;flex:0 0 auto}
+  @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 </style>
 </head>
 <body>
@@ -105,7 +110,8 @@
           <div><div class="phase-t" id="phaseT">Starting…</div><div class="phase-s" id="phaseS"></div></div>
         </div>
         <div class="pbar"><div class="pfill" id="pfill"></div></div>
-        <div class="stats"><div class="stats-h">Live query search statistics</div><div id="statRows"></div></div>
+        <div id="liveWrap"><div class="stats-h" id="liveHead">Harvesting literature…</div><div id="livePapers"></div></div>
+        <div class="stats" id="statsBox"><div class="stats-h">Live query search statistics</div><div id="statRows"></div></div>
       </div>
     </div>
   </main>
@@ -139,6 +145,11 @@
     const icon = running ? '<span class="mi spin">progress_activity</span>' : '<span class="mi ok">check</span>';
     return `<div class="stat${running?' running':''}">${icon}<span class="qx">${esc(msg)}</span></div>`;
   }
+  // Live paper row shown to EVERYONE as papers rank on the fly (no waiting).
+  function livePaperRow(p){
+    const s=Number(p.ai_score||0).toFixed(3);
+    return `<div class="lp"><span class="lp-t">${esc(p.title||'')}</span><span class="lp-m">${esc(String(p.year||''))} · AI ${s}</span></div>`;
+  }
 
   let running=false;
   async function runSearch(){
@@ -149,9 +160,15 @@
     const depth = $('deep').checked ? 'deep' : 'shallow';
     const creativity = (+entropy.value)/100;
     $('progress').style.display='block';
-    $('statRows').innerHTML = statRow('Submitting your search…', true);
+    $('livePapers').innerHTML=''; $('liveHead').textContent='Harvesting literature…';
     $('phaseT').textContent='Phase 1 · Harvesting best literature';
     $('phaseS').textContent='Original focus: '+q;
+
+    // Raw query internals (expanded queries + Boolean relaxation) are admin-only.
+    let IS_ADMIN=false;
+    try{ const me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){}
+    $('statsBox').style.display = IS_ADMIN ? '' : 'none';
+    $('statRows').innerHTML = IS_ADMIN ? statRow('Submitting your search…', true) : '';
 
     let rows=[];
     try{
@@ -162,29 +179,32 @@
           if(type==='phase'){
             $('phaseT').textContent='Phase 1 · '+(data.label||'');
             if(data.focus) $('phaseS').textContent='Original focus: '+data.focus;
-            $('statRows').innerHTML = rows.map(r=>statRow(r)).join('') + statRow((data.label||'')+'…', true);
+            if(IS_ADMIN) $('statRows').innerHTML = rows.map(r=>statRow(r)).join('') + statRow((data.label||'')+'…', true);
           } else if(type==='query_stat'){
-            rows.push(data.message||''); $('statRows').innerHTML = rows.map(r=>statRow(r)).join('');
+            if(IS_ADMIN){ rows.push(data.message||''); $('statRows').innerHTML = rows.map(r=>statRow(r)).join(''); }
           } else if(type==='preview'){
             const pct = data.total ? Math.min(95, Math.round(100*data.scored/data.total)) : 30;
             $('pfill').style.width = pct+'%';
-            $('statRows').innerHTML = rows.map(r=>statRow(r)).join('') + statRow(`Reading & scoring papers — ${data.passed} passed the relevance cutoff so far`, true);
-          } else if(type==='done'){ sessionId=data.session_id; $('pfill').style.width='100%';
-          } else if(type==='error'){ $('statRows').innerHTML += statRow('Search failed: '+(data.message||'error')); }
+            $('liveHead').textContent = `Top matches so far — ${data.passed} passed the relevance cutoff`;
+            $('livePapers').innerHTML = (data.top||[]).map(livePaperRow).join('');
+            if(IS_ADMIN) $('statRows').innerHTML = rows.map(r=>statRow(r)).join('') + statRow(`Reading & scoring — ${data.passed} passed`, true);
+          } else if(type==='done'){ sessionId=data.session_id; $('pfill').style.width='100%'; $('liveHead').textContent='Finalizing your results…';
+          } else if(type==='error'){ $('liveHead').textContent='Search failed: '+(data.message||'error'); if(IS_ADMIN) $('statRows').innerHTML += statRow('Search failed: '+(data.message||'error')); }
         }
       });
       if(sessionId) location.href='results.html?session='+encodeURIComponent(sessionId);
       else running=false;
     }catch(err){
       running=false;
+      $('liveHead').textContent='Could not complete the search.';
       if(err.code===402 || err.code===429){
         const d=err.detail||{};
-        $('statRows').innerHTML = statRow(d.error==='quota_exceeded'
+        $('liveHead').textContent = d.error==='quota_exceeded'
           ? `Monthly deep-search limit reached (${d.used}/${d.limit}). Upgrade for more.`
-          : 'Deep search is a premium feature. Upgrade to enable it.');
+          : 'Deep search is a premium feature. Upgrade to enable it.';
         $('hint').innerHTML = 'See <a href="pricing.html">plans &amp; pricing</a>.';
       } else if(err.code===401){ location.href='index.html'; }
-      else { $('statRows').innerHTML = statRow('Could not start search ('+(err.message||'error')+').'); }
+      else { $('liveHead').textContent='Could not start search ('+(err.message||'error')+').'; }
     }
   }
   $('go').addEventListener('click', runSearch);
