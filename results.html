@@ -119,9 +119,11 @@
   .sub.gap{color:var(--red-strong)}
   .gap-tag{display:inline-flex;align-items:center;gap:5px;font-size:.64rem;font-weight:700;letter-spacing:.05em;color:var(--red-strong);border:1px dashed var(--red);border-radius:99px;padding:2px 8px;margin-left:8px}
   .core-tag{font-size:.62rem;font-weight:700;letter-spacing:.05em;color:#4d5b70;background:var(--slate-soft);border-radius:99px;padding:2px 8px;margin-left:8px}
-  .proj{position:relative;aspect-ratio:1/1;margin:14px;border-radius:14px;border:1px solid var(--line);overflow:hidden;
-    background:radial-gradient(150px 150px at 30% 36%,rgba(186,87,87,.16),transparent 68%),radial-gradient(160px 160px at 66% 62%,rgba(132,151,176,.18),transparent 68%),radial-gradient(120px 120px at 74% 26%,rgba(106,153,120,.18),transparent 68%),radial-gradient(120px 120px at 28% 74%,rgba(201,138,62,.15),transparent 68%),#fff}
-  .pt{position:absolute;width:9px;height:9px;border-radius:50%}
+  .proj{position:relative;aspect-ratio:1/1;margin:14px;border-radius:14px;border:1px solid var(--line);overflow:hidden;background:#fff}
+  .projcanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .pt{position:absolute;width:9px;height:9px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 1px rgba(255,255,255,.9)}
+  .cbar-v{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.6rem;color:var(--ink2);background:rgba(255,255,255,.8);padding:5px 6px;border-radius:8px;box-shadow:0 1px 3px rgba(20,20,20,.12)}
+  .cb-strip{width:9px;height:64px;border-radius:99px;background:linear-gradient(to top,#FBFAF8,#8497B0,#BA5757);border:1px solid var(--line)}
   .star{position:absolute;left:48%;top:50%;transform:translate(-50%,-50%);color:var(--ink);font-size:18px}
   .gaparc{position:absolute;border:2px dashed rgba(186,87,87,.55);border-radius:50%}
   .proj-foot{display:flex;justify-content:space-between;align-items:center;padding:0 16px 14px;font-size:.78rem;color:var(--ink3);flex-wrap:wrap;gap:8px}
@@ -183,7 +185,7 @@
           <div class="panel">
             <div class="ph"><span>Map of the field</span><span id="pointCount"></span></div>
             <div class="proj" id="proj"></div>
-            <div class="proj-foot"><span>Each point is a paper · closer points are more closely related</span><span class="cbar">less studied <span class="grad"></span> populated</span></div>
+            <div class="proj-foot"><span>Each point is a paper · closer points are more related · the colour contour shows paper density (dense = well-studied, sparse = potential gaps)</span></div>
           </div>
         </div>
       </section>
@@ -427,6 +429,34 @@
   // ---------- Topic Map (real data: 2D projection + research-gap mindmap) ----------
   const TOPIC_COLORS=['#BA5757','#8497B0','#6A9978','#C98A3E','#7E6BA8','#4C9AA6','#B07A4C','#5E874F','#A85C8A','#5578A8'];
   const topicColor=i=>TOPIC_COLORS[((i%TOPIC_COLORS.length)+TOPIC_COLORS.length)%TOPIC_COLORS.length];
+  const TOPIC_PAD=0.09;  // margin around extreme points so edge points stay visible (matches the contour)
+  const topicPos=v=>TOPIC_PAD+Math.max(0,Math.min(1,v))*(1-2*TOPIC_PAD);  // [0,1] -> [PAD,1-PAD]
+
+  // Sequential colormap (cream -> slate -> red) matching the colorbar strip.
+  function _cmap(t){
+    t=Math.max(0,Math.min(1,t));
+    const A=[251,250,248],B=[132,151,176],C=[186,87,87];
+    let a,b,f; if(t<0.5){a=A;b=B;f=t/0.5;}else{a=B;b=C;f=(t-0.5)/0.5;}
+    return [Math.round(a[0]+(b[0]-a[0])*f),Math.round(a[1]+(b[1]-a[1])*f),Math.round(a[2]+(b[2]-a[2])*f)];
+  }
+  // Kernel-density estimate of paper positions -> banded colour contour on a canvas.
+  function drawFieldContour(canvas, points){
+    const W=canvas.width,H=canvas.height,ctx=canvas.getContext('2d');
+    if(!points.length){ return; }
+    const px=v=>topicPos(v)*W, py=v=>topicPos(v)*H;
+    const P=points.map(p=>[px(p.x),py(p.y)]);
+    const h=0.12*Math.min(W,H), inv=1/(2*h*h), step=3;
+    const cols=Math.ceil(W/step), rows=Math.ceil(H/step), dens=new Float32Array(cols*rows);
+    let maxD=0;
+    for(let r=0;r<rows;r++){ const y=r*step; for(let c=0;c<cols;c++){ const x=c*step; let d=0;
+      for(let k=0;k<P.length;k++){ const dx=x-P[k][0],dy=y-P[k][1]; d+=Math.exp(-(dx*dx+dy*dy)*inv); }
+      dens[r*cols+c]=d; if(d>maxD)maxD=d; } }
+    const LEVELS=8, img=ctx.createImageData(W,H);
+    for(let y=0;y<H;y++){ const r=Math.min(rows-1,(y/step)|0); for(let x=0;x<W;x++){ const c=Math.min(cols-1,(x/step)|0);
+      let t=maxD>0?dens[r*cols+c]/maxD:0; t=Math.round(t*LEVELS)/LEVELS;  // quantize -> contour bands
+      const col=_cmap(t), i=(y*W+x)*4; img.data[i]=col[0]; img.data[i+1]=col[1]; img.data[i+2]=col[2]; img.data[i+3]=255; } }
+    ctx.putImageData(img,0,0);
+  }
 
   function renderTopic(tm){
     const status=$('topicStatus'), panels=$('topicPanels');
@@ -465,17 +495,25 @@
         `<div class="subs">${subs}</div></div>`;
     }).join('');
 
-    // Scatter: each paper a dot colored by cluster, positioned by normalized [0,1] coords.
+    // Density contour (colormap) behind the papers, with a margin so edge points stay visible.
     $('pointCount').textContent = tm.points.length+' papers';
-    const proj=$('proj');
-    proj.innerHTML = tm.points.map(p=>{
-      const op=(0.45+0.5*(p.score||0)).toFixed(2);
-      return `<div class="pt" title="${esc(p.title||'')}" style="left:${(p.x*100).toFixed(2)}%;top:${(p.y*100).toFixed(2)}%;background:${topicColor(p.cluster)};opacity:${op}"></div>`;
-    }).join('');
+    const proj=$('proj'); proj.innerHTML='';
+    const cv=document.createElement('canvas'); cv.className='projcanvas'; cv.width=320; cv.height=320;
+    proj.appendChild(cv);
+    drawFieldContour(cv, tm.points);
+    tm.points.forEach(p=>{
+      const d=document.createElement('div'); d.className='pt'; d.title=p.title||'';
+      d.style.left=(topicPos(p.x)*100).toFixed(2)+'%'; d.style.top=(topicPos(p.y)*100).toFixed(2)+'%';
+      d.style.background=topicColor(p.cluster); d.style.opacity=(0.5+0.45*(p.score||0)).toFixed(2);
+      proj.appendChild(d);
+    });
     const star=document.createElement('div'); star.className='star'; star.title='your query'; star.textContent='✦';
-    star.style.left=((tm.query&&tm.query.x!=null?tm.query.x:0.5)*100)+'%';
-    star.style.top=((tm.query&&tm.query.y!=null?tm.query.y:0.5)*100)+'%';
+    const qx=tm.query&&tm.query.x!=null?tm.query.x:0.5, qy=tm.query&&tm.query.y!=null?tm.query.y:0.5;
+    star.style.left=(topicPos(qx)*100)+'%'; star.style.top=(topicPos(qy)*100)+'%';
     proj.appendChild(star);
+    const cbar=document.createElement('div'); cbar.className='cbar-v';
+    cbar.innerHTML='<span>dense</span><span class="cb-strip" title="paper density"></span><span>sparse</span>';
+    proj.appendChild(cbar);
   }
 
   async function startTopic(){
