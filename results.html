@@ -272,6 +272,12 @@
 
   // ---------- Publications ----------
   let QDATA=[], PAPERS=[], THRESHOLD=0.65;  // fallback == MIN_PAPER_SIMILARITY; backend overrides via pub.threshold
+  let IS_ADMIN=false;  // set from /me; admins see the recency-adjusted AI score (ai_score_ranked)
+  // Admins see the recency-nudged score (ai_score_ranked); everyone else sees the raw similarity.
+  function aiScoreHTML(p){
+    const v = IS_ADMIN ? (p.ai_score_ranked!=null ? p.ai_score_ranked : p.ai_score) : p.ai_score;
+    return `${IS_ADMIN?'AI Score (recency)':'AI Score'}: <b>${Number(v).toFixed(3)}</b>`;
+  }
   const bar=$('rightbar'), gutter=$('gutter');
   function openPanel(i){
     const d=QDATA[i]; if(!d) return;
@@ -279,8 +285,8 @@
     $('rbCount').textContent=d.count+" matching papers · top matches";
     $('rbBody').innerHTML=d.papers.map(p=>
       `<div class="qres"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a>`+
-      `<div class="meta">${esc(p.authors)}${p.publisher?`<span style="margin:0 7px;color:#cfd2d6">|</span><span class="mi">business</span> ${esc(p.publisher)}`:''}<span style="margin:0 7px;color:#cfd2d6">|</span><span class="mi">event</span> ${esc(p.year)}`+
-      `<span style="margin:0 7px;color:#cfd2d6">|</span><span class="mi">psychology</span> AI Score: <b>${Number(p.ai_score).toFixed(3)}</b></div></div>`
+      `<div class="meta">${esc(p.authors)}${p.publisher?`<span style="margin:0 7px;color:#cfd2d6">|</span><span class="mi">book_ribbon</span> ${esc(p.publisher)}`:''}<span style="margin:0 7px;color:#cfd2d6">|</span><span class="mi">event</span> ${esc(p.year)}`+
+      `<span style="margin:0 7px;color:#cfd2d6">|</span><span class="mi">psychology</span> ${aiScoreHTML(p)}</div></div>`
     ).join('') || '<p class="cap">No matches for this query.</p>';
     bar.classList.add('show'); gutter.classList.add('show');
     document.querySelectorAll('.qbtn').forEach(b=>b.classList.toggle('active', b.dataset.q===String(i)));
@@ -302,7 +308,7 @@
   function paperHTML(p,i){
     const low=Number(p.ai_score)<THRESHOLD;
     return `<div class="paper${low?' below':''}"><div class="ptitle${low?' low':''}"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a></div>`+
-      `<div class="pmeta">${esc(p.authors)}${p.publisher?`<span class="sep">|</span><span class="mi">business</span> ${esc(p.publisher)}`:''}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}<span class="sep">|</span><span class="mi">psychology</span> AI Score: <b>${Number(p.ai_score).toFixed(3)}</b></div>`+
+      `<div class="pmeta">${esc(p.authors)}${p.publisher?`<span class="sep">|</span><span class="mi">book_ribbon</span> ${esc(p.publisher)}`:''}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}<span class="sep">|</span><span class="mi">psychology</span> ${aiScoreHTML(p)}</div>`+
       `<div class="pactions"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}><span class="mi">open_in_new</span> Open</a>`+
       `<a class="cite-btn" data-i="${i}"><span class="mi">format_quote</span> Cite<span class="cite-fmt"></span></a>`+
       `<a class="cite-caret" data-i="${i}" title="Citation options"><span class="mi">expand_more</span></a></div></div>`;
@@ -501,6 +507,7 @@
     if(!SID){ $('resSummary').textContent='No session specified.'; return; }
     try{
       const data=await window.SciCoAPI.getSession(SID);
+      try{ const me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
       const pub=data.publications||{};
       THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[]; VISIBLE=10;
       $('resQuery').textContent='"'+(data.base_query||'')+'"';
