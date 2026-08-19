@@ -63,6 +63,19 @@
   .foot{text-align:center;color:var(--muted);font-size:.86rem;margin-top:34px}
   @media(max-width:860px){.grid{grid-template-columns:1fr;max-width:420px;margin-inline:auto}}
 </style>
+<!-- ── Microsoft Clarity ────────────────────────────────────────────────────
+     Session recordings + heatmaps for Eratosthenes (search.scicoagent.com). The project ID is the last
+     argument below; get it from clarity.microsoft.com -> Settings -> Overview.
+     Until a real ID replaces the placeholder the guard returns early, so the
+     page makes no request to clarity.ms. -->
+<script>
+(function (c, l, a, r, i, t, y) {
+  if (!i || i.indexOf("PASTE_") === 0) return;   // no project ID pasted in yet
+  c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) };
+  t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
+  y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+})(window, document, "clarity", "script", "y4p1zoary7");
+</script>
 </head>
 <body>
 <div class="page">
