@@ -176,6 +176,7 @@
       <div class="tabs">
         <div class="tab active" data-tab="publications"><span class="mi">description</span> Publications</div>
         <div class="tab" data-tab="topicmap"><span class="mi">hub</span> Topic Map</div>
+        <div class="tab" data-tab="disc"><span class="mi">account_tree</span> Gap Graph</div>
         <div class="tab" data-tab="authors"><span class="mi">science</span> Authors</div>
       </div>
 
@@ -220,6 +221,16 @@
         <div id="gapSection" class="gaps-sec"></div>
       </section>
 
+      <!-- ===== GAP GRAPH (disconnectivity) ===== -->
+      <section class="tabpane" id="pane-disc">
+        <div class="maphead">
+          <h2>Research-Gap Graph</h2>
+          <p>The field as a semantic landscape: each leaf is a paper, each branch is the barrier where two sub-areas split. <b>Gap-closers</b> — papers holding otherwise-distant sub-areas together — are scored by how much removing them would fracture the field, and highlighted on demand. Toggle the MST view to see connectors sit between the clusters they bridge.</p>
+        </div>
+        <div id="discStatus" class="sub-h"></div>
+        <div id="discHost" style="margin-top:8px"></div>
+      </section>
+
       <!-- ===== AUTHORS ===== -->
       <section class="tabpane" id="pane-authors">
         <p class="sub-h">Deep-profiles of the PIs behind your top-matched papers — recent lab output and a Fit score for how well their direction overlaps your query.</p>
@@ -248,6 +259,7 @@
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="js/logo.js"></script>
 <script src="js/shell.js"></script>
+<script src="js/disconnectivity.js"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -258,13 +270,14 @@
   Shell.init(SID);
 
   // ---------- Tab switching (no reload) ----------
-  let topicInit=false, authorsInit=false, TOPIC=null;
+  let topicInit=false, authorsInit=false, discInit=false, TOPIC=null;
   function setTab(name){
     document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
     document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('show', p.id==='pane-'+name));
     if(name!=='publications') closePanel();
     const u=new URL(location); u.searchParams.set('tab', name); history.replaceState(null,'',u);
     if(name==='topicmap' && !topicInit){ startTopic(); topicInit=true; }
+    if(name==='disc' && !discInit){ startDisc(); discInit=true; }
     if(name==='authors' && !authorsInit){ startAuthors(); authorsInit=true; }
   }
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setTab(t.dataset.tab)));
@@ -374,7 +387,7 @@
       const data=await window.SciCoAPI.getSession(SID);
       const pub=data.publications||{};
       THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[];
-      TOPIC=null; topicInit=false;  // Get More changed the paper set; recompute the map on next open
+      TOPIC=null; topicInit=false; discInit=false;  // Get More changed the paper set; recompute map + gap graph on next open
       $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
       EXPANDING=false;
       renderQrows(); renderPapers();
@@ -593,6 +606,31 @@
       renderTopic(TOPIC);
     }catch(err){
       $('topicStatus').textContent = err.code===401 ? 'Please sign in again.' : ('Could not build the topic map ('+(err.message||'error')+').');
+    }
+  }
+
+  // ---------- Gap Graph (disconnectivity) ----------
+  function renderDisc(data){
+    const dg=data.disconnectivity;
+    if(!dg || dg.tree==null || (dg.n_points||0) < 3){
+      $('discStatus').textContent='Not enough papers to build the graph yet — try Get More Results to gather more.';
+      $('discHost').innerHTML=''; return;
+    }
+    $('discStatus').textContent='';
+    window.renderDisconnectivity(data, $('discHost'));  // reads data.disconnectivity (server tree + LOO)
+  }
+  async function startDisc(){
+    if(!SID){ $('discStatus').textContent='No session specified.'; return; }
+    try{
+      let data=await window.SciCoAPI.getSession(SID);
+      if(data.disconnectivity && data.disconnectivity.tree){ renderDisc(data); return; }  // cached on session
+      $('discStatus').innerHTML=loadHTML('Building the research-gap landscape…');
+      const { job_id }=await window.SciCoAPI.disconnectivity(SID);
+      await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('discStatus').innerHTML=loadHTML(d.message); } });
+      data=await window.SciCoAPI.getSession(SID);
+      renderDisc(data);
+    }catch(err){
+      $('discStatus').textContent = err.code===401 ? 'Please sign in again.' : ('Could not build the graph ('+(err.message||'error')+').');
     }
   }
 

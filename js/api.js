@@ -53,6 +53,7 @@
     deleteSession(id) { return req("DELETE", "/sessions/" + encodeURIComponent(id)); },
     profileAuthors(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/authors"); },
     topicMap(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/topicmap"); },
+    disconnectivity(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/disconnectivity"); },
     expand(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/expand"); },
 
     /* Stream a job's SSE events. handlers: {onEvent(type,data), onError(err)} */
