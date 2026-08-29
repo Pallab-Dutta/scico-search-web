@@ -260,7 +260,13 @@
     const xAt = LOG ? xLog : xLin;                    // larger barrier -> further left
     const axisY = H - 22;
 
-    leaves.forEach((lf, i) => { lf._x = leafX; lf._y = top + i * rowH; });
+    leaves.forEach((lf, i) => {
+      const p = lf.paper || lf;
+      const held = (OVERLAY && model.held) ? (model.held.get(p) || 0) : 0;
+      lf._x = held > 0 ? xAt(held) : leafX;   // lifted gap-closers sit at their barrier; the branch stops here
+      lf._up = held > 0;
+      lf._y = top + i * rowH;
+    });
     (function lay(n) {
       if (isLeaf(n)) return { y: n._y };
       const c = kids(n).map(lay);
@@ -284,12 +290,12 @@
         const p = n.paper || n;
         const st = paperStyle(p, scores);
         const held = (model.held && model.held.get(p)) || 0;
-        // Highlighter ON: slide a gap-closer LEFT along the barrier axis to the gap it closes
-        // (xAt(held) — its dex position when Log is on), so its X now reads its gap-closing ability.
-        // The paper label follows the lifted dot.
-        const upX = (OVERLAY && held > 0) ? xAt(held) : n._x;
-        dots += `<circle class="dg-node" data-id="${id}" cx="${upX.toFixed(1)}" cy="${n._y}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
-        labels += `<text x="${(upX + 10).toFixed(1)}" y="${n._y + 3.5}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
+        // n._x is the (possibly lifted) position set in the layout, so the parent branch stops AT the
+        // node instead of running on to barrier 0. A lifted label sits just above the row line so the
+        // branch never crosses the text; the paper name follows the dot.
+        const ly = n._up ? n._y - 5 : n._y + 3.5;
+        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
+        labels += `<text x="${(n._x + 10).toFixed(1)}" y="${ly.toFixed(1)}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
         meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, held: held, total: (model.loo && model.loo.get(p)) || 0 };
       }
     })(tree);
