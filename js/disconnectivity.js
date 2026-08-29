@@ -65,6 +65,10 @@
   let MODE = "dg";     // "dg" = disconnectivity, "mst" = minimum spanning tree graph.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
 
+  // Display a barrier / gap magnitude honoring the Log-scale toggle: log10 when LOG is on (consistent
+  // with the log barrier axis and log edge scaling), otherwise the raw gap distance. Non-positive -> raw.
+  const fmtBar = v => (LOG && (+v) > 0) ? `log10 ${Math.log10(+v).toFixed(2)}` : (+v).toFixed(3);
+
   const isLeaf = n => n.leaf || (!n.children && n.paper);
   const kids = n => n.children || [];
   function leafNodes(n) { const out = []; (function g(m) { isLeaf(m) ? out.push(m) : kids(m).forEach(g); })(n); return out; }
@@ -171,7 +175,7 @@
       const score = (p.ai_score != null) ? `relevance ${(+p.ai_score).toFixed(2)}` : "";
       const bridge = (m.bridge > 0)
         ? (m.bridgeKind === "loo"
-          ? `gap-closer · removing it raises barriers by ${(+m.bridge).toFixed(2)}`
+          ? `gap-closer · removing it raises barriers by ${fmtBar(m.bridge)}`
           : `connector · routes ${m.bridge} paper-pairs`)
         : "";
       return `<b>${esc(p.title)}</b>` +
@@ -182,8 +186,8 @@
     const reps = m.papers.slice().sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0));
     const list = reps.slice(0, 4).map(p => `<li>${esc(trunc(p.title, 42))}</li>`).join("");
     const head = m.split
-      ? `barrier ${m.barrier.toFixed(3)} · splits ${m.split[0]} ↔ ${m.split[1]} papers`
-      : `barrier ${m.barrier.toFixed(3)} · ${reps.length} papers below`;
+      ? `barrier ${fmtBar(m.barrier)} · splits ${m.split[0]} ↔ ${m.split[1]} papers`
+      : `barrier ${fmtBar(m.barrier)} · ${reps.length} papers below`;
     return `<b>${esc(m.title)}</b>` +
       `<div class="dg-sub">${head}</div>` +
       `<ul class="dg-list">${list}${reps.length > 4 ? `<li>+${reps.length - 4} more…</li>` : ""}</ul>`;
@@ -243,7 +247,7 @@
       `<line x1="${leafX}" y1="${axisY - 4}" x2="${leafX}" y2="${axisY + 4}" stroke="#bbb"/>` +
       `<line x1="${left}" y1="${axisY - 4}" x2="${left}" y2="${axisY + 4}" stroke="#bbb"/>` +
       `<text x="${leafX}" y="${axisY + 16}" text-anchor="end" font-size="10" fill="#888">0</text>` +
-      `<text x="${left}" y="${axisY + 16}" text-anchor="start" font-size="10" fill="#888">${maxH.toFixed(2)}</text>` +
+      `<text x="${left}" y="${axisY + 16}" text-anchor="start" font-size="10" fill="#888">${LOG ? "log10 " + Math.log10(maxH).toFixed(2) : maxH.toFixed(2)}</text>` +
       `<text x="${(left + leafX) / 2}" y="${axisY + 16}" text-anchor="middle" font-size="10" fill="#888">← barrier (${LOG ? "log" : "linear"} gap magnitude)</text>`;
 
     return { inner: branches + axis + dots + labels, H, meta };
