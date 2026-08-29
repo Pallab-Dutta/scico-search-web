@@ -213,7 +213,7 @@
         // (sessions whose graph was cached before `held` existed / backend not yet redeployed).
         bridge = (m.held > 0)
           ? `gap-closer · holds shut a barrier of ${fmtBar(m.held)} · total gap-closing ${(+m.bridge).toFixed(2)}`
-          : `gap-closer · raises barriers by ${(+m.bridge).toFixed(2)}`;
+          : `gap-closer · total gap-closing ${(+m.bridge).toFixed(2)} (sum over pairs — not a single barrier)`;
       } else if (m.bridge > 0) {
         bridge = `connector · routes ${m.bridge} paper-pairs`;
       }
