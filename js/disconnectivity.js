@@ -207,16 +207,16 @@
       const meta = [p.authors, p.year].filter(Boolean).join(" · ");
       const score = (p.ai_score != null) ? `relevance ${(+p.ai_score).toFixed(2)}` : "";
       let bridge = "";
-      if (m.bridgeKind === "loo" && m.bridge > 0) {
-        // A gap-closer's own barrier HEIGHT = the gap that opens if it is removed (same units as a
-        // gap node), available once the server sends `held`. The total gap-closing (m.bridge) is a
-        // SUM over pairs, hence on a larger scale. Fall back to the total alone when `held` is absent
-        // (sessions whose graph was cached before `held` existed / backend not yet redeployed).
-        bridge = (m.held > 0)
-          ? `gap-closer · closed a barrier of ${fmtBar(m.held)} vs. work up to its year · total gap-closing ${(+m.bridge).toFixed(2)}`
-          : `gap-closer · total gap-closing ${(+m.bridge).toFixed(2)} (sum over pairs — not a single barrier)`;
-      } else if (m.bridge > 0) {
-        bridge = `connector · routes ${m.bridge} paper-pairs`;
+      if (m.held > 0) {
+        // Causal barrier this paper closed among the work that existed up to its year (same units as
+        // a gap node); the total gap-closing is the full-set SUM over pairs (a larger scale).
+        bridge = `gap-closer · closed a barrier of ${fmtBar(m.held)} vs. work up to its year`
+               + (m.total > 0 ? ` · total gap-closing ${(+m.total).toFixed(2)}` : "");
+      } else if (m.overlayKind === "betweenness" && m.overlay > 0) {
+        bridge = `connector · routes ${m.overlay} paper-pairs`;
+      } else if (m.total > 0) {
+        // Contributes to closing gaps overall, but did not singularly open a new gap in its era.
+        bridge = `gap-closer · total gap-closing ${(+m.total).toFixed(2)} (sum over pairs — not a single barrier)`;
       }
       return `<b>${esc(p.title)}</b>` +
         (meta ? `<div class="dg-sub">${esc(meta)}</div>` : "") +
@@ -278,7 +278,7 @@
         const st = paperStyle(p, scores);
         dots += `<circle class="dg-node" data-id="${id}" cx="${n._x}" cy="${n._y}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
         labels += `<text x="${n._x + 10}" y="${n._y + 3.5}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
-        meta[id] = { type: "paper", paper: p, bridge: st.raw, bridgeKind: st.kind, held: (model.held && model.held.get(p)) || 0 };
+        meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, held: (model.held && model.held.get(p)) || 0, total: (model.loo && model.loo.get(p)) || 0 };
       }
     })(tree);
 
@@ -382,7 +382,7 @@
       const st = paperStyle(p, scores);
       ndots += `<circle class="dg-node" data-id="${id}" cx="${p._x.toFixed(1)}" cy="${p._y.toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
       labels += `<text x="${(p._x + 8).toFixed(1)}" y="${(p._y + 3).toFixed(1)}" font-size="9" fill="#666">${esc(trunc(p.title, 16))}</text>`;
-      meta[id] = { type: "paper", paper: p, bridge: st.raw, bridgeKind: st.kind, held: (model.held && model.held.get(p)) || 0 };
+      meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, held: (model.held && model.held.get(p)) || 0, total: (model.loo && model.loo.get(p)) || 0 };
     });
     const hint = `<text x="12" y="${H - 12}" font-size="10" fill="#999">edge length ∝ ${LOG ? "log " : ""}gap magnitude · long / thick edge = larger gap</text>`;
 
@@ -427,7 +427,13 @@
     const W = Math.max(mountEl.clientWidth || 820, 360);
     // Prefer the server's faithful leave-one-out scores; fall back to client betweenness (fixtures /
     // legacy sessions). Same {raw, norm, kind} shape either way, so both views render identically.
-    const scores = (model.loo && model.loo.size) ? looScores(model.loo) : bridgeScore(model);
+    // Highlight/rank by the causal held barrier when the field has any era-bridges, so the emphasised
+    // papers are exactly the ones whose tooltip shows a "closed a barrier of …" reading; fall back to
+    // the total gap-closing sum, then to pure-topology betweenness (fixtures / legacy sessions).
+    const hasHeld = model.held && [...model.held.values()].some(v => v > 0);
+    const scores = hasHeld ? looScores(model.held)
+                 : (model.loo && model.loo.size) ? looScores(model.loo)
+                 : bridgeScore(model);
     const built = MODE === "mst" ? buildMST(model, W, scores) : buildDG(model, W, scores);
 
     const radio = (v, lbl) =>
