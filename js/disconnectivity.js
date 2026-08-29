@@ -87,8 +87,9 @@
   let BMIN = 0;
   // Display a barrier / gap magnitude honoring the Log-scale toggle. Barrier heights are POSITIVE, so
   // rather than log10(distance) (which is negative for distances < 1) the log view shows the raw
-  // distance PLUS "dex" = log10(barrier / tightest-gap) >= 0 — decades above the smallest gap, exactly
-  // the quantity the log axis positions by. Linear view shows just the raw distance.
+  // distance PLUS "dex" = log10(barrier / BMIN) >= 0 — decades above the smallest barrier in the whole
+  // picture (gap nodes AND gap-closer held barriers), so gaps and gap-closers share one scale and
+  // never go negative. Linear view shows just the raw distance.
   const fmtBar = v => {
     v = +v || 0;
     if (!(LOG && v > 0)) return v.toFixed(3);
@@ -421,8 +422,13 @@
     mountEl.style.position = "relative";
     if (!model) { mountEl.innerHTML = '<p style="color:#888">Need ≥2 papers with embeddings to draw the tree.</p>'; return; }
 
+    // Log ("dex") reference = the smallest positive barrier ANYWHERE in the picture — gap-node
+    // barriers AND gap-closer held barriers — so every dex = log10(barrier / BMIN) is >= 0, and the
+    // axis label and the gap-closer tooltips use one identical formula/reference.
     const bw = (model.edges || []).map(e => e.w).filter(w => w > 0);
-    BMIN = bw.length ? Math.min(...bw) : 0;   // tightest gap = reference for the log ("dex") scale
+    const hv = model.held ? [...model.held.values()].filter(v => v > 0) : [];
+    const allBar = bw.concat(hv);
+    BMIN = allBar.length ? Math.min(...allBar) : 0;
 
     const W = Math.max(mountEl.clientWidth || 820, 360);
     // Prefer the server's faithful leave-one-out scores; fall back to client betweenness (fixtures /
