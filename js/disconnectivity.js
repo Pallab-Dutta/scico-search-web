@@ -28,14 +28,14 @@
      path i→j = the height at which i and j first merge under single-linkage. It is the lowest "pass"
      you must cross to get from one to the other. A gap node's height IS this barrier.
    • Removing a paper can only RAISE these minimax barriers (never lower them — you can only lose a
-     shortcut). For paper k we measure two things (pipeline._loo_from_dist):
-        – total gap-closing  = Σ over pairs of the barrier increase. An aggregate over O(n²) pairs,
-          so it is NOT a barrier height and routinely exceeds any single barrier — it ranks papers by
-          how much structure they hold together (this is also the per-paper "Impact" score).
-        – HELD barrier       = CAUSAL. Restrict to papers published UP TO k's year and take the
-          largest barrier INCREASE that removing k causes there — the gap k actually closed given the
-          literature of its time (0 if the year is unknown or k has < 3 predecessors). Same units as a
-          gap node. The TREE stays the full current field; only this per-paper score is time-limited.
+     shortcut). For paper k we measure two things:
+        – total gap-closing  = Σ over pairs of the barrier increase (pipeline._loo_from_dist). An
+          aggregate over O(n²) pairs, so it is NOT a barrier height and routinely exceeds any single
+          barrier — it ranks papers by how much structure they hold together (the "Impact" score).
+        – BARRIER REDUCTION  = the LARGEST single barrier INCREASE that removing k causes across the
+          full field (pipeline._barrier_reduction) = how much k reduced the barrier / the tallest gap
+          it holds shut. Same units as a gap node. This is what a leaf LIFTS to when "Highlight
+          gap-closers" is on; a bridge scores high, a redundant/pendant paper ~0 (stays at the base).
    • LOG scale: barriers are positive but cluster near 0, so log spreads them. Since log10(distance<1)
      is negative, the readout uses "dex" = log10(barrier / tightest-gap) ≥ 0 — decades above the
      smallest gap — which is exactly what the log axis positions by, and stays positive. */
@@ -88,7 +88,7 @@
   // Display a barrier / gap magnitude honoring the Log-scale toggle. Barrier heights are POSITIVE, so
   // rather than log10(distance) (which is negative for distances < 1) the log view shows the raw
   // distance PLUS "dex" = log10(barrier / BMIN) >= 0 — decades above the smallest barrier in the whole
-  // picture (gap nodes AND gap-closer held barriers), so gaps and gap-closers share one scale and
+  // picture (gap nodes AND gap-closer reduction barriers), so gaps and gap-closers share one scale and
   // never go negative. Linear view shows just the raw distance.
   const fmtBar = v => {
     v = +v || 0;
@@ -127,17 +127,18 @@
         : { leaf: false, height: node.height, children: (node.children || []).map(hydrate) };
       const root = hydrate(d.tree);
       const edges = (d.edges || []).map(e => ({ a: papers[e.a], b: papers[e.b], w: e.w }));
-      let loo = null, held = null;
+      let loo = null, reduce = null;
       if (Array.isArray(d.loo) && d.loo.length === papers.length) {
         loo = new Map(); papers.forEach((p, i) => loo.set(p, d.loo[i]));
       }
-      // held[i] = CAUSAL gap-closing barrier: the largest barrier INCREASE a paper caused among only
-      // the papers that existed up to its own publication year. Same units as gap-node barriers.
-      // See _temporal_held in pipeline.py.
-      if (Array.isArray(d.held) && d.held.length === papers.length) {
-        held = new Map(); papers.forEach((p, i) => held.set(p, d.held[i]));
-      }
-      return { root, edges, loo, held };
+      // reduce[i] = gap-closing ability: the LARGEST single barrier that removing paper i reopens across
+      // the full field = how much it reduced the barrier. Same units as gap-node barriers. See
+      // _barrier_reduction in pipeline.py. Fall back to the older CAUSAL `held` (temporal) field for
+      // payloads captured before `reduce` existed.
+      const rsrc = (Array.isArray(d.reduce) && d.reduce.length === papers.length) ? d.reduce
+                 : (Array.isArray(d.held) && d.held.length === papers.length) ? d.held : null;
+      if (rsrc) { reduce = new Map(); papers.forEach((p, i) => reduce.set(p, rsrc[i])); }
+      return { root, edges, loo, reduce };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -208,10 +209,11 @@
       const meta = [p.authors, p.year].filter(Boolean).join(" · ");
       const score = (p.ai_score != null) ? `relevance ${(+p.ai_score).toFixed(2)}` : "";
       let bridge = "";
-      if (m.held > 0) {
-        // Causal barrier this paper closed among the work that existed up to its year (same units as
-        // a gap node); the total gap-closing is the full-set SUM over pairs (a larger scale).
-        bridge = `gap-closer · closed a barrier of ${fmtBar(m.held)} vs. work up to its year`
+      if (m.reduce > 0) {
+        // How much this paper REDUCES the barrier: the largest single gap it holds shut (removing it
+        // reopens by this much), same units as a gap node; the total gap-closing is the full-set SUM
+        // over pairs (a larger scale).
+        bridge = `gap-closer · holds a barrier of ${fmtBar(m.reduce)} shut (removing it reopens this gap)`
                + (m.total > 0 ? ` · total gap-closing ${(+m.total).toFixed(2)}` : "");
       } else if (m.overlayKind === "betweenness" && m.overlay > 0) {
         bridge = `connector · routes ${m.overlay} paper-pairs`;
@@ -248,9 +250,9 @@
     (function mn(n) { if (!isLeaf(n)) { if ((n.height || 0) > 0) hmin = Math.min(hmin, n.height); kids(n).forEach(mn); } })(tree);
     if (!isFinite(hmin)) hmin = maxH;
     // One reference for the whole barrier axis: the smallest positive barrier in the picture — gap
-    // nodes AND gap-closer held barriers (= BMIN). So gaps and lifted gap-closers share the scale,
-    // position matches the dex readout, and a held below the tightest gap still projects LEFT (toward
-    // the root), never overshooting right past barrier 0. Inputs are clamped to [ref, maxH].
+    // nodes AND gap-closer reduction barriers (= BMIN). So gaps and lifted gap-closers share the scale,
+    // position matches the dex readout, and a reduction below the tightest gap still projects LEFT
+    // (toward the root), never overshooting right past barrier 0. Inputs are clamped to [ref, maxH].
     const ref = (BMIN > 0 && BMIN <= hmin) ? BMIN : hmin;
     const LMARGIN = 0.05, lspan = (Math.log(maxH) - Math.log(ref)) || 1;
     const clampH = h => Math.max(ref, Math.min(h, maxH));
@@ -262,8 +264,8 @@
 
     leaves.forEach((lf, i) => {
       const p = lf.paper || lf;
-      const held = (OVERLAY && model.held) ? (model.held.get(p) || 0) : 0;
-      lf._x = held > 0 ? xAt(held) : leafX;   // lifted gap-closers sit at their barrier; the branch stops here
+      const red = (OVERLAY && model.reduce) ? (model.reduce.get(p) || 0) : 0;
+      lf._x = red > 0 ? xAt(red) : leafX;   // gap-closers lift to the barrier they hold shut; branch stops here
       lf._y = top + i * rowH;
     });
     (function lay(n) {
@@ -288,13 +290,13 @@
       } else {
         const p = n.paper || n;
         const st = paperStyle(p, scores);
-        const held = (model.held && model.held.get(p)) || 0;
+        const red = (model.reduce && model.reduce.get(p)) || 0;
         // n._x is the (possibly lifted) position set in the layout, so the parent branch stops AT the
         // node instead of running on to barrier 0. The paper name follows the dot, vertically centred
         // on the node's row.
         dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
         labels += `<text x="${(n._x + 10).toFixed(1)}" y="${(n._y + 3.5).toFixed(1)}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
-        meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, held: held, total: (model.loo && model.loo.get(p)) || 0 };
+        meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: red, total: (model.loo && model.loo.get(p)) || 0 };
       }
     })(tree);
 
@@ -398,7 +400,7 @@
       const st = paperStyle(p, scores);
       ndots += `<circle class="dg-node" data-id="${id}" cx="${p._x.toFixed(1)}" cy="${p._y.toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
       labels += `<text x="${(p._x + 8).toFixed(1)}" y="${(p._y + 3).toFixed(1)}" font-size="9" fill="#666">${esc(trunc(p.title, 16))}</text>`;
-      meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, held: (model.held && model.held.get(p)) || 0, total: (model.loo && model.loo.get(p)) || 0 };
+      meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, total: (model.loo && model.loo.get(p)) || 0 };
     });
     const hint = `<text x="12" y="${H - 12}" font-size="10" fill="#999">edge length ∝ ${LOG ? "log " : ""}gap magnitude · long / thick edge = larger gap</text>`;
 
@@ -438,21 +440,21 @@
     if (!model) { mountEl.innerHTML = '<p style="color:#888">Need ≥2 papers with embeddings to draw the tree.</p>'; return; }
 
     // Log ("dex") reference = the smallest positive barrier ANYWHERE in the picture — gap-node
-    // barriers AND gap-closer held barriers — so every dex = log10(barrier / BMIN) is >= 0, and the
+    // barriers AND gap-closer reduction barriers — so every dex = log10(barrier / BMIN) is >= 0, and the
     // axis label and the gap-closer tooltips use one identical formula/reference.
     const bw = (model.edges || []).map(e => e.w).filter(w => w > 0);
-    const hv = model.held ? [...model.held.values()].filter(v => v > 0) : [];
-    const allBar = bw.concat(hv);
+    const rv = model.reduce ? [...model.reduce.values()].filter(v => v > 0) : [];
+    const allBar = bw.concat(rv);
     BMIN = allBar.length ? Math.min(...allBar) : 0;
 
     const W = Math.max(mountEl.clientWidth || 820, 360);
-    // Prefer the server's faithful leave-one-out scores; fall back to client betweenness (fixtures /
+    // Prefer the server's faithful barrier-reduction scores; fall back to client betweenness (fixtures /
     // legacy sessions). Same {raw, norm, kind} shape either way, so both views render identically.
-    // Highlight/rank by the causal held barrier when the field has any era-bridges, so the emphasised
-    // papers are exactly the ones whose tooltip shows a "closed a barrier of …" reading; fall back to
-    // the total gap-closing sum, then to pure-topology betweenness (fixtures / legacy sessions).
-    const hasHeld = model.held && [...model.held.values()].some(v => v > 0);
-    const scores = hasHeld ? looScores(model.held)
+    // Highlight/rank by how much each paper reduces the barrier when the field has any gap-closers, so
+    // the emphasised papers are exactly the ones whose tooltip shows a "holds a barrier of …" reading;
+    // fall back to the total gap-closing sum, then to pure-topology betweenness (fixtures / legacy).
+    const hasReduce = model.reduce && [...model.reduce.values()].some(v => v > 0);
+    const scores = hasReduce ? looScores(model.reduce)
                  : (model.loo && model.loo.size) ? looScores(model.loo)
                  : bridgeScore(model);
     const built = MODE === "mst" ? buildMST(model, W, scores) : buildDG(model, W, scores);
