@@ -20,7 +20,25 @@
    Data note: the LIVE API strips per-paper `embedding`, so on real sessions the tree + faithful
    leave-one-out gap-closer scores are computed SERVER-SIDE (pipeline.build_disconnectivity, via the
    /sessions/{id}/disconnectivity job) and arrive as `session.disconnectivity`. getModel() hydrates
-   that. Fixtures that still carry toy embeddings fall back to building the tree client-side. */
+   that. Fixtures that still carry toy embeddings fall back to building the tree client-side.
+
+   ── THEORY (barriers & gap-closers) ───────────────────────────────────────────────────────────
+   • Distance between two papers = 1 − cosine(embeddings) ∈ [0, 2].
+   • BARRIER between papers i,j = their cophenetic / minimax distance = the largest edge on the MST
+     path i→j = the height at which i and j first merge under single-linkage. It is the lowest "pass"
+     you must cross to get from one to the other. A gap node's height IS this barrier.
+   • Removing a paper can only RAISE these minimax barriers (never lower them — you can only lose a
+     shortcut). For paper k we measure two things (pipeline._loo_from_dist):
+        – total gap-closing  = Σ over pairs of the barrier increase. An aggregate over O(n²) pairs,
+          so it is NOT a barrier height and routinely exceeds any single barrier — it ranks papers by
+          how much structure they hold together (this is also the per-paper "Impact" score).
+        – HELD barrier       = the absolute barrier that OPENS at the most-affected pair when k is
+          removed. Same units as a gap node → shown as the gap-closer's own barrier height. A sole
+          bridge can hold shut a gap TALLER than the full-tree max, since that gap exists only once k
+          is gone (the two sides then reconnect at their true, larger separation).
+   • LOG scale: barriers are positive but cluster near 0, so log spreads them. Since log10(distance<1)
+     is negative, the readout uses "dex" = log10(barrier / tightest-gap) ≥ 0 — decades above the
+     smallest gap — which is exactly what the log axis positions by, and stays positive. */
 (function () {
   const cos = (a, b) => {
     let d = 0, na = 0, nb = 0;
@@ -65,9 +83,18 @@
   let MODE = "dg";     // "dg" = disconnectivity, "mst" = minimum spanning tree graph.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
 
-  // Display a barrier / gap magnitude honoring the Log-scale toggle: log10 when LOG is on (consistent
-  // with the log barrier axis and log edge scaling), otherwise the raw gap distance. Non-positive -> raw.
-  const fmtBar = v => (LOG && (+v) > 0) ? `log10 ${Math.log10(+v).toFixed(2)}` : (+v).toFixed(3);
+  // Smallest positive barrier in the current map — the reference for the positive log ("dex") scale.
+  let BMIN = 0;
+  // Display a barrier / gap magnitude honoring the Log-scale toggle. Barrier heights are POSITIVE, so
+  // rather than log10(distance) (which is negative for distances < 1) the log view shows the raw
+  // distance PLUS "dex" = log10(barrier / tightest-gap) >= 0 — decades above the smallest gap, exactly
+  // the quantity the log axis positions by. Linear view shows just the raw distance.
+  const fmtBar = v => {
+    v = +v || 0;
+    if (!(LOG && v > 0)) return v.toFixed(3);
+    const dex = (BMIN > 0) ? Math.log10(v / BMIN) : 0;
+    return `${v.toFixed(3)} · ${dex.toFixed(2)} dex`;
+  };
 
   const isLeaf = n => n.leaf || (!n.children && n.paper);
   const kids = n => n.children || [];
@@ -99,11 +126,16 @@
         : { leaf: false, height: node.height, children: (node.children || []).map(hydrate) };
       const root = hydrate(d.tree);
       const edges = (d.edges || []).map(e => ({ a: papers[e.a], b: papers[e.b], w: e.w }));
-      let loo = null;
+      let loo = null, held = null;
       if (Array.isArray(d.loo) && d.loo.length === papers.length) {
         loo = new Map(); papers.forEach((p, i) => loo.set(p, d.loo[i]));
       }
-      return { root, edges, loo };
+      // held[i] = absolute barrier height a paper holds shut (the gap that opens if it is removed),
+      // in the SAME units as gap-node barriers. See _loo_from_dist in pipeline.py.
+      if (Array.isArray(d.held) && d.held.length === papers.length) {
+        held = new Map(); papers.forEach((p, i) => held.set(p, d.held[i]));
+      }
+      return { root, edges, loo, held };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -173,11 +205,16 @@
       const p = m.paper;
       const meta = [p.authors, p.year].filter(Boolean).join(" · ");
       const score = (p.ai_score != null) ? `relevance ${(+p.ai_score).toFixed(2)}` : "";
-      const bridge = (m.bridge > 0)
-        ? (m.bridgeKind === "loo"
-          ? `gap-closer · removing it raises barriers by ${fmtBar(m.bridge)}`
-          : `connector · routes ${m.bridge} paper-pairs`)
-        : "";
+      let bridge = "";
+      if (m.bridgeKind === "loo") {
+        // A gap-closer's own barrier HEIGHT = the gap that opens if it is removed (same units as a
+        // gap node). The total gap-closing (m.bridge) is a SUM over pairs, hence on a larger scale.
+        if (m.held > 0)
+          bridge = `gap-closer · holds shut a barrier of ${fmtBar(m.held)}` +
+                   ` · total gap-closing ${(+m.bridge).toFixed(2)}`;
+      } else if (m.bridge > 0) {
+        bridge = `connector · routes ${m.bridge} paper-pairs`;
+      }
       return `<b>${esc(p.title)}</b>` +
         (meta ? `<div class="dg-sub">${esc(meta)}</div>` : "") +
         (score ? `<div class="dg-sub">${esc(score)}</div>` : "") +
@@ -238,7 +275,7 @@
         const st = paperStyle(p, scores);
         dots += `<circle class="dg-node" data-id="${id}" cx="${n._x}" cy="${n._y}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
         labels += `<text x="${n._x + 10}" y="${n._y + 3.5}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
-        meta[id] = { type: "paper", paper: p, bridge: st.raw, bridgeKind: st.kind };
+        meta[id] = { type: "paper", paper: p, bridge: st.raw, bridgeKind: st.kind, held: (model.held && model.held.get(p)) || 0 };
       }
     })(tree);
 
@@ -247,7 +284,7 @@
       `<line x1="${leafX}" y1="${axisY - 4}" x2="${leafX}" y2="${axisY + 4}" stroke="#bbb"/>` +
       `<line x1="${left}" y1="${axisY - 4}" x2="${left}" y2="${axisY + 4}" stroke="#bbb"/>` +
       `<text x="${leafX}" y="${axisY + 16}" text-anchor="end" font-size="10" fill="#888">0</text>` +
-      `<text x="${left}" y="${axisY + 16}" text-anchor="start" font-size="10" fill="#888">${LOG ? "log10 " + Math.log10(maxH).toFixed(2) : maxH.toFixed(2)}</text>` +
+      `<text x="${left}" y="${axisY + 16}" text-anchor="start" font-size="10" fill="#888">${LOG && BMIN > 0 ? Math.log10(maxH / BMIN).toFixed(2) + " dex" : maxH.toFixed(2)}</text>` +
       `<text x="${(left + leafX) / 2}" y="${axisY + 16}" text-anchor="middle" font-size="10" fill="#888">← barrier (${LOG ? "log" : "linear"} gap magnitude)</text>`;
 
     return { inner: branches + axis + dots + labels, H, meta };
@@ -342,7 +379,7 @@
       const st = paperStyle(p, scores);
       ndots += `<circle class="dg-node" data-id="${id}" cx="${p._x.toFixed(1)}" cy="${p._y.toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
       labels += `<text x="${(p._x + 8).toFixed(1)}" y="${(p._y + 3).toFixed(1)}" font-size="9" fill="#666">${esc(trunc(p.title, 16))}</text>`;
-      meta[id] = { type: "paper", paper: p, bridge: st.raw, bridgeKind: st.kind };
+      meta[id] = { type: "paper", paper: p, bridge: st.raw, bridgeKind: st.kind, held: (model.held && model.held.get(p)) || 0 };
     });
     const hint = `<text x="12" y="${H - 12}" font-size="10" fill="#999">edge length ∝ ${LOG ? "log " : ""}gap magnitude · long / thick edge = larger gap</text>`;
 
@@ -380,6 +417,9 @@
     const model = getModel(session);
     mountEl.style.position = "relative";
     if (!model) { mountEl.innerHTML = '<p style="color:#888">Need ≥2 papers with embeddings to draw the tree.</p>'; return; }
+
+    const bw = (model.edges || []).map(e => e.w).filter(w => w > 0);
+    BMIN = bw.length ? Math.min(...bw) : 0;   // tightest gap = reference for the log ("dex") scale
 
     const W = Math.max(mountEl.clientWidth || 820, 360);
     // Prefer the server's faithful leave-one-out scores; fall back to client betweenness (fixtures /
