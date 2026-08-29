@@ -286,12 +286,10 @@
         const held = (model.held && model.held.get(p)) || 0;
         // Highlighter ON: slide a gap-closer LEFT along the barrier axis to the gap it closes
         // (xAt(held) — its dex position when Log is on), so its X now reads its gap-closing ability.
-        // A dashed amber guide links the lifted dot back to its home row at barrier 0.
+        // The paper label follows the lifted dot.
         const upX = (OVERLAY && held > 0) ? xAt(held) : n._x;
-        if (upX < n._x - 0.5)
-          branches += `<path d="M${n._x} ${n._y} H${upX.toFixed(1)}" stroke="#d9a441" stroke-width="1" stroke-dasharray="2 2" fill="none"/>`;
         dots += `<circle class="dg-node" data-id="${id}" cx="${upX.toFixed(1)}" cy="${n._y}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
-        labels += `<text x="${n._x + 10}" y="${n._y + 3.5}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
+        labels += `<text x="${(upX + 10).toFixed(1)}" y="${n._y + 3.5}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
         meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, held: held, total: (model.loo && model.loo.get(p)) || 0 };
       }
     })(tree);
