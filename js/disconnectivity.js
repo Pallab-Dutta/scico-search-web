@@ -32,10 +32,10 @@
         – total gap-closing  = Σ over pairs of the barrier increase. An aggregate over O(n²) pairs,
           so it is NOT a barrier height and routinely exceeds any single barrier — it ranks papers by
           how much structure they hold together (this is also the per-paper "Impact" score).
-        – HELD barrier       = the absolute barrier that OPENS at the most-affected pair when k is
-          removed. Same units as a gap node → shown as the gap-closer's own barrier height. A sole
-          bridge can hold shut a gap TALLER than the full-tree max, since that gap exists only once k
-          is gone (the two sides then reconnect at their true, larger separation).
+        – HELD barrier       = CAUSAL. Restrict to papers published UP TO k's year and take the
+          largest barrier INCREASE that removing k causes there — the gap k actually closed given the
+          literature of its time (0 if the year is unknown or k has < 3 predecessors). Same units as a
+          gap node. The TREE stays the full current field; only this per-paper score is time-limited.
    • LOG scale: barriers are positive but cluster near 0, so log spreads them. Since log10(distance<1)
      is negative, the readout uses "dex" = log10(barrier / tightest-gap) ≥ 0 — decades above the
      smallest gap — which is exactly what the log axis positions by, and stays positive. */
@@ -130,8 +130,9 @@
       if (Array.isArray(d.loo) && d.loo.length === papers.length) {
         loo = new Map(); papers.forEach((p, i) => loo.set(p, d.loo[i]));
       }
-      // held[i] = absolute barrier height a paper holds shut (the gap that opens if it is removed),
-      // in the SAME units as gap-node barriers. See _loo_from_dist in pipeline.py.
+      // held[i] = CAUSAL gap-closing barrier: the largest barrier INCREASE a paper caused among only
+      // the papers that existed up to its own publication year. Same units as gap-node barriers.
+      // See _temporal_held in pipeline.py.
       if (Array.isArray(d.held) && d.held.length === papers.length) {
         held = new Map(); papers.forEach((p, i) => held.set(p, d.held[i]));
       }
@@ -212,7 +213,7 @@
         // SUM over pairs, hence on a larger scale. Fall back to the total alone when `held` is absent
         // (sessions whose graph was cached before `held` existed / backend not yet redeployed).
         bridge = (m.held > 0)
-          ? `gap-closer · holds shut a barrier of ${fmtBar(m.held)} · total gap-closing ${(+m.bridge).toFixed(2)}`
+          ? `gap-closer · closed a barrier of ${fmtBar(m.held)} vs. work up to its year · total gap-closing ${(+m.bridge).toFixed(2)}`
           : `gap-closer · total gap-closing ${(+m.bridge).toFixed(2)} (sum over pairs — not a single barrier)`;
       } else if (m.bridge > 0) {
         bridge = `connector · routes ${m.bridge} paper-pairs`;
