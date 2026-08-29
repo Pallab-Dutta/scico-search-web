@@ -206,12 +206,14 @@
       const meta = [p.authors, p.year].filter(Boolean).join(" · ");
       const score = (p.ai_score != null) ? `relevance ${(+p.ai_score).toFixed(2)}` : "";
       let bridge = "";
-      if (m.bridgeKind === "loo") {
+      if (m.bridgeKind === "loo" && m.bridge > 0) {
         // A gap-closer's own barrier HEIGHT = the gap that opens if it is removed (same units as a
-        // gap node). The total gap-closing (m.bridge) is a SUM over pairs, hence on a larger scale.
-        if (m.held > 0)
-          bridge = `gap-closer · holds shut a barrier of ${fmtBar(m.held)}` +
-                   ` · total gap-closing ${(+m.bridge).toFixed(2)}`;
+        // gap node), available once the server sends `held`. The total gap-closing (m.bridge) is a
+        // SUM over pairs, hence on a larger scale. Fall back to the total alone when `held` is absent
+        // (sessions whose graph was cached before `held` existed / backend not yet redeployed).
+        bridge = (m.held > 0)
+          ? `gap-closer · holds shut a barrier of ${fmtBar(m.held)} · total gap-closing ${(+m.bridge).toFixed(2)}`
+          : `gap-closer · raises barriers by ${(+m.bridge).toFixed(2)}`;
       } else if (m.bridge > 0) {
         bridge = `connector · routes ${m.bridge} paper-pairs`;
       }
