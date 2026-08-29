@@ -247,10 +247,16 @@
     let hmin = Infinity;
     (function mn(n) { if (!isLeaf(n)) { if ((n.height || 0) > 0) hmin = Math.min(hmin, n.height); kids(n).forEach(mn); } })(tree);
     if (!isFinite(hmin)) hmin = maxH;
-    const LMARGIN = 0.05, lspan = (Math.log(maxH) - Math.log(hmin)) || 1;
-    const xLin = h => leafX - (h / maxH) * innerW;
+    // One reference for the whole barrier axis: the smallest positive barrier in the picture — gap
+    // nodes AND gap-closer held barriers (= BMIN). So gaps and lifted gap-closers share the scale,
+    // position matches the dex readout, and a held below the tightest gap still projects LEFT (toward
+    // the root), never overshooting right past barrier 0. Inputs are clamped to [ref, maxH].
+    const ref = (BMIN > 0 && BMIN <= hmin) ? BMIN : hmin;
+    const LMARGIN = 0.05, lspan = (Math.log(maxH) - Math.log(ref)) || 1;
+    const clampH = h => Math.max(ref, Math.min(h, maxH));
+    const xLin = h => leafX - (Math.min(h, maxH) / maxH) * innerW;
     const xLog = h => h <= 0 ? leafX
-      : leafX - (LMARGIN + (1 - LMARGIN) * (Math.log(h) - Math.log(hmin)) / lspan) * innerW;
+      : leafX - (LMARGIN + (1 - LMARGIN) * (Math.log(clampH(h)) - Math.log(ref)) / lspan) * innerW;
     const xAt = LOG ? xLog : xLin;                    // larger barrier -> further left
     const axisY = H - 22;
 
