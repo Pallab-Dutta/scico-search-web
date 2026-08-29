@@ -191,7 +191,7 @@
         </details>
         <div class="tools">
           <span>Sort by</span>
-          <select id="sortSel"><option value="ai">AI Score</option><option value="year">Year</option><option value="cite">Citations</option></select>
+          <select id="sortSel"><option value="ai">AI Score</option><option value="impact">Impact</option><option value="year">Year</option><option value="cite">Citations</option></select>
           <span id="showCount"></span>
         </div>
         <div id="paperList"></div>
@@ -290,6 +290,15 @@
     const v = IS_ADMIN ? (p.ai_score_ranked!=null ? p.ai_score_ranked : p.ai_score) : p.ai_score;
     return `${IS_ADMIN?'AI Score (recency)':'AI Score'}: <b>${Number(v).toFixed(3)}</b>`;
   }
+  // Barrier-height IMPACT: the backend's leave-one-out gap-closer score (impact_raw) — how much a
+  // paper holds otherwise-distant sub-areas together — normalised to 0-100 across the shown papers.
+  // Shown only when the session actually carries impact data (>=3 papers with embeddings).
+  let IMPACT_MAX=0;
+  function impactSeg(p){
+    if(!(IMPACT_MAX>0)) return '';
+    const v=Math.round(100*(Number(p.impact_raw)||0)/IMPACT_MAX);
+    return `<span class="sep">|</span><span class="mi">bolt</span> Impact: <b>${v}</b>`;
+  }
   const bar=$('rightbar'), gutter=$('gutter');
   function openPanel(i){
     const d=QDATA[i]; if(!d) return;
@@ -320,7 +329,7 @@
   function paperHTML(p,i){
     const low=Number(p.ai_score)<THRESHOLD;
     return `<div class="paper${low?' below':''}"><div class="ptitle${low?' low':''}"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a></div>`+
-      `<div class="pmeta">${esc(p.authors)}${p.publisher?`<span class="sep">|</span><span class="mi">book_ribbon</span> ${esc(p.publisher)}`:''}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}<span class="sep">|</span><span class="mi">psychology</span> ${aiScoreHTML(p)}</div>`+
+      `<div class="pmeta">${esc(p.authors)}${p.publisher?`<span class="sep">|</span><span class="mi">book_ribbon</span> ${esc(p.publisher)}`:''}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}<span class="sep">|</span><span class="mi">psychology</span> ${aiScoreHTML(p)}${impactSeg(p)}</div>`+
       `<div class="pactions"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}><span class="mi">open_in_new</span> Open</a>`+
       `<a class="cite-btn" data-i="${i}"><span class="mi">format_quote</span> Cite<span class="cite-fmt"></span></a>`+
       `<a class="cite-caret" data-i="${i}" title="Citation options"><span class="mi">expand_more</span></a></div></div>`;
@@ -333,10 +342,12 @@
   function renderPapers(){
     closeCite();
     const sort=$('sortSel').value;
+    IMPACT_MAX=Math.max(0,...PAPERS.map(p=>Number(p.impact_raw)||0));  // scale for the 0-100 Impact badge
     // Sort all papers (below-cutoff ones are just dimmed, no divider label).
     let list=PAPERS.slice();
     if(sort==='year') list.sort((a,b)=>(b.year||0)-(a.year||0));
     else if(sort==='cite') list.sort((a,b)=>(b.citation_count||0)-(a.citation_count||0));
+    else if(sort==='impact') list.sort((a,b)=>(Number(b.impact_raw)||0)-(Number(a.impact_raw)||0));
     // "AI Score" sort uses the recency-nudged score (parity with the Streamlit rank_key); red
     // membership still keys off raw ai_score vs THRESHOLD, so recency only reorders the reds.
     else list.sort((a,b)=>((b.ai_score_ranked??b.ai_score)||0)-((a.ai_score_ranked??a.ai_score)||0));
