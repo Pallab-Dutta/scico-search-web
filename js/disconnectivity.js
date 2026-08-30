@@ -35,10 +35,11 @@
         – BARRIER REDUCTION  = the LARGEST single barrier INCREASE that removing k causes across the
           full field (pipeline._barrier_reduction), plus the PAIR of works whose barrier rises most =
           the gap k closes between them. Same units as a gap node; ranks/colors the gap-closers.
-     When "Highlight gap-closers" is on, a gap-closer LIFTS to sit ON the red junction that joins its
-     bridged pair (their lowest-common-ancestor height) — so the green paper lands exactly on the red
-     gap-node it holds shut. A bridge sits at a high junction (near the root); a redundant/pendant
-     paper reduces nothing and stays at the base.
+     When "Highlight gap-closers" is on, a gap-closer is DRAWN AS the red junction that joins the two
+     works it bridges (its bridged pair's lowest common ancestor) — a GREEN fork with an arm to each
+     side — instead of hanging as a pendant leaf; it gives up its base row and the trivial merge where
+     it first attached collapses. A strong bridge becomes a fork near the root; a redundant/pendant
+     paper reduces nothing and stays a base minimum.
    • LOG scale: barriers are positive but cluster near 0, so log spreads them. Since log10(distance<1)
      is negative, the readout uses "dex" = log10(barrier / tightest-gap) ≥ 0 — decades above the
      smallest gap — which is exactly what the log axis positions by, and stays positive. */
@@ -105,19 +106,19 @@
   function leafNodes(n) { const out = []; (function g(m) { isLeaf(m) ? out.push(m) : kids(m).forEach(g); })(n); return out; }
   function leafPapers(n) { return leafNodes(n).map(m => m.paper || m); }
 
-  // Barrier height of the red gap-node that JOINS two papers = height of their lowest common ancestor
-  // = their cophenetic (minimax) barrier in this tree. Post-order: the deepest internal node whose
-  // subtree first contains BOTH papers is the LCA, so its height is captured first. 0 if not joined.
-  function mergeHeight(root, pa, pb) {
-    let h = 0;
+  // The red gap-node that JOINS two papers = their lowest common ancestor (its height is their
+  // cophenetic / minimax barrier). Post-order: the deepest internal node whose subtree first holds
+  // BOTH papers is the LCA. Null if they are not both present. A gap-closer is drawn AS this node.
+  function lcaNode(root, pa, pb) {
+    let found = null;
     (function rec(n) {                                   // returns how many of {pa,pb} live under n
       if (isLeaf(n)) { const p = n.paper || n; return (p === pa || p === pb) ? 1 : 0; }
       let cnt = 0;
       for (const c of kids(n)) cnt += rec(c);
-      if (cnt >= 2 && h === 0) h = n.height || 0;        // first (deepest) node holding both = the LCA
+      if (cnt >= 2 && !found) found = n;                 // first (deepest) node holding both = the LCA
       return cnt;
     })(root);
-    return h;
+    return found;
   }
 
   // Fallback edges when a server tree arrives WITHOUT embeddings: one edge per internal node, joining
@@ -276,8 +277,33 @@
     const tree = model.root;
     const leaves = leafNodes(tree);
 
+    // ── Seat gap-closers ON their junction ─────────────────────────────────────────────────────
+    // When "Highlight gap-closers" is on, a bridge paper is drawn AS the red junction that joins the
+    // two works it bridges (its LCA node) — a GREEN fork with an arm to each side — instead of hanging
+    // as a pendant leaf. It gives up its base row; the trivial merge where it first attached collapses
+    // away. If two papers land on the same junction, the higher-reducing one wins it and the other
+    // stays a base leaf. Off → seatOf empty → the plain tree.
+    const seatOf = new Map();      // paper  -> junction node it is drawn as
+    const owner = new Map();       // junction node -> the paper drawn as it
+    if (OVERLAY && model.reduce && model.reducePair) {
+      leaves.forEach(lf => {
+        const p = lf.paper || lf;
+        const rv = model.reduce.get(p) || 0;
+        const pr = rv > 0 ? model.reducePair.get(p) : null;
+        const J = pr ? lcaNode(tree, pr.a, pr.b) : null;
+        if (!J || isLeaf(J)) return;
+        const cur = owner.get(J);
+        if (!cur || (model.reduce.get(cur) || 0) < rv) {
+          if (cur) seatOf.delete(cur);                   // demoted back to a base leaf
+          owner.set(J, p); seatOf.set(p, J);
+        }
+      });
+    }
+    const seated = p => seatOf.has(p);
+
     const left = 34, right = 264, top = 24, rowH = 26, axisPad = 40;
-    const H = top * 2 + Math.max(1, leaves.length - 1) * rowH + axisPad;
+    const nRows = Math.max(1, leaves.reduce((k, lf) => k + (seated(lf.paper || lf) ? 0 : 1), 0));
+    const H = top * 2 + Math.max(1, nRows - 1) * rowH + axisPad;
     const innerW = W - left - right;
     const maxH = (function m(n) { return isLeaf(n) ? 0 : Math.max(n.height || 0, ...kids(n).map(m)); })(tree) || 1;
     const leafX = left + innerW;                      // barrier 0 (minima column, right)
@@ -285,9 +311,8 @@
     (function mn(n) { if (!isLeaf(n)) { if ((n.height || 0) > 0) hmin = Math.min(hmin, n.height); kids(n).forEach(mn); } })(tree);
     if (!isFinite(hmin)) hmin = maxH;
     // One reference for the whole barrier axis: the smallest positive barrier in the picture (= BMIN).
-    // Gap-closers lift onto real red junctions (LCA node heights), so they share the tree's own scale,
-    // their position matches the dex readout, and a lift never overshoots past the root. Clamped to
-    // [ref, maxH].
+    // Gap-closers are drawn AS real junction nodes (their heights are edge weights already in BMIN), so
+    // they share the tree's own scale and the dex readout, never past the root. Clamped to [ref, maxH].
     const ref = (BMIN > 0 && BMIN <= hmin) ? BMIN : hmin;
     const LMARGIN = 0.05, lspan = (Math.log(maxH) - Math.log(ref)) || 1;
     const clampH = h => Math.max(ref, Math.min(h, maxH));
@@ -297,51 +322,55 @@
     const xAt = LOG ? xLog : xLin;                    // larger barrier -> further left
     const axisY = H - 22;
 
-    leaves.forEach((lf, i) => {
-      const p = lf.paper || lf;
-      // A gap-closer lifts to sit ON the red junction that joins the two works it bridges: the height
-      // of their lowest common ancestor (their merge point in this tree). So the green paper dot lands
-      // exactly on that red gap-node. Only when the overlay is on. Legacy payloads without a pair fall
-      // back to the reduction magnitude. Junction heights are real node heights, so a paper never
-      // overshoots past the root. Branch stops AT the lifted node.
-      let lift = 0;
-      if (OVERLAY && model.reduce && (model.reduce.get(p) || 0) > 0) {
-        const pr = model.reducePair && model.reducePair.get(p);
-        lift = (pr && mergeHeight(tree, pr.a, pr.b)) || (model.reduce.get(p) || 0);
-      }
-      lf._x = lift > 0 ? xAt(lift) : leafX;
-      lf._y = top + i * rowH;
-    });
+    // Rows: only NON-seated leaves (base minima) take a row; seated leaves are drawn at their junction.
+    let r = 0;
+    leaves.forEach(lf => { lf._x = leafX; lf._y = top + (seated(lf.paper || lf) ? 0 : r++) * rowH; });
+
+    // Layout: each internal node's y = midpoint of its VISIBLE descendants' rows (seated leaves add no
+    // row, so a junction centres between the base works on either side). x = its barrier column.
     (function lay(n) {
-      if (isLeaf(n)) return { y: n._y };
-      const c = kids(n).map(lay);
+      if (isLeaf(n)) return seated(n.paper || n) ? null : { y: n._y };
+      const cs = kids(n).map(lay).filter(Boolean);
       n._x = xAt(n.height || 0);
-      const ys = c.map(p => p.y);
-      n._y = (Math.min(...ys) + Math.max(...ys)) / 2;
+      const ys = cs.map(c => c.y);
+      n._y = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : top;
       return { y: n._y };
     })(tree);
 
     let branches = "", dots = "", labels = "", uid = 0;
     const meta = {};
+    const paperDot = (id, p, x, y) => {
+      const st = paperStyle(p, scores);
+      dots += `<circle class="dg-node" data-id="${id}" cx="${(+x).toFixed(1)}" cy="${(+y).toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
+      labels += `<text x="${(+x + 10).toFixed(1)}" y="${(+y + 3.5).toFixed(1)}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
+      meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0 };
+    };
+
+    // walk returns the attach point {x,y} the parent draws a connector to, or null if this whole
+    // subtree is invisible (all its leaves are seated elsewhere).
     (function walk(n) {
       const id = "d" + (uid++);
-      if (!isLeaf(n)) {
-        const c = kids(n), ys = c.map(k => k._y);
-        branches += `<path d="M${n._x} ${Math.min(...ys)} V${Math.max(...ys)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
-        c.forEach(k => { branches += `<path d="M${k._x} ${k._y} H${n._x}" stroke="#111" stroke-width="1.5" fill="none"/>`; walk(k); });
-        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x}" cy="${n._y}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
-        meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: n.height || 0, papers: leafPapers(n) };
-      } else {
+      if (isLeaf(n)) {
         const p = n.paper || n;
-        const st = paperStyle(p, scores);
-        const red = (model.reduce && model.reduce.get(p)) || 0;
-        // n._x is the (possibly lifted) position set in the layout, so the parent branch stops AT the
-        // node instead of running on to barrier 0. The paper name follows the dot, vertically centred
-        // on the node's row.
-        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
-        labels += `<text x="${(n._x + 10).toFixed(1)}" y="${(n._y + 3.5).toFixed(1)}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
-        meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: red, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0 };
+        if (seated(p)) return null;                      // drawn as its junction, not as a pendant
+        paperDot(id, p, leafX, n._y);                    // base minimum, at barrier 0
+        return { x: leafX, y: n._y };
       }
+      const arms = kids(n).map(walk).filter(Boolean);    // visible child attach points
+      const claim = owner.get(n);                        // paper drawn AS this fork, if any
+      if (!claim && arms.length <= 1) return arms[0] || null;  // trivial merge (a seated child) collapses
+      const ys = arms.map(a => a.y);
+      if (arms.length) {
+        branches += `<path d="M${n._x} ${Math.min(...ys)} V${Math.max(...ys)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
+        arms.forEach(a => { branches += `<path d="M${a.x} ${a.y} H${n._x}" stroke="#111" stroke-width="1.5" fill="none"/>`; });
+      }
+      if (claim) {
+        paperDot(id, claim, n._x, n._y);                 // GREEN fork = the gap-closer, at its junction
+      } else {
+        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
+        meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: n.height || 0, papers: leafPapers(n) };
+      }
+      return { x: n._x, y: n._y };
     })(tree);
 
     const axis =
