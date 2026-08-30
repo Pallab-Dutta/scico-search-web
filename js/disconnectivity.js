@@ -138,7 +138,19 @@
       const rsrc = (Array.isArray(d.reduce) && d.reduce.length === papers.length) ? d.reduce
                  : (Array.isArray(d.held) && d.held.length === papers.length) ? d.held : null;
       if (rsrc) { reduce = new Map(); papers.forEach((p, i) => reduce.set(p, rsrc[i])); }
-      return { root, edges, loo, reduce };
+      // reduce_pair[i] = the two papers (index pair) whose barrier a gap-closer holds shut = the gap it
+      // closes BETWEEN. Hydrate to paper objects so the tooltip can name them. Absent on `held`-only
+      // (pre-reduce_pair) payloads -> no pair line, which is fine.
+      let reducePair = null;
+      if (Array.isArray(d.reduce_pair) && d.reduce_pair.length === papers.length) {
+        reducePair = new Map();
+        papers.forEach((p, i) => {
+          const pr = d.reduce_pair[i];
+          if (pr && pr.length === 2 && papers[pr[0]] && papers[pr[1]] && pr[0] !== pr[1])
+            reducePair.set(p, { a: papers[pr[0]], b: papers[pr[1]] });
+        });
+      }
+      return { root, edges, loo, reduce, reducePair };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -209,12 +221,16 @@
       const meta = [p.authors, p.year].filter(Boolean).join(" · ");
       const score = (p.ai_score != null) ? `relevance ${(+p.ai_score).toFixed(2)}` : "";
       let bridge = "";
+      let gapPair = "";
       if (m.reduce > 0) {
         // How much this paper REDUCES the barrier: the largest single gap it holds shut (removing it
         // reopens by this much), same units as a gap node; the total gap-closing is the full-set SUM
         // over pairs (a larger scale).
         bridge = `gap-closer · holds a barrier of ${fmtBar(m.reduce)} shut (removing it reopens this gap)`
                + (m.total > 0 ? ` · total gap-closing ${(+m.total).toFixed(2)}` : "");
+        // Name the two works this paper bridges — the endpoints of the pass it holds shut = the gap
+        // it closes BETWEEN. (Absent on legacy/held-only payloads.)
+        if (m.pair) gapPair = `closes the gap between “${esc(trunc(m.pair.a.title, 40))}” and “${esc(trunc(m.pair.b.title, 40))}”`;
       } else if (m.overlayKind === "betweenness" && m.overlay > 0) {
         bridge = `connector · routes ${m.overlay} paper-pairs`;
       } else if (m.total > 0) {
@@ -224,7 +240,8 @@
       return `<b>${esc(p.title)}</b>` +
         (meta ? `<div class="dg-sub">${esc(meta)}</div>` : "") +
         (score ? `<div class="dg-sub">${esc(score)}</div>` : "") +
-        (bridge ? `<div class="dg-sub">${esc(bridge)}</div>` : "");
+        (bridge ? `<div class="dg-sub">${esc(bridge)}</div>` : "") +
+        (gapPair ? `<div class="dg-sub">${gapPair}</div>` : "");
     }
     const reps = m.papers.slice().sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0));
     const list = reps.slice(0, 4).map(p => `<li>${esc(trunc(p.title, 42))}</li>`).join("");
@@ -296,7 +313,7 @@
         // on the node's row.
         dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
         labels += `<text x="${(n._x + 10).toFixed(1)}" y="${(n._y + 3.5).toFixed(1)}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
-        meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: red, total: (model.loo && model.loo.get(p)) || 0 };
+        meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: red, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0 };
       }
     })(tree);
 
@@ -400,7 +417,7 @@
       const st = paperStyle(p, scores);
       ndots += `<circle class="dg-node" data-id="${id}" cx="${p._x.toFixed(1)}" cy="${p._y.toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
       labels += `<text x="${(p._x + 8).toFixed(1)}" y="${(p._y + 3).toFixed(1)}" font-size="9" fill="#666">${esc(trunc(p.title, 16))}</text>`;
-      meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, total: (model.loo && model.loo.get(p)) || 0 };
+      meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0 };
     });
     const hint = `<text x="12" y="${H - 12}" font-size="10" fill="#999">edge length ∝ ${LOG ? "log " : ""}gap magnitude · long / thick edge = larger gap</text>`;
 
