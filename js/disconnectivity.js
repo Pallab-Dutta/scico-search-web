@@ -33,9 +33,12 @@
           aggregate over O(n²) pairs, so it is NOT a barrier height and routinely exceeds any single
           barrier — it ranks papers by how much structure they hold together (the "Impact" score).
         – BARRIER REDUCTION  = the LARGEST single barrier INCREASE that removing k causes across the
-          full field (pipeline._barrier_reduction) = how much k reduced the barrier / the tallest gap
-          it holds shut. Same units as a gap node. This is what a leaf LIFTS to when "Highlight
-          gap-closers" is on; a bridge scores high, a redundant/pendant paper ~0 (stays at the base).
+          full field (pipeline._barrier_reduction), plus the PAIR of works whose barrier rises most =
+          the gap k closes between them. Same units as a gap node; ranks/colors the gap-closers.
+     When "Highlight gap-closers" is on, a gap-closer LIFTS to sit ON the red junction that joins its
+     bridged pair (their lowest-common-ancestor height) — so the green paper lands exactly on the red
+     gap-node it holds shut. A bridge sits at a high junction (near the root); a redundant/pendant
+     paper reduces nothing and stays at the base.
    • LOG scale: barriers are positive but cluster near 0, so log spreads them. Since log10(distance<1)
      is negative, the readout uses "dex" = log10(barrier / tightest-gap) ≥ 0 — decades above the
      smallest gap — which is exactly what the log axis positions by, and stays positive. */
@@ -101,6 +104,21 @@
   const kids = n => n.children || [];
   function leafNodes(n) { const out = []; (function g(m) { isLeaf(m) ? out.push(m) : kids(m).forEach(g); })(n); return out; }
   function leafPapers(n) { return leafNodes(n).map(m => m.paper || m); }
+
+  // Barrier height of the red gap-node that JOINS two papers = height of their lowest common ancestor
+  // = their cophenetic (minimax) barrier in this tree. Post-order: the deepest internal node whose
+  // subtree first contains BOTH papers is the LCA, so its height is captured first. 0 if not joined.
+  function mergeHeight(root, pa, pb) {
+    let h = 0;
+    (function rec(n) {                                   // returns how many of {pa,pb} live under n
+      if (isLeaf(n)) { const p = n.paper || n; return (p === pa || p === pb) ? 1 : 0; }
+      let cnt = 0;
+      for (const c of kids(n)) cnt += rec(c);
+      if (cnt >= 2 && h === 0) h = n.height || 0;        // first (deepest) node holding both = the LCA
+      return cnt;
+    })(root);
+    return h;
+  }
 
   // Fallback edges when a server tree arrives WITHOUT embeddings: one edge per internal node, joining
   // a representative leaf of each child, weight = the node's barrier. Yields a valid spanning tree.
@@ -266,10 +284,10 @@
     let hmin = Infinity;
     (function mn(n) { if (!isLeaf(n)) { if ((n.height || 0) > 0) hmin = Math.min(hmin, n.height); kids(n).forEach(mn); } })(tree);
     if (!isFinite(hmin)) hmin = maxH;
-    // One reference for the whole barrier axis: the smallest positive barrier in the picture — gap
-    // nodes AND gap-closer reduction barriers (= BMIN). So gaps and lifted gap-closers share the scale,
-    // position matches the dex readout, and a reduction below the tightest gap still projects LEFT
-    // (toward the root), never overshooting right past barrier 0. Inputs are clamped to [ref, maxH].
+    // One reference for the whole barrier axis: the smallest positive barrier in the picture (= BMIN).
+    // Gap-closers lift onto real red junctions (LCA node heights), so they share the tree's own scale,
+    // their position matches the dex readout, and a lift never overshoots past the root. Clamped to
+    // [ref, maxH].
     const ref = (BMIN > 0 && BMIN <= hmin) ? BMIN : hmin;
     const LMARGIN = 0.05, lspan = (Math.log(maxH) - Math.log(ref)) || 1;
     const clampH = h => Math.max(ref, Math.min(h, maxH));
@@ -281,8 +299,17 @@
 
     leaves.forEach((lf, i) => {
       const p = lf.paper || lf;
-      const red = (OVERLAY && model.reduce) ? (model.reduce.get(p) || 0) : 0;
-      lf._x = red > 0 ? xAt(red) : leafX;   // gap-closers lift to the barrier they hold shut; branch stops here
+      // A gap-closer lifts to sit ON the red junction that joins the two works it bridges: the height
+      // of their lowest common ancestor (their merge point in this tree). So the green paper dot lands
+      // exactly on that red gap-node. Only when the overlay is on. Legacy payloads without a pair fall
+      // back to the reduction magnitude. Junction heights are real node heights, so a paper never
+      // overshoots past the root. Branch stops AT the lifted node.
+      let lift = 0;
+      if (OVERLAY && model.reduce && (model.reduce.get(p) || 0) > 0) {
+        const pr = model.reducePair && model.reducePair.get(p);
+        lift = (pr && mergeHeight(tree, pr.a, pr.b)) || (model.reduce.get(p) || 0);
+      }
+      lf._x = lift > 0 ? xAt(lift) : leafX;
       lf._y = top + i * rowH;
     });
     (function lay(n) {
@@ -456,13 +483,11 @@
     mountEl.style.position = "relative";
     if (!model) { mountEl.innerHTML = '<p style="color:#888">Need ≥2 papers with embeddings to draw the tree.</p>'; return; }
 
-    // Log ("dex") reference = the smallest positive barrier ANYWHERE in the picture — gap-node
-    // barriers AND gap-closer reduction barriers — so every dex = log10(barrier / BMIN) is >= 0, and the
-    // axis label and the gap-closer tooltips use one identical formula/reference.
+    // Log ("dex") reference = the smallest positive barrier in the picture. Gap-closers now lift ONTO
+    // real red junctions (LCA node heights ⊆ these edge weights), so the tree's own gaps are the whole
+    // scale — every dex = log10(barrier / BMIN) is >= 0, and axis + tooltips share one reference.
     const bw = (model.edges || []).map(e => e.w).filter(w => w > 0);
-    const rv = model.reduce ? [...model.reduce.values()].filter(v => v > 0) : [];
-    const allBar = bw.concat(rv);
-    BMIN = allBar.length ? Math.min(...allBar) : 0;
+    BMIN = bw.length ? Math.min(...bw) : 0;
 
     const W = Math.max(mountEl.clientWidth || 820, 360);
     // Prefer the server's faithful barrier-reduction scores; fall back to client betweenness (fixtures /
