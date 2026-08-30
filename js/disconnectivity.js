@@ -35,11 +35,11 @@
         – BARRIER REDUCTION  = the LARGEST single barrier INCREASE that removing k causes across the
           full field (pipeline._barrier_reduction), plus the PAIR of works whose barrier rises most =
           the gap k closes between them. Same units as a gap node; ranks/colors the gap-closers.
-     When "Highlight gap-closers" is on, a gap-closer is DRAWN AS the red junction that joins the two
-     works it bridges (its bridged pair's lowest common ancestor) — a GREEN fork with an arm to each
-     side — instead of hanging as a pendant leaf; it gives up its base row and the trivial merge where
-     it first attached collapses. A strong bridge becomes a fork near the root; a redundant/pendant
-     paper reduces nothing and stays a base minimum.
+     When "Highlight gap-closers" is on, a gap-closer leaves its base row and is drawn as a green node
+     BETWEEN the two works it bridges — midway between their rows, at the barrier it closes (their merge
+     height) — with a green arm to each work, i.e. a fork whose two children are those works. The red
+     disconnectivity tree of the remaining papers is kept around them. A redundant/pendant paper
+     reduces nothing and stays a base minimum.
    • LOG scale: barriers are positive but cluster near 0, so log spreads them. Since log10(distance<1)
      is negative, the readout uses "dex" = log10(barrier / tightest-gap) ≥ 0 — decades above the
      smallest gap — which is exactly what the log axis positions by, and stays positive. */
@@ -277,26 +277,30 @@
     const tree = model.root;
     const leaves = leafNodes(tree);
 
-    // ── Seat gap-closers ON their junction ─────────────────────────────────────────────────────
-    // When "Highlight gap-closers" is on, a bridge paper is drawn AS the red junction that joins the
-    // two works it bridges (its LCA node) — a GREEN fork with an arm to each side — instead of hanging
-    // as a pendant leaf. It gives up its base row; the trivial merge where it first attached collapses
-    // away. If two papers land on the same junction, the higher-reducing one wins it and the other
-    // stays a base leaf. Off → seatOf empty → the plain tree.
-    const seatOf = new Map();      // paper  -> junction node it is drawn as
-    const owner = new Map();       // junction node -> the paper drawn as it
+    // ── Seat gap-closers BETWEEN the two works they bridge ─────────────────────────────────────
+    // When "Highlight gap-closers" is on, a bridge paper leaves the base row and is drawn as a green
+    // node BETWEEN its two bridged works — vertically at the midpoint of their two rows, horizontally
+    // at the barrier it closes (their merge height) — with an arm reaching directly to each work. The
+    // red-gap tree of the remaining papers is kept around them. To stay clean, a closer is seated ONLY
+    // when BOTH its works remain base leaves: strongest-reducing closers claim first, and the two works
+    // they bridge are pinned as base leaves, so no closer is drawn hanging off another. Off → none.
+    const seatOf = new Map();      // paper -> { a, b, height } : the two works it bridges + merge barrier
     if (OVERLAY && model.reduce && model.reducePair) {
-      leaves.forEach(lf => {
-        const p = lf.paper || lf;
-        const rv = model.reduce.get(p) || 0;
-        const pr = rv > 0 ? model.reducePair.get(p) : null;
-        const J = pr ? lcaNode(tree, pr.a, pr.b) : null;
-        if (!J || isLeaf(J)) return;
-        const cur = owner.get(J);
-        if (!cur || (model.reduce.get(cur) || 0) < rv) {
-          if (cur) seatOf.delete(cur);                   // demoted back to a base leaf
-          owner.set(J, p); seatOf.set(p, J);
-        }
+      const cand = leaves.map(lf => lf.paper || lf)
+        .filter(p => (model.reduce.get(p) || 0) > 0 && model.reducePair.get(p))
+        .sort((x, y) => (model.reduce.get(y) || 0) - (model.reduce.get(x) || 0));
+      const pinned = new Set();    // works claimed by an already-seated closer -> must stay base leaves
+      const takenJ = new Set();    // junctions already occupied -> one closer per junction (strongest wins)
+      cand.forEach(p => {
+        if (pinned.has(p)) return;                       // p is someone's base work; keep it a base leaf
+        const pr = model.reducePair.get(p);
+        const a = pr.a, b = pr.b;
+        if (a === p || b === p || a === b) return;
+        if (seatOf.has(a) || seatOf.has(b)) return;      // a work is itself seated -> would nest; skip
+        const J = lcaNode(tree, a, b);
+        if (!J || isLeaf(J) || takenJ.has(J)) return;    // junction already holds a (stronger) closer
+        seatOf.set(p, { a, b, height: J.height || 0 });
+        pinned.add(a); pinned.add(b); takenJ.add(J);
       });
     }
     const seated = p => seatOf.has(p);
@@ -322,9 +326,14 @@
     const xAt = LOG ? xLog : xLin;                    // larger barrier -> further left
     const axisY = H - 22;
 
-    // Rows: only NON-seated leaves (base minima) take a row; seated leaves are drawn at their junction.
+    // Rows: only NON-seated leaves (base minima) take a row; a seated closer is drawn between its works.
     let r = 0;
-    leaves.forEach(lf => { lf._x = leafX; lf._y = top + (seated(lf.paper || lf) ? 0 : r++) * rowH; });
+    const rowY = new Map();                             // base paper -> its row y (for the closer arms)
+    leaves.forEach(lf => {
+      const p = lf.paper || lf;
+      lf._x = leafX;
+      if (seated(p)) { lf._y = top; } else { lf._y = top + (r++) * rowH; rowY.set(p, lf._y); }
+    });
 
     // Layout: each internal node's y = midpoint of its VISIBLE descendants' rows (seated leaves add no
     // row, so a junction centres between the base works on either side). x = its barrier column.
@@ -346,32 +355,39 @@
       meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0 };
     };
 
-    // walk returns the attach point {x,y} the parent draws a connector to, or null if this whole
-    // subtree is invisible (all its leaves are seated elsewhere).
+    // Base tree: the disconnectivity graph over the non-seated papers. A seated closer leaves the tree
+    // (returns null) and the trivial merge where it attached collapses, so the remaining red gaps stay
+    // connected. walk returns the attach point {x,y} for the parent, or null if the subtree is empty.
     (function walk(n) {
       const id = "d" + (uid++);
       if (isLeaf(n)) {
         const p = n.paper || n;
-        if (seated(p)) return null;                      // drawn as its junction, not as a pendant
+        if (seated(p)) return null;                      // drawn as a bridge, not as a base pendant
         paperDot(id, p, leafX, n._y);                    // base minimum, at barrier 0
         return { x: leafX, y: n._y };
       }
       const arms = kids(n).map(walk).filter(Boolean);    // visible child attach points
-      const claim = owner.get(n);                        // paper drawn AS this fork, if any
-      if (!claim && arms.length <= 1) return arms[0] || null;  // trivial merge (a seated child) collapses
+      if (arms.length <= 1) return arms[0] || null;      // trivial merge (a seated child) collapses
       const ys = arms.map(a => a.y);
-      if (arms.length) {
-        branches += `<path d="M${n._x} ${Math.min(...ys)} V${Math.max(...ys)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
-        arms.forEach(a => { branches += `<path d="M${a.x} ${a.y} H${n._x}" stroke="#111" stroke-width="1.5" fill="none"/>`; });
-      }
-      if (claim) {
-        paperDot(id, claim, n._x, n._y);                 // GREEN fork = the gap-closer, at its junction
-      } else {
-        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
-        meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: n.height || 0, papers: leafPapers(n) };
-      }
+      branches += `<path d="M${n._x} ${Math.min(...ys)} V${Math.max(...ys)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
+      arms.forEach(a => { branches += `<path d="M${a.x} ${a.y} H${n._x}" stroke="#111" stroke-width="1.5" fill="none"/>`; });
+      dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
+      meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: n.height || 0, papers: leafPapers(n) };
       return { x: n._x, y: n._y };
     })(tree);
+
+    // Gap-closers: each is drawn BETWEEN its two bridged works — a green node at the merge barrier,
+    // midway between the works' rows, with a green arm reaching to each work. This is exactly a fork
+    // whose two children are the works it settles the gap for.
+    seatOf.forEach((info, p) => {
+      const ya = rowY.get(info.a), yb = rowY.get(info.b);
+      if (ya == null || yb == null) return;              // safety: both works must be base leaves
+      const x = xAt(info.height), y = (ya + yb) / 2, id = "d" + (uid++);
+      branches += `<path d="M${x.toFixed(1)} ${Math.min(ya, yb)} V${Math.max(ya, yb)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
+      branches += `<path d="M${leafX} ${ya} H${x.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
+      branches += `<path d="M${leafX} ${yb} H${x.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
+      paperDot(id, p, x, y);                             // green closer node + label + tooltip
+    });
 
     const axis =
       `<line x1="${left}" y1="${axisY}" x2="${leafX}" y2="${axisY}" stroke="#bbb" stroke-width="1"/>` +
