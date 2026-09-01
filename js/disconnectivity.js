@@ -90,6 +90,7 @@
 
   let LOG = true;      // barrier axis / edge length scale: true = log(gap) (compact), false = linear.
   let MODE = "dg";     // "dg" = disconnectivity, "mst" = minimum spanning tree graph.
+  let FEV = false;     // free-energy DG view active: axis is already -ln p (energy), so never re-log it.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
 
   // Smallest positive barrier in the current map — the reference for the positive log ("dex") scale.
@@ -101,7 +102,7 @@
   // never go negative. Linear view shows just the raw distance.
   const fmtBar = v => {
     v = +v || 0;
-    if (!(LOG && v > 0)) return v.toFixed(3);
+    if (!(LOG && !FEV && v > 0)) return v.toFixed(3);   // FEV: already an energy axis — no dex
     const dex = (BMIN > 0) ? Math.log10(v / BMIN) : 0;
     return `${v.toFixed(3)} · ${dex.toFixed(2)} dex`;
   };
@@ -351,7 +352,8 @@
     const xLin = h => leafX - (Math.min(h, maxH) / maxH) * innerW;
     const xLog = h => h <= 0 ? leafX
       : leafX - (LMARGIN + (1 - LMARGIN) * (Math.log(clampH(h)) - Math.log(ref)) / lspan) * innerW;
-    const xAt = LOG ? xLog : xLin;                    // larger barrier -> further left
+    const useLog = LOG && !FE;                        // free energy is ALREADY a log(prob) axis: don't re-log it
+    const xAt = useLog ? xLog : xLin;                 // larger barrier -> further left
     const axisY = H - 22;
 
     // Rows: only NON-seated leaves (base minima) take a row; a seated closer is drawn between its works.
@@ -396,9 +398,9 @@
       }
       const arms = kids(n).map(walk).filter(Boolean);    // visible child attach points
       if (arms.length <= 1) return arms[0] || null;      // trivial merge (a seated child) collapses
-      const ys = arms.map(a => a.y);
-      branches += `<path d="M${n._x} ${Math.min(...ys)} V${Math.max(...ys)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
-      arms.forEach(a => { branches += `<path d="M${a.x} ${a.y} H${n._x}" stroke="#111" stroke-width="1.5" fill="none"/>`; });
+      // 'Y' join: a straight diagonal from each child's attach point to the junction point, so two
+      // children meet as a V/Y at the gap node (clearer than square brackets).
+      arms.forEach(a => { branches += `<path d="M${a.x.toFixed(1)} ${a.y.toFixed(1)} L${n._x.toFixed(1)} ${n._y.toFixed(1)}" stroke="#111" stroke-width="1.5" fill="none"/>`; });
       dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
       meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: val(n), papers: leafPapers(n) };
       return { x: n._x, y: n._y };
@@ -412,9 +414,8 @@
       if (ya == null || yb == null) return;              // safety: both works must be base leaves
       const x = xAt(info.height), y = (ya + yb) / 2, id = "d" + (uid++);
       const xa = FE ? feX(info.a) : leafX, xb = FE ? feX(info.b) : leafX;   // each work at its own depth
-      branches += `<path d="M${x.toFixed(1)} ${Math.min(ya, yb)} V${Math.max(ya, yb)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
-      branches += `<path d="M${xa.toFixed(1)} ${ya} H${x.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
-      branches += `<path d="M${xb.toFixed(1)} ${yb} H${x.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
+      branches += `<path d="M${xa.toFixed(1)} ${ya.toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
+      branches += `<path d="M${xb.toFixed(1)} ${yb.toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
       paperDot(id, p, x, y);                             // green closer node + label + tooltip
     });
 
@@ -423,8 +424,8 @@
       `<line x1="${leafX}" y1="${axisY - 4}" x2="${leafX}" y2="${axisY + 4}" stroke="#bbb"/>` +
       `<line x1="${left}" y1="${axisY - 4}" x2="${left}" y2="${axisY + 4}" stroke="#bbb"/>` +
       `<text x="${leafX}" y="${axisY + 16}" text-anchor="end" font-size="10" fill="#888">0</text>` +
-      `<text x="${left}" y="${axisY + 16}" text-anchor="start" font-size="10" fill="#888">${LOG && BMIN > 0 ? Math.log10(maxH / BMIN).toFixed(2) + " dex" : maxH.toFixed(2)}</text>` +
-      `<text x="${(left + leafX) / 2}" y="${axisY + 16}" text-anchor="middle" font-size="10" fill="#888">${FE ? `← free energy  −ln p  (${LOG ? "log" : "linear"}, k_BT=1)` : `← barrier (${LOG ? "log" : "linear"} gap magnitude)`}</text>`;
+      `<text x="${left}" y="${axisY + 16}" text-anchor="start" font-size="10" fill="#888">${useLog && BMIN > 0 ? Math.log10(maxH / BMIN).toFixed(2) + " dex" : maxH.toFixed(2)}</text>` +
+      `<text x="${(left + leafX) / 2}" y="${axisY + 16}" text-anchor="middle" font-size="10" fill="#888">${FE ? `← free energy  −ln p  (k_BT=1)` : `← barrier (${useLog ? "log" : "linear"} gap magnitude)`}</text>`;
 
     return { inner: branches + axis + dots + labels, H, meta };
   }
@@ -557,6 +558,10 @@
     mountEl.style.position = "relative";
     if (!model) { mountEl.innerHTML = '<p style="color:#888">Need ≥2 papers with embeddings to draw the tree.</p>'; return; }
 
+    // Free-energy DG view: the axis IS the energy (−ln p), so the Log toggle is inert here (re-logging
+    // an energy axis collapses the barriers). It stays live for MST, whose axis is cosine distance.
+    FEV = !!(model.hasFE && MODE === "dg");
+
     // Log ("dex") reference = the smallest positive barrier in the picture. Gap-closers now lift ONTO
     // real red junctions (LCA node heights ⊆ these edge weights), so the tree's own gaps are the whole
     // scale — every dex = log10(barrier / BMIN) is >= 0, and axis + tooltips share one reference.
@@ -590,8 +595,8 @@
       `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:8px;` +
       `font:12px system-ui,sans-serif;color:#555">` +
       `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")} ${radio("mst", "MST")}</span>` +
-      `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">` +
-      `<input type="checkbox" class="dg-log"${LOG ? " checked" : ""}/> Log scale (compress large gaps)</label>` +
+      `<label style="cursor:${FEV ? "default" : "pointer"};display:inline-flex;align-items:center;gap:6px;user-select:none${FEV ? ";opacity:.45" : ""}" title="${FEV ? "The free-energy axis is already −ln p; log scaling applies to the MST view." : ""}">` +
+      `<input type="checkbox" class="dg-log"${LOG ? " checked" : ""}${FEV ? " disabled" : ""}/> ${FEV ? "Log scale (n/a — energy axis)" : "Log scale (compress large gaps)"}</label>` +
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">` +
       `<input type="checkbox" class="dg-overlay"${OVERLAY ? " checked" : ""}/> Highlight gap-closers</label>` +
       `</div>`;
