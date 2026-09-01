@@ -307,11 +307,11 @@
     // NOTE: in this VERTICAL view the "seat gap-closers between two works" overlay is disabled; the
     // "Highlight gap-closers" checkbox now only recolours the dots (paperStyle) by bridge score.
 
-    // VERTICAL disconnectivity graph (classical, symmetric): energy runs UP the Y-axis (root at the top,
-    // deepest well at the bottom); leaves take evenly-spaced columns and every junction is CENTRED above
-    // its two children — the canonical look. Saddles now sit strictly above their minima (gap-col
-    // barrier), so centred junctions no longer collide. Many papers -> the shell scrolls horizontally.
-    const left = 60, top = 30, colW = 34, energyH = 480, botLabel = 30, rightPad = 34;
+    // VERTICAL disconnectivity graph (classical, PELE-style symmetric): energy runs UP the Y-axis (root
+    // at the top, deepest well at the bottom); leaves take evenly-spaced columns and every junction is
+    // CENTRED over its children, so a balanced minimax tree draws as a balanced fan. Many papers -> the
+    // shell scrolls horizontally.
+    const left = 60, top = 30, colW = 42, energyH = 470, botLabel = 150, STEM = 14, rightPad = 34;
     const nCols = Math.max(1, leaves.length);
     const DW = left + nCols * colW + rightPad;         // total width (>= viewport -> horizontal scroll)
     const H = top + energyH + botLabel;
@@ -359,37 +359,40 @@
       if (!moved) break;
     }
 
-    let branches = "", hits = "", uid = 0;
+    let branches = "", dots = "", labels = "", guides = "", uid = 0;
     const meta = {};
 
-    // Classical RECTANGULAR disconnectivity graph (like the reference): every junction is a HORIZONTAL
-    // bar at its energy spanning its children, with a VERTICAL drop from each child up to the bar; the
-    // bar's midpoint carries the stub up to the parent. Minima hang at their own depths — no dots, just
-    // monochrome lines. Invisible hit-circles preserve hover/tooltips.
+    // GREEN minima at their own depths, RED transition-state nodes at real barriers, ANGLED branches:
+    // each child rises straight along its column then a short diagonal converges into the junction (a Y
+    // fork), and every junction is centred over its children (PELE-style symmetric layout). A
+    // zero-barrier merge (junction pinned onto a minimum's level) draws its lines but gets no red dot.
     (function walk(n) {
       const id = "d" + (uid++);
       if (isLeaf(n)) {
-        const p = n.paper || n;
-        hits += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="7" fill="transparent"/>`;
-        meta[id] = { type: "paper", paper: p, overlay: 0, overlayKind: "", reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0, fe: (FE && model.energy) ? model.energy.get(p) : null };
+        const p = n.paper || n, st = paperStyle(p, scores);
+        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
+        meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0, fe: (FE && model.energy) ? model.energy.get(p) : null };
+        guides += `<line x1="${n._x.toFixed(1)}" y1="${(n._y + 6).toFixed(1)}" x2="${n._x.toFixed(1)}" y2="${bottomY.toFixed(1)}" stroke="#e8e8e8" stroke-width="1"/>`;
+        labels += `<text transform="translate(${n._x.toFixed(1)} ${(bottomY + 8).toFixed(1)}) rotate(90)" font-size="10" fill="#555">${esc(trunc(p.title, 22))}</text>`;
         return { x: n._x, y: n._y };
       }
       const cps = kids(n).map(walk).filter(Boolean);
       if (cps.length <= 1) return cps[0] || null;
-      const xs = cps.map(c => c.x), minx = Math.min(...xs), maxx = Math.max(...xs);
-      branches += `<path d="M${minx.toFixed(1)} ${n._y.toFixed(1)} H${maxx.toFixed(1)}" stroke="#333" stroke-width="1.3" fill="none"/>`;   // horizontal bar
-      cps.forEach(c => { branches += `<path d="M${c.x.toFixed(1)} ${c.y.toFixed(1)} V${n._y.toFixed(1)}" stroke="#333" stroke-width="1.3" fill="none"/>`; });  // vertical drops
-      n._x = (minx + maxx) / 2;                          // bar midpoint carries the stub up to the parent
-      // Hover only on a REAL barrier (strictly above both sub-basins); a zero-barrier merge is just a
-      // corner in one basin, not a transition state.
+      cps.forEach(a => {
+        const dy = a.y - n._y;                             // child sits BELOW the (higher-energy) junction
+        const sy = n._y + (dy > 4 ? Math.min(STEM, dy * 0.6) : dy);
+        branches += `<path d="M${a.x.toFixed(1)} ${a.y.toFixed(1)} L${a.x.toFixed(1)} ${sy.toFixed(1)} L${n._x.toFixed(1)} ${n._y.toFixed(1)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
+      });
+      // Red node only at a REAL transition state (strictly above both sub-basins); a zero-barrier merge
+      // is just a corner within one basin, not a saddle, so it gets no dot.
       if (val(n) > Math.max(...kids(n).map(c => val(c))) + 1e-4) {
-        hits += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="6" fill="transparent"/>`;
+        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
         meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: val(n), papers: leafPapers(n) };
       }
       return { x: n._x, y: n._y };
     })(tree);
-    // Root stub above the top bar (the classical single line rising out of the root).
-    branches += `<path d="M${tree._x.toFixed(1)} ${tree._y.toFixed(1)} V${(tree._y - 16).toFixed(1)}" stroke="#333" stroke-width="1.3" fill="none"/>`;
+    // Root stub above the top junction.
+    branches += `<path d="M${tree._x.toFixed(1)} ${tree._y.toFixed(1)} V${(tree._y - 16).toFixed(1)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
 
     // Vertical energy axis (0 = deepest well at the bottom, root at the top).
     const ax = left - 16;
@@ -401,7 +404,7 @@
       `<text x="${ax - 6}" y="${top + 3}" text-anchor="end" font-size="10" fill="#888">${useLog && BMIN > 0 ? Math.log10(maxH / BMIN).toFixed(2) + " dex" : maxH.toFixed(2)}</text>` +
       `<text transform="translate(14 ${(top + energyH / 2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="10" fill="#888">${FE ? "free energy  −ln p  ↑ (less stable / higher barrier)" : "barrier ↑ (larger gap)"}</text>`;
 
-    return { inner: branches + axis + hits, H, meta, W: DW };
+    return { inner: guides + branches + axis + dots + labels, H, meta, W: DW };
   }
 
   /* ---- View B: minimum spanning tree graph (force-directed) ---- */
