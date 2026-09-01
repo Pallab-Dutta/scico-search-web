@@ -334,7 +334,7 @@
     }
     const seated = p => seatOf.has(p);
 
-    const left = 34, right = 264, top = 24, rowH = 26, axisPad = 40;
+    const left = 34, right = 264, top = 24, rowH = 26, axisPad = 40, STEM = 14;   // STEM = Y-fork length
     const nRows = Math.max(1, leaves.reduce((k, lf) => k + (seated(lf.paper || lf) ? 0 : 1), 0));
     const H = top * 2 + Math.max(1, nRows - 1) * rowH + axisPad;
     const innerW = W - left - right;
@@ -398,9 +398,13 @@
       }
       const arms = kids(n).map(walk).filter(Boolean);    // visible child attach points
       if (arms.length <= 1) return arms[0] || null;      // trivial merge (a seated child) collapses
-      // 'Y' join: a straight diagonal from each child's attach point to the junction point, so two
-      // children meet as a V/Y at the gap node (clearer than square brackets).
-      arms.forEach(a => { branches += `<path d="M${a.x.toFixed(1)} ${a.y.toFixed(1)} L${n._x.toFixed(1)} ${n._y.toFixed(1)}" stroke="#111" stroke-width="1.5" fill="none"/>`; });
+      // 'Y' join: each child runs as a STRAIGHT line along its own row, then a SHORT diagonal converges
+      // into the junction point — a small Y fork at the branch, straight elsewhere (classic DG look).
+      arms.forEach(a => {
+        const dx = a.x - n._x;                           // child is right of the (higher-energy) junction
+        const sx = n._x + (dx > 4 ? Math.min(STEM, dx * 0.6) : dx);   // where the diagonal starts
+        branches += `<path d="M${a.x.toFixed(1)} ${a.y.toFixed(1)} L${sx.toFixed(1)} ${a.y.toFixed(1)} L${n._x.toFixed(1)} ${n._y.toFixed(1)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
+      });
       dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
       meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: val(n), papers: leafPapers(n) };
       return { x: n._x, y: n._y };
@@ -414,8 +418,11 @@
       if (ya == null || yb == null) return;              // safety: both works must be base leaves
       const x = xAt(info.height), y = (ya + yb) / 2, id = "d" + (uid++);
       const xa = FE ? feX(info.a) : leafX, xb = FE ? feX(info.b) : leafX;   // each work at its own depth
-      branches += `<path d="M${xa.toFixed(1)} ${ya.toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
-      branches += `<path d="M${xb.toFixed(1)} ${yb.toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
+      const yArm = (wx, wy) => {                         // straight along the work's row, then a short Y diagonal
+        const dx = wx - x, sx = x + (dx > 4 ? Math.min(STEM, dx * 0.6) : dx);
+        return `<path d="M${wx.toFixed(1)} ${wy.toFixed(1)} L${sx.toFixed(1)} ${wy.toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
+      };
+      branches += yArm(xa, ya) + yArm(xb, yb);
       paperDot(id, p, x, y);                             // green closer node + label + tooltip
     });
 
