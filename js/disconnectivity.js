@@ -307,12 +307,12 @@
     // NOTE: in this VERTICAL view the "seat gap-closers between two works" overlay is disabled; the
     // "Highlight gap-closers" checkbox now only recolours the dots (paperStyle) by bridge score.
 
-    // VERTICAL disconnectivity graph: energy runs UP the Y-axis (root at the top, deepest well at the
-    // bottom). EVERY node — leaf AND junction — gets its own column (in-order), so no two dots can share
-    // a column and nothing overlaps even when a saddle sits at a minimum's energy (density ties). Many
-    // papers -> the shell scrolls horizontally.
-    const left = 60, top = 24, colW = 34, energyH = 470, botLabel = 158, STEM = 14, rightPad = 40;
-    const nCols = Math.max(1, 2 * leaves.length - 1);
+    // VERTICAL disconnectivity graph (classical, symmetric): energy runs UP the Y-axis (root at the top,
+    // deepest well at the bottom); leaves take evenly-spaced columns and every junction is CENTRED above
+    // its two children — the canonical look. Saddles now sit strictly above their minima (gap-col
+    // barrier), so centred junctions no longer collide. Many papers -> the shell scrolls horizontally.
+    const left = 60, top = 24, colW = 50, energyH = 470, botLabel = 158, STEM = 14, rightPad = 40;
+    const nCols = Math.max(1, leaves.length);
     const DW = left + nCols * colW + rightPad;         // total width (>= viewport -> horizontal scroll)
     const H = top + energyH + botLabel;
     const bottomY = top + energyH;
@@ -328,17 +328,36 @@
                         : (e => Math.min(e, maxH) / maxH);
     const yAt = e => top + (1 - frac(e)) * energyH;     // higher energy -> higher up (toward the root)
 
-    // Layout: in-order walk gives every node (leaf AND junction) its own column — left subtree, node,
-    // right subtree — so subtrees stay contiguous, lines don't cross, and no two dots share a column.
-    // x = column, y = the node's own free energy.
-    let slot = 0;
+    // Layout: leaves take successive evenly-spaced columns (in-order, so subtrees stay contiguous and
+    // lines never cross); a junction is placed at the MEAN x of its children — centred above them — and
+    // at its own free-energy height. This is the classical symmetric disconnectivity-graph layout.
+    let li = 0;
     (function lay(n) {
-      if (isLeaf(n)) { n._x = left + colW * (slot++) + colW / 2; n._y = yAt(val(n)); return; }
-      const cs = kids(n);
-      lay(cs[0]);
-      n._x = left + colW * (slot++) + colW / 2; n._y = yAt(val(n));
-      for (let i = 1; i < cs.length; i++) lay(cs[i]);
+      if (isLeaf(n)) { n._x = left + colW * (li++) + colW / 2; n._y = yAt(val(n)); return n._x; }
+      const xs = kids(n).map(lay);
+      n._x = xs.reduce((a, b) => a + b, 0) / xs.length;
+      n._y = yAt(val(n));
+      return n._x;
     })(tree);
+
+    // De-collision: on a chained (caterpillar) tree two spine junctions can land at nearly the same
+    // point. Nudge overlapping dots apart HORIZONTALLY only (energy/y is exact and never moved), so the
+    // centred layout stays put except where dots would actually touch.
+    const nodesAll = [];
+    (function collect(n) { nodesAll.push(n); kids(n).forEach(collect); })(tree);
+    const minSep = 15;
+    for (let iter = 0; iter < 60; iter++) {
+      let moved = false;
+      for (let i = 0; i < nodesAll.length; i++) for (let j = i + 1; j < nodesAll.length; j++) {
+        const a = nodesAll[i], b = nodesAll[j], dy = Math.abs(a._y - b._y);
+        if (dy >= minSep) continue;
+        const needX = Math.sqrt(minSep * minSep - dy * dy), dx = b._x - a._x;
+        if (Math.abs(dx) >= needX) continue;
+        const shove = (needX - Math.abs(dx)) / 2 + 0.25, dir = dx >= 0 ? 1 : -1;
+        a._x -= dir * shove; b._x += dir * shove; moved = true;
+      }
+      if (!moved) break;
+    }
 
     let branches = "", dots = "", labels = "", guides = "", uid = 0;
     const meta = {};
