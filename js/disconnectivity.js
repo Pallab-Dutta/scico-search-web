@@ -335,9 +335,17 @@
     const seated = p => seatOf.has(p);
 
     const left = 34, right = 264, top = 24, rowH = 26, axisPad = 40, STEM = 14;   // STEM = Y-fork length
-    const nRows = Math.max(1, leaves.reduce((k, lf) => k + (seated(lf.paper || lf) ? 0 : 1), 0));
-    const H = top * 2 + Math.max(1, nRows - 1) * rowH + axisPad;
-    const innerW = W - left - right;
+    // Default view: give EVERY node (leaf AND junction) its own slot, so no two nodes can share a row —
+    // overlaps become impossible however compressed the energy axis is. The overlay view keeps its
+    // leaves-only rows (junctions centre on their descendants).
+    const inorder = seatOf.size === 0;
+    const nSlots = inorder ? Math.max(1, 2 * leaves.length - 1)
+                           : Math.max(1, leaves.reduce((k, lf) => k + (seated(lf.paper || lf) ? 0 : 1), 0));
+    const H = top * 2 + Math.max(1, nSlots - 1) * rowH + axisPad;
+    // Widen the energy axis well beyond the viewport (the shell scrolls horizontally) so the compressed
+    // small-barrier region near the base is legible.
+    const innerW = Math.max(W - left - right, 40 * nSlots);
+    const DW = left + right + innerW;                 // total drawing width (>= viewport -> horizontal scroll)
     const maxH = (function m(n) { return Math.max(val(n), ...kids(n).map(m)); })(tree) || 1;
     const leafX = left + innerW;                      // energy 0 = deepest well (minima column, right)
     let hmin = Infinity;
@@ -356,25 +364,36 @@
     const xAt = useLog ? xLog : xLin;                 // larger barrier -> further left
     const axisY = H - 22;
 
-    // Rows: only NON-seated leaves (base minima) take a row; a seated closer is drawn between its works.
-    let r = 0;
-    const rowY = new Map();                             // base paper -> its row y (for the closer arms)
-    leaves.forEach(lf => {
-      const p = lf.paper || lf;
-      lf._x = FE ? xAt(val(lf)) : leafX;                 // FE: leaf sits at its own well depth
-      if (seated(p)) { lf._y = top; } else { lf._y = top + (r++) * rowH; rowY.set(p, lf._y); }
-    });
-
-    // Layout: each internal node's y = midpoint of its VISIBLE descendants' rows (seated leaves add no
-    // row, so a junction centres between the base works on either side). x = its barrier column.
-    (function lay(n) {
-      if (isLeaf(n)) return seated(n.paper || n) ? null : { y: n._y };
-      const cs = kids(n).map(lay).filter(Boolean);
-      n._x = xAt(val(n));
-      const ys = cs.map(c => c.y);
-      n._y = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : top;
-      return { y: n._y };
-    })(tree);
+    const xOf = n => (isLeaf(n) ? (FE ? xAt(val(n)) : leafX) : xAt(val(n)));
+    const rowY = new Map();                             // base paper -> its row y (only used by the overlay)
+    if (inorder) {
+      // In-order walk: left subtree above, the node on its own slot, right subtree below. Every node —
+      // leaf or junction — lands on a distinct row, so nothing overlaps; x stays the true energy.
+      let slot = 0;
+      (function lay(n) {
+        if (isLeaf(n)) { n._x = xOf(n); n._y = top + (slot++) * rowH; return; }
+        const cs = kids(n);
+        lay(cs[0]);
+        n._x = xOf(n); n._y = top + (slot++) * rowH;
+        for (let i = 1; i < cs.length; i++) lay(cs[i]);
+      })(tree);
+    } else {
+      // Overlay view: only non-seated leaves take a row; a junction centres on its visible descendants.
+      let r = 0;
+      leaves.forEach(lf => {
+        const p = lf.paper || lf;
+        lf._x = xOf(lf);
+        if (seated(p)) { lf._y = top; } else { lf._y = top + (r++) * rowH; rowY.set(p, lf._y); }
+      });
+      (function lay(n) {
+        if (isLeaf(n)) return seated(n.paper || n) ? null : { y: n._y };
+        const cs = kids(n).map(lay).filter(Boolean);
+        n._x = xOf(n);
+        const ys = cs.map(c => c.y);
+        n._y = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : top;
+        return { y: n._y };
+      })(tree);
+    }
 
     let branches = "", dots = "", labels = "", uid = 0;
     const meta = {};
@@ -434,7 +453,7 @@
       `<text x="${left}" y="${axisY + 16}" text-anchor="start" font-size="10" fill="#888">${useLog && BMIN > 0 ? Math.log10(maxH / BMIN).toFixed(2) + " dex" : maxH.toFixed(2)}</text>` +
       `<text x="${(left + leafX) / 2}" y="${axisY + 16}" text-anchor="middle" font-size="10" fill="#888">${FE ? `← free energy  −ln p  (k_BT=1)` : `← barrier (${useLog ? "log" : "linear"} gap magnitude)`}</text>`;
 
-    return { inner: branches + axis + dots + labels, H, meta };
+    return { inner: branches + axis + dots + labels, H, meta, W: DW };
   }
 
   /* ---- View B: minimum spanning tree graph (force-directed) ---- */
@@ -530,7 +549,7 @@
     });
     const hint = `<text x="12" y="${H - 12}" font-size="10" fill="#999">edge length ∝ ${LOG ? "log " : ""}gap magnitude · long / thick edge = larger gap</text>`;
 
-    return { inner: lines + gapdots + ndots + labels + hint, H, meta };
+    return { inner: lines + gapdots + ndots + labels + hint, H, meta, W };
   }
 
   /* ---- Shared shell: toolbar, svg wrapper, tooltip ---- */
@@ -608,9 +627,13 @@
       `<input type="checkbox" class="dg-overlay"${OVERLAY ? " checked" : ""}/> Highlight gap-closers</label>` +
       `</div>`;
 
+    // Draw at the layout's natural width (which may exceed the viewport) and let the shell scroll
+    // horizontally, so a wide energy axis never has to squeeze nodes on top of each other.
+    const DW = built.W || W;
     mountEl.innerHTML = tools +
-      `<svg viewBox="0 0 ${W} ${built.H}" width="100%" height="${built.H}" preserveAspectRatio="xMinYMin meet" ` +
-      `style="font-family:system-ui,sans-serif;display:block;max-width:100%">` + built.inner + `</svg>`;
+      `<div style="overflow-x:auto;overflow-y:hidden;max-width:100%">` +
+      `<svg viewBox="0 0 ${DW} ${built.H}" width="${DW}" height="${built.H}" preserveAspectRatio="xMinYMin meet" ` +
+      `style="font-family:system-ui,sans-serif;display:block">` + built.inner + `</svg></div>`;
 
     mountEl.querySelectorAll(".dg-mode").forEach(r =>
       r.addEventListener("change", () => { if (r.checked) { MODE = r.value; draw(session, mountEl); } }));
