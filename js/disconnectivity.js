@@ -3,10 +3,15 @@
 
    Single-linkage clustering IS the minimum spanning tree, so we offer two VIEWS of one tree:
 
-     • Disconnectivity ("dg")  — the canonical energy-landscape rendering, plotted horizontally.
-         Horizontal position (x) = barrier / gap magnitude = the merge distance (1 - cosine sim)
-         at which two sub-basins first join. Minima at barrier 0 (right); root at the largest
-         barrier (left). Leaves = papers (green), branch junctions = research gaps (red).
+     • Disconnectivity ("dg")  — the canonical FREE-ENERGY landscape, plotted horizontally, built
+         exactly like a protein-folding PES. Horizontal position (x) = FREE ENERGY F = −ln p
+         (Boltzmann inversion, k_BT=1) on ONE axis for minima AND saddles. A LEAF (paper) sits at
+         its OWN well depth F_i = −ln(density) — dense, well-populated semantic regions are deep,
+         stable wells (right); isolated outliers are shallow, up near the root (left). A JUNCTION
+         (research gap) sits at the barrier F = −ln(cos-sim of its merge edge), raised so no barrier
+         lies below the wells it separates. Deepest well = 0 (right); root = largest F (left).
+         Leaves = papers (green), branch junctions = research gaps (red). Server sends per-node `fe`
+         + per-paper `energy`; payloads without them fall back to the legacy leaves-at-0 dendrogram.
 
      • MST ("mst") — the same tree drawn as a graph (force-directed). EVERY paper is a node, so a
          paper that bridges two clusters sits geometrically between them. Edges = links; edge
@@ -141,9 +146,12 @@
     // faithful leave-one-out scores by paper object.
     if (d && d.tree) {
       const papers = d.papers || [];
+      // `fe` = Boltzmann-inverted FREE ENERGY (k_BT=1) on every node — leaf minima at their own well
+      // depth, junctions raised to the barrier that separates their basins. Present on free-energy
+      // payloads; absent (undefined) on older ones, which then render the legacy leaves-at-0 way.
       const hydrate = node => node.leaf
-        ? { leaf: true, paper: papers[node.i] }
-        : { leaf: false, height: node.height, children: (node.children || []).map(hydrate) };
+        ? { leaf: true, paper: papers[node.i], fe: node.fe }
+        : { leaf: false, height: node.height, fe: node.fe, children: (node.children || []).map(hydrate) };
       const root = hydrate(d.tree);
       const edges = (d.edges || []).map(e => ({ a: papers[e.a], b: papers[e.b], w: e.w }));
       let loo = null, reduce = null;
@@ -169,7 +177,13 @@
             reducePair.set(p, { a: papers[pr[0]], b: papers[pr[1]] });
         });
       }
-      return { root, edges, loo, reduce, reducePair };
+      // Per-paper free energy F_i = -ln p_i (KDE density), keyed by paper object; deepest well = 0.
+      let energy = null;
+      if (Array.isArray(d.energy) && d.energy.length === papers.length) {
+        energy = new Map(); papers.forEach((p, i) => energy.set(p, d.energy[i]));
+      }
+      const hasFE = (typeof root.fe === "number") && energy != null;
+      return { root, edges, loo, reduce, reducePair, energy, hasFE };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -256,9 +270,15 @@
         // Contributes to closing gaps overall, but did not singularly open a new gap in its era.
         bridge = `gap-closer · total gap-closing ${(+m.total).toFixed(2)} (sum over pairs — not a single barrier)`;
       }
+      // Free-energy well depth (Boltzmann-inverted density): 0 = deepest, most stable / well-populated
+      // region; larger = shallower, more isolated, nearer the root.
+      const depth = (m.fe != null)
+        ? `free energy ${fmtBar(m.fe)} · ${m.fe <= 1e-6 ? "deepest, most stable well" : "well depth above the deepest"}`
+        : "";
       return `<b>${esc(p.title)}</b>` +
         (meta ? `<div class="dg-sub">${esc(meta)}</div>` : "") +
         (score ? `<div class="dg-sub">${esc(score)}</div>` : "") +
+        (depth ? `<div class="dg-sub">${esc(depth)}</div>` : "") +
         (bridge ? `<div class="dg-sub">${esc(bridge)}</div>` : "") +
         (gapPair ? `<div class="dg-sub">${gapPair}</div>` : "");
     }
@@ -276,6 +296,14 @@
   function buildDG(model, W, scores) {
     const tree = model.root;
     const leaves = leafNodes(tree);
+    // FREE-ENERGY landscape (default): every node has a Boltzmann-inverted energy `fe` (leaf = its own
+    // well depth, junction = the barrier separating its basins), all on one axis — a true protein-PES
+    // disconnectivity graph. `val(n)` is a node's position on that axis; a paper's is its leaf fe.
+    // Without `fe` (legacy payloads) we fall back to the old dendrogram: leaves at 0, junctions at the
+    // cosine merge height.
+    const FE = model.hasFE;
+    const val = n => FE ? (n.fe || 0) : (isLeaf(n) ? 0 : (n.height || 0));
+    const feX = p => xAt(model.energy.get(p) || 0);   // a paper's x from its free energy (xAt below)
 
     // ── Seat gap-closers BETWEEN the two works they bridge ─────────────────────────────────────
     // When "Highlight gap-closers" is on, a bridge paper leaves the base row and is drawn as a green
@@ -299,7 +327,7 @@
         if (seatOf.has(a) || seatOf.has(b)) return;      // a work is itself seated -> would nest; skip
         const J = lcaNode(tree, a, b);
         if (!J || isLeaf(J) || takenJ.has(J)) return;    // junction already holds a (stronger) closer
-        seatOf.set(p, { a, b, height: J.height || 0 });
+        seatOf.set(p, { a, b, height: val(J) });
         pinned.add(a); pinned.add(b); takenJ.add(J);
       });
     }
@@ -309,10 +337,10 @@
     const nRows = Math.max(1, leaves.reduce((k, lf) => k + (seated(lf.paper || lf) ? 0 : 1), 0));
     const H = top * 2 + Math.max(1, nRows - 1) * rowH + axisPad;
     const innerW = W - left - right;
-    const maxH = (function m(n) { return isLeaf(n) ? 0 : Math.max(n.height || 0, ...kids(n).map(m)); })(tree) || 1;
-    const leafX = left + innerW;                      // barrier 0 (minima column, right)
+    const maxH = (function m(n) { return Math.max(val(n), ...kids(n).map(m)); })(tree) || 1;
+    const leafX = left + innerW;                      // energy 0 = deepest well (minima column, right)
     let hmin = Infinity;
-    (function mn(n) { if (!isLeaf(n)) { if ((n.height || 0) > 0) hmin = Math.min(hmin, n.height); kids(n).forEach(mn); } })(tree);
+    (function mn(n) { const v = val(n); if (v > 0) hmin = Math.min(hmin, v); kids(n).forEach(mn); })(tree);
     if (!isFinite(hmin)) hmin = maxH;
     // One reference for the whole barrier axis: the smallest positive barrier in the picture (= BMIN).
     // Gap-closers are drawn AS real junction nodes (their heights are edge weights already in BMIN), so
@@ -331,7 +359,7 @@
     const rowY = new Map();                             // base paper -> its row y (for the closer arms)
     leaves.forEach(lf => {
       const p = lf.paper || lf;
-      lf._x = leafX;
+      lf._x = FE ? xAt(val(lf)) : leafX;                 // FE: leaf sits at its own well depth
       if (seated(p)) { lf._y = top; } else { lf._y = top + (r++) * rowH; rowY.set(p, lf._y); }
     });
 
@@ -340,7 +368,7 @@
     (function lay(n) {
       if (isLeaf(n)) return seated(n.paper || n) ? null : { y: n._y };
       const cs = kids(n).map(lay).filter(Boolean);
-      n._x = xAt(n.height || 0);
+      n._x = xAt(val(n));
       const ys = cs.map(c => c.y);
       n._y = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : top;
       return { y: n._y };
@@ -352,7 +380,7 @@
       const st = paperStyle(p, scores);
       dots += `<circle class="dg-node" data-id="${id}" cx="${(+x).toFixed(1)}" cy="${(+y).toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
       labels += `<text x="${(+x + 10).toFixed(1)}" y="${(+y + 3.5).toFixed(1)}" font-size="11" fill="#333">${esc(trunc(p.title, 38))}</text>`;
-      meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0 };
+      meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0, fe: (FE && model.energy) ? model.energy.get(p) : null };
     };
 
     // Base tree: the disconnectivity graph over the non-seated papers. A seated closer leaves the tree
@@ -363,8 +391,8 @@
       if (isLeaf(n)) {
         const p = n.paper || n;
         if (seated(p)) return null;                      // drawn as a bridge, not as a base pendant
-        paperDot(id, p, leafX, n._y);                    // base minimum, at barrier 0
-        return { x: leafX, y: n._y };
+        paperDot(id, p, n._x, n._y);                     // minimum, at its own free energy (well depth)
+        return { x: n._x, y: n._y };
       }
       const arms = kids(n).map(walk).filter(Boolean);    // visible child attach points
       if (arms.length <= 1) return arms[0] || null;      // trivial merge (a seated child) collapses
@@ -372,7 +400,7 @@
       branches += `<path d="M${n._x} ${Math.min(...ys)} V${Math.max(...ys)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
       arms.forEach(a => { branches += `<path d="M${a.x} ${a.y} H${n._x}" stroke="#111" stroke-width="1.5" fill="none"/>`; });
       dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
-      meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: n.height || 0, papers: leafPapers(n) };
+      meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: val(n), papers: leafPapers(n) };
       return { x: n._x, y: n._y };
     })(tree);
 
@@ -383,9 +411,10 @@
       const ya = rowY.get(info.a), yb = rowY.get(info.b);
       if (ya == null || yb == null) return;              // safety: both works must be base leaves
       const x = xAt(info.height), y = (ya + yb) / 2, id = "d" + (uid++);
+      const xa = FE ? feX(info.a) : leafX, xb = FE ? feX(info.b) : leafX;   // each work at its own depth
       branches += `<path d="M${x.toFixed(1)} ${Math.min(ya, yb)} V${Math.max(ya, yb)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
-      branches += `<path d="M${leafX} ${ya} H${x.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
-      branches += `<path d="M${leafX} ${yb} H${x.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
+      branches += `<path d="M${xa.toFixed(1)} ${ya} H${x.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
+      branches += `<path d="M${xb.toFixed(1)} ${yb} H${x.toFixed(1)}" stroke="#2e9e5b" stroke-width="1.5" fill="none"/>`;
       paperDot(id, p, x, y);                             // green closer node + label + tooltip
     });
 
@@ -395,7 +424,7 @@
       `<line x1="${left}" y1="${axisY - 4}" x2="${left}" y2="${axisY + 4}" stroke="#bbb"/>` +
       `<text x="${leafX}" y="${axisY + 16}" text-anchor="end" font-size="10" fill="#888">0</text>` +
       `<text x="${left}" y="${axisY + 16}" text-anchor="start" font-size="10" fill="#888">${LOG && BMIN > 0 ? Math.log10(maxH / BMIN).toFixed(2) + " dex" : maxH.toFixed(2)}</text>` +
-      `<text x="${(left + leafX) / 2}" y="${axisY + 16}" text-anchor="middle" font-size="10" fill="#888">← barrier (${LOG ? "log" : "linear"} gap magnitude)</text>`;
+      `<text x="${(left + leafX) / 2}" y="${axisY + 16}" text-anchor="middle" font-size="10" fill="#888">${FE ? `← free energy  −ln p  (${LOG ? "log" : "linear"}, k_BT=1)` : `← barrier (${LOG ? "log" : "linear"} gap magnitude)`}</text>`;
 
     return { inner: branches + axis + dots + labels, H, meta };
   }
@@ -531,8 +560,16 @@
     // Log ("dex") reference = the smallest positive barrier in the picture. Gap-closers now lift ONTO
     // real red junctions (LCA node heights ⊆ these edge weights), so the tree's own gaps are the whole
     // scale — every dex = log10(barrier / BMIN) is >= 0, and axis + tooltips share one reference.
-    const bw = (model.edges || []).map(e => e.w).filter(w => w > 0);
-    BMIN = bw.length ? Math.min(...bw) : 0;
+    // In the free-energy landscape the axis IS the node energies, so the dex reference is the smallest
+    // positive free energy in the picture (leaves + junctions); otherwise it's the smallest edge barrier.
+    if (model.hasFE) {
+      const fes = [];
+      (function g(n) { if (typeof n.fe === "number" && n.fe > 0) fes.push(n.fe); (n.children || []).forEach(g); })(model.root);
+      BMIN = fes.length ? Math.min(...fes) : 0;
+    } else {
+      const bw = (model.edges || []).map(e => e.w).filter(w => w > 0);
+      BMIN = bw.length ? Math.min(...bw) : 0;
+    }
 
     const W = Math.max(mountEl.clientWidth || 820, 360);
     // Prefer the server's faithful barrier-reduction scores; fall back to client betweenness (fixtures /
