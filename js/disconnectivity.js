@@ -308,11 +308,11 @@
     // "Highlight gap-closers" checkbox now only recolours the dots (paperStyle) by bridge score.
 
     // VERTICAL disconnectivity graph: energy runs UP the Y-axis (root at the top, deepest well at the
-    // bottom); each leaf gets its own column and every junction is centred above its two children — a
-    // planar dendrogram, so lines don't cross and dots don't overlap. Many papers -> the shell scrolls
-    // horizontally.
-    const left = 60, top = 24, colW = 46, energyH = 470, botLabel = 158, STEM = 14, rightPad = 40;
-    const nCols = Math.max(1, leaves.length);
+    // bottom). EVERY node — leaf AND junction — gets its own column (in-order), so no two dots can share
+    // a column and nothing overlaps even when a saddle sits at a minimum's energy (density ties). Many
+    // papers -> the shell scrolls horizontally.
+    const left = 60, top = 24, colW = 34, energyH = 470, botLabel = 158, STEM = 14, rightPad = 40;
+    const nCols = Math.max(1, 2 * leaves.length - 1);
     const DW = left + nCols * colW + rightPad;         // total width (>= viewport -> horizontal scroll)
     const H = top + energyH + botLabel;
     const bottomY = top + energyH;
@@ -328,15 +328,16 @@
                         : (e => Math.min(e, maxH) / maxH);
     const yAt = e => top + (1 - frac(e)) * energyH;     // higher energy -> higher up (toward the root)
 
-    // Layout: leaves take successive columns (in-order, so subtrees stay contiguous and nothing crosses);
-    // a junction sits at the mean x of its children and at its own energy height.
-    let li = 0;
+    // Layout: in-order walk gives every node (leaf AND junction) its own column — left subtree, node,
+    // right subtree — so subtrees stay contiguous, lines don't cross, and no two dots share a column.
+    // x = column, y = the node's own free energy.
+    let slot = 0;
     (function lay(n) {
-      if (isLeaf(n)) { n._x = left + colW * (li++) + colW / 2; n._y = yAt(val(n)); return n._x; }
-      const xs = kids(n).map(lay);
-      n._x = xs.reduce((a, b) => a + b, 0) / xs.length;
-      n._y = yAt(val(n));
-      return n._x;
+      if (isLeaf(n)) { n._x = left + colW * (slot++) + colW / 2; n._y = yAt(val(n)); return; }
+      const cs = kids(n);
+      lay(cs[0]);
+      n._x = left + colW * (slot++) + colW / 2; n._y = yAt(val(n));
+      for (let i = 1; i < cs.length; i++) lay(cs[i]);
     })(tree);
 
     let branches = "", dots = "", labels = "", guides = "", uid = 0;
