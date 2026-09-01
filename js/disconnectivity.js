@@ -382,8 +382,15 @@
         const sy = n._y + (dy > 4 ? Math.min(STEM, dy * 0.6) : dy);
         branches += `<path d="M${a.x.toFixed(1)} ${a.y.toFixed(1)} L${a.x.toFixed(1)} ${sy.toFixed(1)} L${n._x.toFixed(1)} ${n._y.toFixed(1)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
       });
-      dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
-      meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: val(n), papers: leafPapers(n) };
+      // A red node is a TRANSITION STATE — draw it only where the barrier is real, i.e. strictly above
+      // BOTH sub-basins. A zero-barrier merge (the junction pinned onto a minimum's own level, because
+      // those papers share one basin with no valley between them) is NOT a transition state, so it gets
+      // no red dot — the shallower minimum simply connects in at its own energy.
+      const childMax = Math.max(...kids(n).map(c => val(c)));
+      if (val(n) > childMax + 1e-4) {
+        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
+        meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: val(n), papers: leafPapers(n) };
+      }
       return { x: n._x, y: n._y };
     })(tree);
 
