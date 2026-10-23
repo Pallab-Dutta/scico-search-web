@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+# The search app and its result views are per-user and login-gated, not for indexing
+Disallow: /search.html
+Disallow: /results.html
+Disallow: /results-publications.html
+Disallow: /results-authors.html
+Disallow: /results-topicmap.html
+
+Sitemap: https://search.scicoagent.com/sitemap.xml

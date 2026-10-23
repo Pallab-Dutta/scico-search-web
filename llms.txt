@@ -1,0 +1,39 @@
+# Eratosthenes
+
+> Eratosthenes (also called SciCo-Search) is an AI research assistant for academic literature search. It turns a research topic into a set of optimized academic queries, reads and ranks the papers by how well they match your intent rather than by keyword overlap, maps the field into themed branches so under-explored research gaps stand out, and profiles the principal investigators and labs behind the work. It is built for PhD students, postdocs, and researchers scoping a literature review, entering a new field, or looking for labs to work with. Live at https://search.scicoagent.com.
+
+## What Eratosthenes does
+
+- AI query expansion: a plain-language research interest becomes many optimized academic queries, with synonyms and broader terms. A "Query Entropy" setting widens or narrows the net.
+- AI relevance match: every retrieved paper is read and scored against your stated intent. The AI Match score ranks results by conceptual overlap, not by shared keywords.
+- Topic map and research gaps: an interactive map groups the papers into themed branches, with a mind map that walks from the well-studied core of a field out toward its under-explored frontier.
+- PI and lab profiling: a second phase profiles the principal investigators behind the papers, covering their recent output, lab focus, and fit with your research direction.
+- Saved sessions: sign in with Google and every search is saved to your account, so you can restore any past session.
+
+## How a search works
+
+1. Define your search: type a specific research interest and set the Query Entropy.
+2. Auto-expand and search: the AI expands the topic into optimized queries and harvests the literature.
+3. Harvest and rank: papers are retrieved and scored by how well they match your intent.
+4. Map and profile: explore the topic map and profile the labs behind the work.
+
+## How it differs from keyword search
+
+Keyword search engines return papers that share your words, and ranking them by real relevance is left to you. Eratosthenes treats a search as a strategy: it expands the question, scores each paper for meaning, and organizes the results into a map, so the gaps in a field are visible without reading dozens of papers first. It also goes past papers to the people, by profiling the labs and PIs doing the work.
+
+## Pricing
+
+All plans include unlimited shallow search and report generation. Quotas reset monthly. Prices are in US dollars; see the pricing page for current amounts.
+
+- Free: unlimited shallow search and reports, plus a small monthly allowance of deep searches and deep reports.
+- Individual: more deep searches and deep reports, PI profiling, research-gap identification, hypothesis refinement, and help writing an article's introduction.
+- Team: the Individual toolkit for every member of a lab or group, with per-seat billing at a lower price per seat.
+
+## Key pages
+
+- [Home](https://search.scicoagent.com/): what Eratosthenes does and how a search works.
+- [Pricing](https://search.scicoagent.com/pricing.html): plans, monthly quotas, and prices.
+
+## About
+
+Eratosthenes is named after the ancient Greek polymath and chief librarian of the Library of Alexandria. It is part of SciCoagent (https://scicoagent.com), an ecosystem of AI scientist co-agents that aim to cut trial and error across research gap identification, experiment design, and academic writing. Its sibling, Benjamin (https://benjamin.scicoagent.com), proofreads scientific manuscripts. Contact: contact@scicoagent.com.

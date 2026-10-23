@@ -1,0 +1,39 @@
+name: IndexNow ping
+
+# Eratosthenes is served straight from this branch (Pages-from-branch, no build step), so
+# there is no deploy job to hook into. On every push to main we tell IndexNow to re-crawl
+# the two indexable pages (the search app and results views stay out of the index). Bing's index
+# is what ChatGPT Search and Copilot retrieve from, so this keeps the generative engines
+# current within minutes of a change. Pushes here are infrequent and human-made, so
+# submitting both pages each time is fine, not spammy.
+#
+# The key is public by design (served at /<key>.txt) and is not a secret. Submission is
+# best-effort: a non-2xx or a network error is logged, never failing the run.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: indexnow
+  cancel-in-progress: true
+
+jobs:
+  indexnow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Submit URLs to IndexNow
+        env:
+          KEY: 50c3c11a188d6e68487b3602e95ca5e5
+          HOST: search.scicoagent.com
+        run: |
+          set -euo pipefail
+          curl -sS -X POST "https://api.indexnow.org/indexnow" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            -d "{\"host\":\"${HOST}\",\"key\":\"${KEY}\",\"keyLocation\":\"https://${HOST}/${KEY}.txt\",\"urlList\":[\"https://${HOST}/\",\"https://${HOST}/pricing.html\"]}" \
+            -w "\n[indexnow] HTTP %{http_code}\n" \
+            || echo "[indexnow] submission failed (non-fatal)"
