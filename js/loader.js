@@ -124,6 +124,7 @@
 
   // One clock for every loader on the page, so a status line that is redrawn on each progress
   // message keeps turning smoothly. Clockwise, slowing briefly at the logo pose (sun overhead).
+  let STILL = 0;           // teal (still) arrow angle; 0 points right, as in the logo
   let fixedAngle = null;   // set by configure({ angle }) to hold the orange arrow still
   function angleAt(now) {
     if (fixedAngle !== null) return fixedAngle;
@@ -145,7 +146,7 @@
         '<stop offset=".8" stop-color="' + SHADE + '" stop-opacity=".16"/>' +
         '<stop offset=".98" stop-color="' + SHADE + '" stop-opacity="0"/></radialGradient></defs>';
     const areas = !withArea ? "" :
-      '<path d="' + area(0) + '" fill="url(#' + g + ')"/>' +
+      '<path d="' + area(STILL) + '" fill="url(#' + g + ')"/>' +
       '<path class="era-ar-o" d="' + area(th) + '" fill="url(#' + g + ')"/>';
     return '<svg class="era-ld ' + (cls || "") + '" viewBox="6 96 600 600" role="img" aria-label="Loading">' +
       shade + areas +
@@ -153,12 +154,13 @@
       (withArea ? '<path d="' + nightDisc() + '" fill="' + SHADE + '" fill-opacity=".09"/>' : "") +
       '<path d="' + nightPath() + '" fill="none" stroke="' + NIGHT + '" stroke-width="20"/>' +
       (grad ? '<defs>' + lawGradient(lg) + '</defs>' : "") +
-      '<path class="era-sh" d="' + shadowPath(0) + '"' + (fade ? ' style="stroke:' + shadeAt(0) + '"' : "") +
+      '<path class="era-sh" d="' + shadowPath(STILL) + '"' + (fade ? ' style="stroke:' + shadeAt(STILL) + '"' : "") +
         (grad ? ' style="stroke:url(#' + lg + ')"' : "") + '/>' +
       '<path class="era-sh era-sh-o' + (fade ? " era-fade" : "") + '" d="' + shadowPath(th) + '"' +
         (fade ? ' style="stroke:' + shadeAt(th) + '"' : "") + (grad ? ' style="stroke:url(#' + lg + ')"' : "") + '/>' +
-      '<line x1="306" y1="396" x2="567.4" y2="396" stroke="' + TEAL + '" stroke-width="10" stroke-linecap="round"/>' +
-      '<polygon fill="' + TEAL + '" points="561.6,415.9 596.2,396 561.6,376.1"/>' +
+      '<g transform="rotate(' + f(-STILL) + ' 306 396)">' +
+        '<line x1="306" y1="396" x2="567.4" y2="396" stroke="' + TEAL + '" stroke-width="10" stroke-linecap="round"/>' +
+        '<polygon fill="' + TEAL + '" points="561.6,415.9 596.2,396 561.6,376.1"/></g>' +
       '<g class="era-orange" transform="rotate(' + f(POSE - th) + ' 306 396)">' + arrow(ORANGE) + '</g>' +
       '<circle cx="306" cy="396" r="43.7" fill="' + ORANGE + '"/>' +
       '</svg>';
@@ -192,14 +194,16 @@
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
 
-  // For tuning only: change the colours or hold the orange arrow at an angle (degrees, measured
-  // anticlockwise from the teal arrow; 45 is the logo pose, null lets it turn). Loaders created
+  // For tuning only: change the colours, turn the still teal arrow ({ still }), or hold the orange
+  // arrow at an angle ({ angle }; null lets it turn). Angles are degrees anticlockwise from
+  // pointing right; the logo has teal at 0 and orange at 45, with the sun at 45. Loaders created
   // afterwards use the new colours.
   function configure(o) {
     if (o.ring) RING = o.ring;
     if (o.night) NIGHT = o.night;
     if (o.shade) SHADE = o.shade;
     DARK = hex(SHADE); LIGHT = hex(NIGHT);
+    if ("still" in o) STILL = +o.still || 0;
     if ("angle" in o) fixedAngle = o.angle === null ? null : +o.angle;
     start();
   }
