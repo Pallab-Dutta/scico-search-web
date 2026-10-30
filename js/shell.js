@@ -22,7 +22,7 @@
       <button class="sb-logout" id="sbLogout"><span class="mi">logout</span> Log out</button>
 
       <div class="sb-rate">
-        <p class="side-h"><span class="mi">star</span> Rate SciCo-Search</p>
+        <p class="side-h"><span class="mi">star</span> Rate Eratosthenes</p>
         <div class="stars" id="sbStars">${'<span class="mi fill">star</span>'.repeat(5)}</div>
       </div>
 
