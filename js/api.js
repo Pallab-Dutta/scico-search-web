@@ -30,6 +30,7 @@
 
   window.SciCoAPI = {
     me() { return req("GET", "/me"); },
+    feedback(stars, comment) { return req("POST", "/feedback", { stars, comment: comment || "" }); },
     search(query, opts) {
       opts = opts || {};
       return req("POST", "/search", {

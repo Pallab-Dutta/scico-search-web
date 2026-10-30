@@ -24,14 +24,19 @@ a{color:inherit;text-decoration:none}
 
 /* ---- Sidebar ---- */
 .sidebar{width:264px;flex:0 0 264px;background:var(--bg-soft);border-right:1px solid var(--line);
-  display:flex;flex-direction:column;gap:14px;padding:14px 14px 18px;position:sticky;top:0;height:100vh;overflow:auto}
+  display:flex;flex-direction:column;gap:14px;padding:14px 14px 18px;position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:hidden;
+  font-family:"Cutive Mono",monospace;font-weight:700}   /* Benjamin's sidebar typeface */
+.sidebar button,.sidebar textarea{font-family:inherit}
 body.sb-collapsed .sidebar{display:none}
 .sb-expand{display:none;position:fixed;left:10px;top:12px;z-index:50;border:1px solid var(--line);background:#fff;
   border-radius:8px;width:34px;height:34px;cursor:pointer;color:var(--muted);align-items:center;justify-content:center}
 body.sb-collapsed .sb-expand{display:inline-flex}
 .sb-expand:hover{border-color:var(--btn);color:var(--btn)}
 
-.sb-top{display:flex;align-items:center;justify-content:space-between}
+.sb-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sb-logo{display:inline-flex;align-items:center;gap:.5em;min-width:0;font-size:1.15rem;line-height:1}
+.sb-mark{display:inline-flex;width:2em;height:2em;flex:0 0 auto}
+.sb-mark .era-mark{width:100%;height:100%}
 .sb-toggle{border:1px solid var(--line);background:#fff;border-radius:8px;width:30px;height:30px;cursor:pointer;
   color:var(--muted);display:inline-flex;align-items:center;justify-content:center}
 .sb-toggle:hover{border-color:var(--btn);color:var(--btn)}
@@ -44,17 +49,29 @@ body.sb-collapsed .sb-expand{display:inline-flex}
 .sb-email{color:var(--muted);font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 .sb-logout{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;border-radius:8px;
-  padding:8px 12px;font-size:.86rem;cursor:pointer;color:var(--ink)}
+  padding:8px 12px;font-size:.86rem;cursor:pointer;color:var(--ink);width:100%;text-decoration:none}
 .sb-logout:hover{border-color:var(--red);color:var(--red)}
 .sb-logout .mi{font-size:1.05rem}
+.sb-plans:hover{border-color:var(--btn);color:var(--btn)}
+.sb-rule{border:0;border-top:1px solid var(--line);margin:0}
 
 .side-h{font-size:.76rem;font-weight:700;margin:0 0 6px;display:flex;align-items:center;gap:6px;
   text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
 .side-h .mi{font-size:1rem}
-.sb-rate .stars .mi{color:#E3A52E;font-size:1.15rem}
+.sb-rate .stars{display:flex;gap:2px;cursor:pointer}
+.sb-rate .stars .mi{color:#ccc;font-size:1.3rem;transition:color .12s}
+.sb-rate .stars .mi.lit{color:#E3A52E}
+.sb-feedback{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.sb-feedback textarea{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.86rem;resize:vertical;
+  min-height:68px;color:var(--ink);background:#fff;font-weight:400}
+.sb-feedback textarea:focus{outline:none;border-color:var(--btn)}
+.sb-feedback button{border:0;background:var(--btn);color:#fff;border-radius:8px;padding:8px 12px;font-size:.86rem;font-weight:600;cursor:pointer}
+.sb-feedback button:hover{background:var(--btn-strong)}
+.sb-feedback button:disabled{opacity:.6;cursor:wait}
+.sb-thanks{font-size:.85rem;color:var(--btn);margin-top:6px}
 
 .sb-newbtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;background:var(--btn);color:#fff;
-  border-radius:8px;padding:9px 12px;font-size:.9rem;font-weight:600;cursor:pointer}
+  border-radius:8px;padding:9px 12px;font-size:.9rem;font-weight:600;cursor:pointer;width:100%}
 .sb-newbtn:hover{background:var(--btn-strong)}
 .sb-newbtn .mi{font-size:1.1rem}
 
@@ -70,6 +87,10 @@ body.sb-collapsed .sb-expand{display:inline-flex}
 .session-row:hover .session-del{opacity:1}
 .session-del:hover{background:#e2e5e8;color:var(--red)}
 .session-del .mi{font-size:1.05rem}
+.sb-loading{display:flex;align-items:center;gap:6px;padding:7px 8px;font-size:.86rem;color:var(--muted)}
+.sb-empty{color:var(--muted);padding:0 8px}
+.session.opening{color:var(--muted)}
+.session-row.deleting{opacity:.4;pointer-events:none}
 
 /* ---- Shared content header + tabs ---- */
 .content{max-width:900px;margin:0 auto;padding:22px 26px 90px;width:100%}
