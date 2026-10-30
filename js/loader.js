@@ -12,6 +12,9 @@
    Pass { area: true } to any of them for the second version: the space each stick shades (between
    the stick, the sunray grazing its tip and the ground) is drawn as a fading shadow, and the Earth's
    night half is shaded, as in classic drawings of the experiment.
+   Pass { fade: true } for the third version: ground shadows only, with each shadow's colour set by
+   the sun's angle from overhead: darkest when the stick points at the sun, fading to the night-side
+   grey as the stick turns perpendicular to the rays, just before it crosses into the night.
    With prefers-reduced-motion the orange stick stays put and gently pulses. */
 (function () {
   const TEAL = "#0C5455", ORANGE = "#D77B4B", RING = "#BDC6C9", NIGHT = "#A2ACB0";
@@ -46,6 +49,13 @@
     const d = ((b - a) % 360 + 540) % 360 - 180;
     const [x1, y1] = pt(R_RING, a), [x2, y2] = pt(R_RING, a + d);
     return "M" + f(x1) + " " + f(y1) + "A" + R_RING + " " + R_RING + " 0 0 " + (d < 0 ? 1 : 0) + " " + f(x2) + " " + f(y2);
+  }
+  // Shadow colour for a stick at angle th: SHADE when it points at the sun, NIGHT at 90 degrees.
+  const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+  const DARK = hex(SHADE), LIGHT = hex(NIGHT);
+  function shadeAt(th) {
+    const k = Math.min(1, Math.abs(((th - SUN) % 360 + 540) % 360 - 180) / 90);
+    return "rgb(" + DARK.map((v, i) => Math.round(v + (LIGHT[i] - v) * k)).join(",") + ")";
   }
   const shadowPath = th => { const s = shadow(th); return s ? arc(s[0], s[1]) : ""; };
   // The region a stick shades, outside the Earth: stick, the ray through its tip, and the ground.
@@ -125,7 +135,7 @@
   let n = 0;
   function svg(cls, opts) {
     start();
-    const th = angleAt(performance.now()), withArea = !!(opts && opts.area), g = "era-fade-" + (++n);
+    const th = angleAt(performance.now()), withArea = !!(opts && opts.area), fade = !!(opts && opts.fade), g = "era-fade-" + (++n);
     // Shade is darkest at the ground and fades with height, so long shadows dissolve before the edge.
     const shade = !withArea ? "" :
       '<defs><radialGradient id="' + g + '" gradientUnits="userSpaceOnUse" cx="306" cy="396" r="300">' +
@@ -140,8 +150,9 @@
       '<circle cx="306" cy="396" r="181.6" fill="#fff" stroke="' + RING + '" stroke-width="20"/>' +
       (withArea ? '<path d="' + nightDisc() + '" fill="' + SHADE + '" fill-opacity=".09"/>' : "") +
       '<path d="' + nightPath() + '" fill="none" stroke="' + NIGHT + '" stroke-width="20"/>' +
-      '<path class="era-sh" d="' + shadowPath(0) + '"/>' +
-      '<path class="era-sh era-sh-o" d="' + shadowPath(th) + '"/>' +
+      '<path class="era-sh" d="' + shadowPath(0) + '"' + (fade ? ' style="stroke:' + shadeAt(0) + '"' : "") + '/>' +
+      '<path class="era-sh era-sh-o' + (fade ? " era-fade" : "") + '" d="' + shadowPath(th) + '"' +
+        (fade ? ' style="stroke:' + shadeAt(th) + '"' : "") + '/>' +
       '<line x1="306" y1="396" x2="567.4" y2="396" stroke="' + TEAL + '" stroke-width="10" stroke-linecap="round"/>' +
       '<polygon fill="' + TEAL + '" points="561.6,415.9 596.2,396 561.6,376.1"/>' +
       '<g class="era-orange" transform="rotate(' + f(POSE - th) + ' 306 396)">' + arrow(ORANGE) + '</g>' +
@@ -158,11 +169,11 @@
     } else {
       idleSince = 0;
       const th = angleAt(now), tr = "rotate(" + f(POSE - th) + " 306 396)", d = shadowPath(th);
-      let ar = null;
+      let ar = null, col = null;
       for (const el of live) {
         const o = el.querySelector(".era-orange"), s = el.querySelector(".era-sh-o"), a = el.querySelector(".era-ar-o");
         if (o) o.setAttribute("transform", tr);
-        if (s) s.setAttribute("d", d);
+        if (s) { s.setAttribute("d", d); if (s.classList.contains("era-fade")) s.style.stroke = col || (col = shadeAt(th)); }
         if (a) a.setAttribute("d", ar || (ar = area(th)));
       }
     }
