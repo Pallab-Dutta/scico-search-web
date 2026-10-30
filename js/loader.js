@@ -20,7 +20,7 @@
    further from the sun), reaching the night-side grey at the day/night line.
    With prefers-reduced-motion the orange stick stays put and gently pulses. */
 (function () {
-  let TEAL = "#0C5455", ORANGE = "#D77B4B", HUB = "#D77B4B";   // can be changed with configure()
+  let TEAL = "#1E2A31", ORANGE = "#BA5757", HUB = "#BA5757";   // can be changed with configure()
   let RING = "#D1D1D1", NIGHT = "#6E7A82", SHADE = "#1E2A31";   // can be changed with configure()
   const CX = 306, CY = 396;          // hub
   const R_RING = 181.6;              // ring centre line (stroke 20)
@@ -104,8 +104,8 @@
     const st = document.createElement("style");
     st.id = "eratost-loader-style";
     st.textContent =
-      ".era-ld{display:block;overflow:hidden}" +
-      ".era-ld .era-sh{fill:none;stroke:" + SHADE + ";stroke-width:20}" +
+      ".era-ld,.era-mark{display:block;overflow:hidden}" +
+      ".era-ld .era-sh,.era-mark .era-sh{fill:none;stroke:" + SHADE + ";stroke-width:20}" +
       "@keyframes era-pulse{0%,100%{opacity:1}50%{opacity:.45}}" +
       "@media (prefers-reduced-motion:reduce){.era-ld .era-orange{animation:era-pulse 1.8s ease-in-out infinite}}" +
       ".era-ld-block{display:flex;flex-direction:column;align-items:center;padding:26px 0 18px}" +
@@ -169,8 +169,9 @@
 
   let n = 0;
   function svg(cls, opts) {
-    start();
-    const th = angleAt(performance.now()), withArea = !!(opts && opts.area), fade = !!(opts && opts.fade),
+    const still = !!(opts && opts.still);   // a static mark (logo): drawn once, never animated
+    if (!still) start();
+    const th = still ? +opts.angle || 0 : angleAt(performance.now()), withArea = !!(opts && opts.area), fade = !!(opts && opts.fade),
       grad = !!(opts && opts.gradient), g = "era-fade-" + (++n), lg = "era-law-" + n;
     // Shade is darkest at the ground and fades with height, so long shadows dissolve before the edge.
     const shade = !withArea ? "" :
@@ -181,7 +182,8 @@
     const areas = !withArea ? "" :
       '<path d="' + area(STILL) + '" fill="url(#' + g + ')"/>' +
       '<path class="era-ar-o" d="' + area(th) + '" fill="url(#' + g + ')"/>';
-    return '<svg class="era-ld ' + (cls || "") + '" viewBox="6 96 600 600" role="img" aria-label="Loading">' +
+    return '<svg class="' + (still ? "era-mark " : "era-ld ") + (cls || "") + '" viewBox="6 96 600 600" role="img" aria-label="' +
+      (still ? "Eratosthenes" : "Loading") + '">' +
       shade + areas +
       '<circle cx="306" cy="396" r="181.6" fill="#fff" stroke="' + RING + '" stroke-width="20"/>' +
       (withArea ? '<path d="' + nightDisc() + '" fill="' + SHADE + '" fill-opacity=".09"/>' : "") +
@@ -253,5 +255,8 @@
     block: (label, opts) => '<div class="era-ld-block" role="status">' + svg("", opts) +
       (label ? '<div class="era-ld-label">' + esc(label) + '</div>' : "") + '</div>',
     inline: opts => '<span class="era-ld-inline">' + svg("", opts) + '</span>',
+    // The logo, standing still. The rotating arrow sits where a 0.75 score puts it, which is the
+    // pose of the original drawing (Eratost-01.svg), turned so the still arrow points at the sun.
+    mark: (cls, opts) => svg(cls, Object.assign({ gradient: true, angle: STILL - 45 }, opts, { still: true })),
   };
 })();

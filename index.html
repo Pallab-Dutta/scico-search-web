@@ -43,7 +43,7 @@
         "@type": "AggregateOffer",
         "priceCurrency": "USD",
         "lowPrice": "0",
-        "highPrice": "39",
+        "highPrice": "24",
         "offerCount": "4",
         "url": "https://eratost.scicoagent.com/pricing.html"
       },
@@ -63,129 +63,224 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Cutive+Mono&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --red:#BA5757; --red-strong:#A23F3F; --red-soft:#F6E7E7;
-    --btn:#68829e; --btn-strong:#586f87;
-    --ink:#1A1A1A; --ink-2:#5A5F66; --ink-3:#8A8F96;
-    --slate:#8497B0; --slate-soft:#EEF1F6;
-    --bg:#FBFAF8; --surface:#FFFFFF; --line:#ECE9E4;
-    --shadow:0 1px 2px rgba(20,20,20,.04), 0 8px 24px rgba(20,20,20,.06);
-    --radius:16px;
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0}
-  body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg);
-       -webkit-font-smoothing:antialiased;line-height:1.5}
-  a{color:inherit;text-decoration:none}
-  .wrap{max-width:1120px;margin:0 auto;padding:0 28px}
+/* Same type and layout as the Benjamin homepage; the palette is Eratosthenes' own, taken from the
+   logo: slate ink (#1E2A31, the still arrow), brand red (#BA5757, the rotating arrow), the night-side
+   grey (#6E7A82) and the ring's light grey, set on warm paper. */
+@font-face{font-family:"KaTeX_Main";font-style:normal;font-weight:400;
+  src:url("https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/fonts/KaTeX_Main-Regular.woff2")format("woff2");font-display:swap}
+@font-face{font-family:"KaTeX_Main";font-style:normal;font-weight:700;
+  src:url("https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/fonts/KaTeX_Main-Bold.woff2")format("woff2");font-display:swap}
+@font-face{font-family:"KaTeX_Main";font-style:italic;font-weight:400;
+  src:url("https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/fonts/KaTeX_Main-Italic.woff2")format("woff2");font-display:swap}
 
-  /* ---------- logo lockup ---------- */
-  .logo{display:inline-flex;align-items:flex-start;font-weight:800;letter-spacing:-.02em;line-height:1;padding-top:0.65em}
-  .logo .sci{font-size:1.5em;color:var(--ink)}
-  .logo .badge{font-size:1.06em;color:#fff;background:var(--red);border-radius:7px;
-       padding:.12em .34em;margin-left:.14em;box-shadow:0 2px 6px rgba(186,87,87,.35)}
-  .logo .sup{font-family:"Newsreader",serif;font-style:italic;font-weight:500;
-       font-size:.62em;color:var(--slate);margin-left:.22em;margin-top:-.1em}
+:root{
+  --bg:#f7f4ee; --bg-alt:#eeeae1; --surface:#fffdf9; --border:#dcd5c7;
+  --text:#1e2a31; --muted:#5e6a71; --slate:#6e7a82;
+  --accent:#ba5757; --accent-dark:#9c4343;
+  --red-soft:#f3dcd9; --slate-soft:#dfe5e8;
+  --shadow:0 8px 24px -12px rgba(30,42,49,.28);
+  --radius:16px;
+  --font-serif:"Cutive Mono",monospace;
+  --font-sans:"Cutive Mono",monospace;
+  --font-prose:"Lora",Georgia,"Times New Roman",serif;
+}
 
-  /* ---------- nav ---------- */
-  header{position:sticky;top:0;z-index:20;background:rgba(251,250,248,.82);
-       backdrop-filter:saturate(160%) blur(12px);border-bottom:1px solid var(--line)}
-  nav{display:flex;align-items:center;gap:28px;height:68px}
-  nav .logo{margin-right:auto}
-  nav .links{display:flex;gap:30px;font-size:.92rem;font-weight:500;color:var(--ink-2)}
-  nav .links a:hover{color:var(--ink)}
-  .btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:.94rem;
-       border-radius:11px;padding:11px 18px;cursor:pointer;border:1px solid transparent;transition:.15s}
-  .btn-ghost{background:var(--surface);border-color:var(--line);color:var(--ink)}
-  .btn-ghost:hover{border-color:#d9d5cd}
-  .btn-primary{background:var(--btn);color:#fff;box-shadow:0 6px 16px rgba(104,130,158,.30)}
-  .btn-primary:hover{background:var(--btn-strong)}
-  .g-ico{width:17px;height:17px;display:inline-block}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-sans);font-weight:700;background:var(--bg);color:var(--text);
+     line-height:1.6;-webkit-font-smoothing:antialiased}
+.hero__bgref,.paper__t{font-weight:400}
+a{color:inherit;text-decoration:none}
+img,svg{display:block;max-width:100%}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+         clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
-  /* ---------- hero ---------- */
-  .hero{padding:78px 0 30px;text-align:center}
-  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;font-weight:600;
-       color:var(--red-strong);background:var(--red-soft);padding:7px 14px;border-radius:999px;
-       letter-spacing:.01em}
-  .hero h1{font-size:clamp(2.4rem,5.2vw,3.8rem);line-height:1.1;letter-spacing:-.035em;
-       font-weight:800;margin:26px auto 0;max-width:24ch}
-  .hero h1 .hl{color:var(--red)}
-  .hero p.sub{font-size:1.18rem;color:var(--ink-2);max-width:62ch;margin:22px auto 0}
-  .hero-points{list-style:none;max-width:60ch;margin:24px auto 6px;padding:0;text-align:left;display:grid;gap:13px}
-  .hero-points li{display:flex;gap:13px;align-items:flex-start;font-size:1.04rem;color:var(--ink-2);line-height:1.5}
-  .hero-points .hp-n{flex:0 0 26px;height:26px;border-radius:50%;background:var(--red);color:#fff;font-weight:700;font-size:.85rem;display:inline-flex;align-items:center;justify-content:center;margin-top:2px}
-  .hero-points b{color:var(--ink)}
-  .cta-row{display:flex;gap:14px;justify-content:center;margin-top:34px;flex-wrap:wrap}
-  .micro{margin-top:16px;font-size:.86rem;color:var(--ink-3)}
-  .micro b{color:var(--ink-2);font-weight:600}
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4em;
+     font-family:var(--font-sans);font-weight:600;text-decoration:none;border-radius:999px;cursor:pointer;
+     border:1px solid transparent;transition:transform .15s,box-shadow .15s,background-color .15s,color .15s;white-space:nowrap}
+.btn--primary{background:var(--red-soft);color:var(--accent-dark)}
+.btn--primary:hover{background:var(--slate-soft);color:var(--text);transform:translateY(-1px)}
+.btn--ghost{background:transparent;border-color:var(--border);color:var(--text)}
+.btn--ghost:hover{border-color:var(--text);transform:translateY(-1px)}
+.btn--lg{padding:.85rem 1.7rem;font-size:1rem}
+.btn--sm{padding:.5rem 1.1rem;font-size:.85rem}
 
-  /* ---------- product preview ---------- */
-  .stage{margin:54px auto 0;max-width:1000px;background:linear-gradient(180deg,#fff, #fcfbf9);
-       border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);overflow:hidden}
-  .stage .bar{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid var(--line);background:#fff}
-  .dot{width:11px;height:11px;border-radius:50%}
-  .stage .omni{flex:1;margin-left:14px;height:30px;border-radius:8px;background:var(--slate-soft);
-       display:flex;align-items:center;padding:0 12px;font-size:.8rem;color:var(--ink-3)}
-  .stage .body{display:grid;grid-template-columns:1.05fr 1fr;gap:0}
-  .pane{padding:22px}
-  .pane.left{border-right:1px solid var(--line)}
-  .pane h4{margin:0 0 14px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
-  .paper{padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:#fff}
-  .paper .t{font-weight:600;font-size:.92rem;color:var(--red);line-height:1.3}
-  .paper .m{font-size:.76rem;color:var(--ink-3);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap}
-  .score{margin-left:auto;font-weight:700;color:var(--ink);background:var(--red-soft);
-       border-radius:7px;padding:2px 8px;font-size:.74rem}
-  /* mini topic map */
-  .map{position:relative;height:230px;border-radius:14px;background:
-       radial-gradient(120px 120px at 30% 38%, rgba(186,87,87,.16), transparent 70%),
-       radial-gradient(120px 120px at 68% 64%, rgba(132,151,176,.20), transparent 70%),
-       radial-gradient(90px 90px at 74% 28%, rgba(106,153,120,.18), transparent 70%),
-       #fff;border:1px solid var(--line);overflow:hidden}
-  .pt{position:absolute;width:8px;height:8px;border-radius:50%;opacity:.92}
-  .legend{display:flex;gap:14px;margin-top:12px;font-size:.76rem;color:var(--ink-2);flex-wrap:wrap}
-  .key{display:inline-flex;align-items:center;gap:6px}
-  .swatch{width:10px;height:10px;border-radius:3px}
+/* ── Nav ─────────────────────────────────────────────────────────────────── */
+.nav{position:sticky;top:0;z-index:100;background:rgba(247,244,238,.72);
+     backdrop-filter:blur(10px);border-bottom:1px solid transparent;
+     transition:border-color .25s,box-shadow .25s}
+.nav--scrolled{border-bottom-color:var(--border);box-shadow:0 4px 20px -16px rgba(30,42,49,.45)}
+.nav__inner{max-width:1100px;margin:0 auto;padding:1rem 1.5rem;
+            display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+.nav__links{display:flex;align-items:center;gap:1.75rem;font-size:.95rem;font-weight:700}
+.nav__links a{color:var(--accent-dark);transition:color .2s}
+.nav__links a:hover{color:var(--text)}
+.nav__toggle{display:none;flex-direction:column;justify-content:center;gap:5px;
+             width:36px;height:36px;background:transparent;border:1px solid var(--border);
+             border-radius:8px;cursor:pointer}
+.nav__toggle span{display:block;height:2px;width:18px;margin:0 auto;
+                  background:var(--text);transition:transform .2s,opacity .2s}
 
-  /* ---------- features ---------- */
-  section.features{padding:84px 0 10px}
-  .sec-head{text-align:center;max-width:60ch;margin:0 auto 46px}
-  .sec-head h2{font-size:2.2rem;letter-spacing:-.03em;margin:0}
-  .sec-head p{color:var(--ink-2);font-size:1.06rem;margin:14px 0 0}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
-       padding:24px;box-shadow:var(--shadow)}
-  .card .ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;
-       background:var(--red-soft);color:var(--red-strong);font-size:20px;margin-bottom:16px}
-  .card h3{margin:0 0 8px;font-size:1.08rem;letter-spacing:-.01em}
-  .card p{margin:0;color:var(--ink-2);font-size:.93rem}
-  .card.alt .ic{background:var(--slate-soft);color:#54657f}
+/* ── Logo lockup: the mark and the wordmark ──────────────────────────────── */
+.lockup{display:inline-flex;align-items:center;gap:.45em;font-family:"KaTeX_Main",var(--font-prose);
+        font-weight:700;line-height:1;color:var(--text);white-space:nowrap}
+.lockup .era-mark{width:1.75em;height:1.75em;flex:0 0 auto}
+.lockup .era-a{color:var(--accent)}
+.lockup--nav{font-size:1.55rem}
+.lockup--footer{font-size:1.25rem}
+.wordmark{font-family:"KaTeX_Main",var(--font-prose);font-weight:700;font-size:clamp(2.6rem,9vw,4.8rem);
+          line-height:1;color:var(--text);letter-spacing:.005em}
+.wordmark .era-a{color:var(--accent)}
 
-  /* ---------- workflow ---------- */
-  section.flow{padding:84px 0}
-  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px}
-  .step{position:relative;padding:22px;border:1px solid var(--line);border-radius:14px;background:#fff}
-  .step .n{font-family:"Newsreader",serif;font-size:1.9rem;font-weight:600;color:var(--red);line-height:1}
-  .step h4{margin:12px 0 6px;font-size:1rem}
-  .step p{margin:0;font-size:.86rem;color:var(--ink-2)}
+/* ── Scroll-reveal ───────────────────────────────────────────────────────── */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease-out,transform .7s ease-out}
+.reveal.in-view{opacity:1;transform:translateY(0)}
+.hero .reveal:nth-child(2){transition-delay:.05s}
+.hero .reveal:nth-child(3){transition-delay:.1s}
+.hero .reveal:nth-child(4){transition-delay:.15s}
+.hero .reveal:nth-child(5){transition-delay:.2s}
+.hero .reveal:nth-child(6){transition-delay:.25s}
 
-  /* ---------- cta band ---------- */
-  .band{margin:30px auto 90px;background:linear-gradient(135deg,#2A2522,#1A1A1A);
-       border-radius:24px;padding:56px;text-align:center;color:#fff;box-shadow:var(--shadow)}
-  .band h2{font-size:2.1rem;letter-spacing:-.03em;margin:0 0 10px}
-  .band p{color:#C9C5BE;margin:0 auto 26px;max-width:52ch}
-  .band .btn-primary{box-shadow:0 8px 24px rgba(186,87,87,.45)}
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+.hero{position:relative;overflow:hidden;padding:4.5rem 1.5rem 5rem;
+      border-bottom:1px solid var(--border)}
+.hero__inner{position:relative;z-index:1;max-width:760px;margin:0 auto;text-align:center}
+/* Behind the hero: a faint two-column reference list, as at the end of a paper. The entries a
+   search would surface are picked out in the brand red with their match score. */
+.hero__bgtext{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;user-select:none;
+              padding:1.5rem 3.5rem;display:flex;gap:2.5rem}
+.hero__bgcol{flex:1;overflow:hidden}
+.hero__bgref{font-family:var(--font-prose);font-size:.73rem;line-height:1.8;color:rgba(30,42,49,.08);
+             margin-bottom:.55rem;padding-left:1.6em;text-indent:-1.6em;text-align:left}
+.hwm-hit{color:rgba(186,87,87,.22)}
+.hwm-score{font-family:var(--font-sans);font-weight:700;color:rgba(186,87,87,.30);margin-left:.4em}
+.hero__eyebrow{display:inline-block;font-size:.85rem;font-weight:600;letter-spacing:.12em;
+               text-transform:uppercase;color:var(--text);margin-bottom:1.6rem}
+.hero__logo{display:flex;flex-direction:column;align-items:center;gap:1.1rem;margin:0 0 1.5rem}
+.hero__mark{display:block;width:min(210px,52vw);height:auto}
+.hero__mark .era-ld{width:100%;height:auto;aspect-ratio:1}
+.hero__tagline{font-family:var(--font-serif);font-size:clamp(1.15rem,2.4vw,1.5rem);color:var(--text);margin-bottom:1rem}
+.hero__desc{font-size:1.02rem;color:var(--muted);max-width:610px;margin:0 auto 2rem}
+.hero__actions{display:flex;flex-wrap:wrap;justify-content:center;gap:.9rem;margin-bottom:2.25rem}
+.hero__pills{display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem}
+.pill{font-size:.8rem;font-weight:600;color:var(--muted);background:var(--surface);
+      border:1px solid var(--border);border-radius:999px;padding:.3rem .85rem}
 
-  footer{border-top:1px solid var(--line);padding:30px 0;color:var(--ink-3);font-size:.86rem}
-  footer .wrap{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+/* ── Shared section ──────────────────────────────────────────────────────── */
+section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76px}
+.section-title{font-family:var(--font-serif);font-size:clamp(1.7rem,4vw,2.4rem);text-align:center;margin-bottom:.75rem}
+.section-sub{text-align:center;color:var(--muted);max-width:650px;margin:0 auto 3rem;font-size:1rem}
 
-  @media(max-width:820px){
-    .stage .body,.grid,.steps{grid-template-columns:1fr}
-    .pane.left{border-right:0;border-bottom:1px solid var(--line)}
-    nav .links{display:none}
-  }
+/* ── Showcase: the app, in miniature ─────────────────────────────────────── */
+.showcase-wrap{background:var(--bg-alt);border-radius:28px;padding:3rem 2rem}
+.showcase-wrap .section-sub{margin-bottom:2rem}
+.stage{max-width:1000px;margin:0 auto;background:var(--surface);border:1px solid var(--border);
+       border-radius:22px;box-shadow:var(--shadow);overflow:hidden}
+.stage__bar{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.dot{width:11px;height:11px;border-radius:50%;background:var(--border)}
+.stage__omni{flex:1;margin-left:14px;min-height:30px;border-radius:8px;background:var(--bg);
+       display:flex;align-items:center;gap:.5rem;padding:0 12px;font-size:.8rem;color:var(--muted);overflow:hidden;white-space:nowrap}
+.stage__body{display:grid;grid-template-columns:1.05fr 1fr}
+.pane{padding:22px}
+.pane--left{border-right:1px solid var(--border)}
+.pane h4{margin:0 0 14px;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.paper{padding:12px 14px;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;background:#fff}
+.paper__t{font-family:var(--font-prose);font-weight:600;font-size:.95rem;color:var(--accent-dark);line-height:1.35}
+.paper__m{font-size:.76rem;color:var(--muted);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.score{margin-left:auto;font-weight:700;color:var(--text);background:var(--red-soft);border-radius:7px;padding:2px 8px;font-size:.74rem}
+.map{position:relative;height:230px;border-radius:14px;border:1px solid var(--border);overflow:hidden;background:
+     radial-gradient(120px 120px at 30% 38%, rgba(186,87,87,.15), transparent 70%),
+     radial-gradient(120px 120px at 68% 64%, rgba(110,122,130,.20), transparent 70%),
+     radial-gradient(90px 90px at 74% 28%, rgba(30,42,49,.12), transparent 70%),#fff}
+.pt{position:absolute;width:8px;height:8px;border-radius:50%}
+.legend{display:flex;gap:14px;margin-top:12px;font-size:.76rem;color:var(--muted);flex-wrap:wrap}
+.key{display:inline-flex;align-items:center;gap:6px}
+.swatch{width:10px;height:10px;border-radius:3px}
+
+/* ── How it works ────────────────────────────────────────────────────────── */
+.how__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.5rem;margin-top:1rem}
+.how__step{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem}
+.how__num{display:inline-flex;align-items:center;justify-content:center;width:2.2rem;height:2.2rem;
+          border-radius:50%;background:var(--text);color:#fff;font-weight:700;font-family:var(--font-serif);margin-bottom:1rem}
+.how__step h3{font-family:var(--font-serif);font-size:1.15rem;margin-bottom:.5rem}
+.how__step p{color:var(--muted);font-size:.95rem}
+
+/* ── Features ────────────────────────────────────────────────────────────── */
+.features__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.5rem;margin-top:1rem}
+.feature-card{position:relative;border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;
+              background:var(--surface);transition:transform .2s,box-shadow .2s}
+.feature-card--soon{border-style:dashed}
+.feature-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.feature-card h3{font-family:var(--font-serif);font-size:1.1rem;margin-bottom:.5rem;padding-right:3.5rem}
+.feature-card p{color:var(--muted);font-size:.95rem}
+.feat-badge{position:absolute;top:1.1rem;right:1.1rem;font-size:.6rem;font-weight:700;letter-spacing:.06em;
+            text-transform:uppercase;color:#fff;background:var(--accent);border-radius:999px;padding:.16rem .5rem}
+.feat-badge--soon{color:var(--muted);background:var(--bg-alt);border:1px dashed var(--border)}
+.feature-card a{color:var(--accent-dark);text-decoration:underline}
+
+/* ── FAQ ─────────────────────────────────────────────────────────────────── */
+.faq__list{max-width:780px;margin:1rem auto 0;display:flex;flex-direction:column;gap:.9rem}
+.faq__item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0 1.5rem;transition:box-shadow .2s}
+.faq__item[open]{box-shadow:var(--shadow)}
+.faq__q{font-family:var(--font-serif);font-size:1.05rem;font-weight:700;cursor:pointer;list-style:none;
+        padding:1.25rem 0;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.faq__q::-webkit-details-marker{display:none}
+.faq__q::after{content:"+";color:var(--accent);font-size:1.4rem;line-height:1;transition:transform .2s}
+.faq__item[open] .faq__q::after{transform:rotate(45deg)}
+.faq__a{color:var(--muted);font-size:.95rem;padding:0 0 1.35rem;margin-top:-.35rem}
+.faq__a a{color:var(--accent-dark);text-decoration:underline}
+
+/* ── CTA ─────────────────────────────────────────────────────────────────── */
+.cta__inner{text-align:center;background:var(--red-soft);transition:background .35s ease;
+            border-radius:24px;padding:3.5rem 2rem;color:var(--text)}
+.cta__inner h2{font-family:var(--font-serif);font-size:clamp(1.5rem,3.5vw,2.1rem);margin-bottom:.5rem}
+.cta__inner p{opacity:.8;margin-bottom:1.75rem}
+.cta__inner:hover{background:var(--slate-soft)}
+.cta__inner .btn--primary{background:transparent;color:var(--accent-dark);border:2px solid var(--accent-dark)}
+.cta__inner:hover .btn--primary{color:var(--text);border-color:var(--text)}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.footer{border-top:1px solid var(--border);padding:2rem 1.5rem}
+.footer__inner{max-width:1100px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem}
+.footer__copy{color:var(--muted);font-size:.9rem}
+.footer__copy a:hover{color:var(--accent-dark)}
+
+/* ── Sign-in wait screen ─────────────────────────────────────────────────── */
+.signin-wait{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;
+             flex-direction:column;background:rgba(247,244,238,.97);text-align:center;padding:16px}
+.signin-wait.on{display:flex}
+.signin-wait .era-ld-label{color:var(--text);font-size:1rem}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media(max-width:820px){
+  .stage__body{grid-template-columns:1fr}
+  .pane--left{border-right:0;border-bottom:1px solid var(--border)}
+}
+@media(max-width:760px){
+  .nav__links{position:absolute;top:100%;left:0;right:0;background:var(--surface);
+              border-bottom:1px solid var(--border);flex-direction:column;
+              align-items:stretch;gap:1rem;padding:1.25rem 1.5rem;display:none}
+  .nav--open .nav__links{display:flex}
+  .nav__links a{text-align:center}
+  .nav__toggle{display:flex}
+  .nav--open .nav__toggle span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+  .nav--open .nav__toggle span:nth-child(2){opacity:0}
+  .nav--open .nav__toggle span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+  section{padding:3.5rem 1rem}
+  .hero{padding:3.5rem 1rem 4rem}
+  .hero__bgtext{padding:1rem;gap:1rem}
+  .hero__bgcol + .hero__bgcol{display:none}
+  .hero__tagline br{display:none}
+  .showcase-wrap{padding:2rem 1rem}
+  .pane{padding:16px}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .reveal{transition:none!important;opacity:1!important;transform:none!important}
+}
 </style>
 <!-- ── Microsoft Clarity ────────────────────────────────────────────────────
      Session recordings + heatmaps for Eratosthenes (eratost.scicoagent.com). The project ID is the last
@@ -200,192 +295,337 @@
   y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
 })(window, document, "clarity", "script", "y4p1zoary7");
 </script>
+<script src="js/loader.js?v=20261030k"></script>
 </head>
 <body>
-<header>
-  <div class="wrap">
-    <nav>
-      <div class="logo scico-logo" style="font-size:1.35rem">Eratosthenes</div>
-      <div class="links">
-        <a href="#features">Features</a>
-        <a href="#how">How it works</a>
-        <a href="pricing.html">Pricing</a>
-      </div>
-      <button class="btn btn-primary js-signin">
-        <svg class="g-ico" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.2h5.35c-.25 1.5-1.8 4.4-5.35 4.4-3.22 0-5.85-2.66-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 4.2 14.6 3.3 12 3.3 6.96 3.3 2.9 7.36 2.9 12.4S6.96 21.5 12 21.5c5.2 0 8.64-3.66 8.64-8.8 0-.6-.06-1.04-.16-1.6z"/></svg>
-        Sign in with Google
-      </button>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────────── -->
+<header class="nav" id="top">
+  <div class="nav__inner">
+    <a href="#top" class="lockup lockup--nav js-mark" aria-label="Eratosthenes"><span><span class="era-a">Era</span>tosthenes</span></a>
+    <nav class="nav__links" id="nav-links">
+      <a href="#showcase">Demo</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#faq">FAQ</a>
+      <a href="pricing.html">Pricing</a>
+      <button class="btn btn--primary btn--sm js-signin" type="button">Sign in with Google</button>
     </nav>
+    <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
   </div>
 </header>
 
 <main>
-  <section class="hero">
-    <div class="wrap">
-      <span class="eyebrow">● An AI scientist co-agent for scientific discovery</span>
-      <h1>Reduce trial &amp; errors in<br><span class="hl">scientific R&amp;D loops</span></h1>
-      <p class="sub"><b>SciCoagent</b> is building an ecosystem of AI scientist co-agents that sustainably accelerate research across gap identification, experiment design, and academic writing, by minimizing trial &amp; error. <b>Eratosthenes</b>, named after the ancient Greek polymath and chief librarian of the Library of Alexandria, is the persona for discovery:</p>
-      <ul class="hero-points">
-        <li><span class="hp-n">1</span><div><b>Closest existing work.</b> Surface the nearest publications &amp; patents around any scientific hypothesis.</div></li>
-        <li><span class="hp-n">2</span><div><b>Automated research-gap discovery.</b> Efficiently and automatically identify the research gaps around any topic in academic R&amp;D.</div></li>
-        <li><span class="hp-n">3</span><div><b>A feasible path to close it.</b> Hypothesize the most sustainable, feasible timeline to solve the gap, minimizing trial &amp; error.</div></li>
-      </ul>
-      <div class="cta-row">
-        <button class="btn btn-primary js-signin">
-          <svg class="g-ico" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.2h5.35c-.25 1.5-1.8 4.4-5.35 4.4-3.22 0-5.85-2.66-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 4.2 14.6 3.3 12 3.3 6.96 3.3 2.9 7.36 2.9 12.4S6.96 21.5 12 21.5c5.2 0 8.64-3.66 8.64-8.8 0-.6-.06-1.04-.16-1.6z"/></svg>
-          Start free with Google
-        </button>
-        <a class="btn btn-ghost" href="pricing.html">See plans &amp; pricing</a>
-      </div>
-      <p class="micro">Built by researchers, for researchers. <b>Your search history is saved to your account</b> so you can restore any session.</p>
 
-      <!-- product preview -->
-      <div class="stage">
-        <div class="bar">
-          <span class="dot" style="background:#F0625D"></span>
-          <span class="dot" style="background:#F6B73C"></span>
-          <span class="dot" style="background:#4FB969"></span>
-          <span class="omni">scico.search › "Flow matching for rare event sampling"</span>
-        </div>
-        <div class="body">
-          <div class="pane left">
-            <h4>Phase 1 · Ranked publications</h4>
-            <div class="paper">
-              <div class="t">Stochastic interpolants for rare-event transition paths</div>
-              <div class="m"><span>Albergo et&nbsp;al.</span><span>2024</span><span>· 142 cites</span><span class="score">0.91</span></div>
-            </div>
-            <div class="paper">
-              <div class="t">Flow-matching samplers for metastable molecular systems</div>
-              <div class="m"><span>Noé Lab</span><span>2023</span><span>· 88 cites</span><span class="score">0.87</span></div>
-            </div>
-            <div class="paper">
-              <div class="t">Importance sampling via continuous normalizing flows</div>
-              <div class="m"><span>Chen &amp; Duvenaud</span><span>2022</span><span>· 311 cites</span><span class="score">0.79</span></div>
-            </div>
-          </div>
-          <div class="pane">
-            <h4>Topic Map · clusters &amp; research gaps</h4>
-            <div class="map" id="map"></div>
-            <div class="legend">
-              <span class="key"><span class="swatch" style="background:#BA5757"></span>Generative samplers</span>
-              <span class="key"><span class="swatch" style="background:#8497B0"></span>Rare-event theory</span>
-              <span class="key"><span class="swatch" style="background:#6A9978"></span>MD simulation</span>
-            </div>
-          </div>
-        </div>
-      </div>
+<!-- ── Hero ─────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero__bgtext" aria-hidden="true">
+    <div class="hero__bgcol">
+      <p class="hero__bgref">[1] Garfield, E. Citation indexes for science. <i>Science</i> <b>122</b>, 108 (1955).</p>
+      <p class="hero__bgref">[2] Price, D. J. de S. Networks of scientific papers. <i>Science</i> <b>149</b>, 510 (1965).</p>
+      <p class="hero__bgref hwm-hit">[3] Swanson, D. R. Fish oil, Raynaud's syndrome, and undiscovered public knowledge. <i>Perspect. Biol. Med.</i> <b>30</b>, 7 (1986).<span class="hwm-score">0.91</span></p>
+      <p class="hero__bgref">[4] Torrie, G. M. &amp; Valleau, J. P. Nonphysical sampling distributions in Monte Carlo free-energy estimation: umbrella sampling. <i>J. Comput. Phys.</i> <b>23</b>, 187 (1977).</p>
+      <p class="hero__bgref">[5] Sugita, Y. &amp; Okamoto, Y. Replica-exchange molecular dynamics method for protein folding. <i>Chem. Phys. Lett.</i> <b>314</b>, 141 (1999).</p>
+      <p class="hero__bgref">[6] Laio, A. &amp; Parrinello, M. Escaping free-energy minima. <i>Proc. Natl. Acad. Sci. USA</i> <b>99</b>, 12562 (2002).</p>
+      <p class="hero__bgref">[7] Bolhuis, P. G., Chandler, D., Dellago, C. &amp; Geissler, P. L. Transition path sampling. <i>Annu. Rev. Phys. Chem.</i> <b>53</b>, 291 (2002).</p>
+      <p class="hero__bgref hwm-hit">[8] Mikolov, T., Chen, K., Corrado, G. &amp; Dean, J. Efficient estimation of word representations in vector space. arXiv:1301.3781 (2013).<span class="hwm-score">0.84</span></p>
+      <p class="hero__bgref">[9] Rezende, D. J. &amp; Mohamed, S. Variational inference with normalizing flows. <i>Proc. ICML</i> (2015).</p>
+      <p class="hero__bgref">[10] Chen, R. T. Q., Rubanova, Y., Bettencourt, J. &amp; Duvenaud, D. Neural ordinary differential equations. <i>NeurIPS</i> (2018).</p>
+      <p class="hero__bgref">[11] Noé, F., Olsson, S., Köhler, J. &amp; Wu, H. Boltzmann generators. <i>Science</i> <b>365</b>, eaaw1147 (2019).</p>
     </div>
-  </section>
-
-  <section class="features" id="features">
-    <div class="wrap">
-      <div class="sec-head">
-        <h2>Not keyword search. A research strategy.</h2>
-        <p>SciCo expands your intent into many optimized queries, then reads, scores and organizes the results by meaning.</p>
-      </div>
-      <div class="grid">
-        <div class="card">
-          <div class="ic">✦</div>
-          <h3>AI query expansion</h3>
-          <p>Your topic becomes a set of optimized academic queries with synonyms and hypernyms; tune the <b>Query Entropy</b> to widen or narrow the net.</p>
-        </div>
-        <div class="card">
-          <div class="ic">◎</div>
-          <h3>AI relevance match</h3>
-          <p>Every paper is read and scored against your intent. The <b>AI Match</b> score ranks results by true conceptual overlap, not keyword overlap.</p>
-        </div>
-        <div class="card alt">
-          <div class="ic">⬡</div>
-          <h3>Topic Map &amp; research gaps</h3>
-          <p>An interactive map of the field groups papers into themed branches, with a mindmap that walks from the well-studied core out toward the under-explored frontier.</p>
-        </div>
-        <div class="card alt">
-          <div class="ic">⚲</div>
-          <h3>PI &amp; lab profiling</h3>
-          <p>Phase 2 deep-profiles the Principal Investigators behind the papers: recent output, lab focus, and fit for your research direction.</p>
-        </div>
-        <div class="card">
-          <div class="ic">↺</div>
-          <h3>Saved sessions</h3>
-          <p>Sign in with Google and every search is saved to your account. Restore any past session from the sidebar at any time.</p>
-        </div>
-        <div class="card">
-          <div class="ic">∞</div>
-          <h3>Free to start</h3>
-          <p>Unlimited quick search and topic maps, free forever, plus 3 deep searches and 3 Research-Gap Graphs a month. <a href="pricing.html">See pricing</a>.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="flow" id="how">
-    <div class="wrap">
-      <div class="sec-head">
-        <h2>From a sentence to a literature map in four steps</h2>
-      </div>
-      <div class="steps">
-        <div class="step"><div class="n">1</div><h4>Define your search</h4><p>Type a specific research interest and set the Query Entropy.</p></div>
-        <div class="step"><div class="n">2</div><h4>Auto-expand &amp; search</h4><p>The AI expands your topic into optimized queries and harvests the literature automatically.</p></div>
-        <div class="step"><div class="n">3</div><h4>Harvest &amp; rank</h4><p>Papers are retrieved and scored by how well they match your intent.</p></div>
-        <div class="step"><div class="n">✓</div><h4>Map &amp; profile</h4><p>Explore the Topic Map and deep-profile the labs behind the work.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <div class="wrap">
-    <div class="band">
-      <h2>Find the prior work. Spot the gap. Plan the path.</h2>
-      <p>Join researchers using Eratosthenes to map their field and find where their next contribution fits.</p>
-      <button class="btn btn-primary js-signin">
-        <svg class="g-ico" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.2h5.35c-.25 1.5-1.8 4.4-5.35 4.4-3.22 0-5.85-2.66-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 4.2 14.6 3.3 12 3.3 6.96 3.3 2.9 7.36 2.9 12.4S6.96 21.5 12 21.5c5.2 0 8.64-3.66 8.64-8.8 0-.6-.06-1.04-.16-1.6z"/></svg>
-        Sign in with Google
-      </button>
+    <div class="hero__bgcol">
+      <p class="hero__bgref">[12] Reimers, N. &amp; Gurevych, I. Sentence-BERT: sentence embeddings using Siamese BERT-networks. <i>Proc. EMNLP</i> (2019).</p>
+      <p class="hero__bgref hwm-hit">[13] Karpukhin, V. <i>et al.</i> Dense passage retrieval for open-domain question answering. <i>Proc. EMNLP</i> (2020).<span class="hwm-score">0.88</span></p>
+      <p class="hero__bgref">[14] Ho, J., Jain, A. &amp; Abbeel, P. Denoising diffusion probabilistic models. <i>NeurIPS</i> (2020).</p>
+      <p class="hero__bgref">[15] Lewis, P. <i>et al.</i> Retrieval-augmented generation for knowledge-intensive NLP tasks. <i>NeurIPS</i> (2020).</p>
+      <p class="hero__bgref">[16] Song, Y. <i>et al.</i> Score-based generative modeling through stochastic differential equations. <i>Proc. ICLR</i> (2021).</p>
+      <p class="hero__bgref">[17] Jumper, J. <i>et al.</i> Highly accurate protein structure prediction with AlphaFold. <i>Nature</i> <b>596</b>, 583 (2021).</p>
+      <p class="hero__bgref hwm-hit">[18] Albergo, M. S. &amp; Vanden-Eijnden, E. Building normalizing flows with stochastic interpolants. <i>Proc. ICLR</i> (2023).<span class="hwm-score">0.79</span></p>
+      <p class="hero__bgref">[19] Lipman, Y., Chen, R. T. Q., Ben-Hamu, H., Nickel, M. &amp; Le, M. Flow matching for generative modeling. <i>Proc. ICLR</i> (2023).</p>
+      <p class="hero__bgref">[20] Vaswani, A. <i>et al.</i> Attention is all you need. <i>NeurIPS</i> (2017).</p>
+      <p class="hero__bgref">[21] Kuhn, T. S. <i>The Structure of Scientific Revolutions</i> (Univ. Chicago Press, 1962).</p>
+      <p class="hero__bgref">[22] Fortunato, S. <i>et al.</i> Science of science. <i>Science</i> <b>359</b>, eaao0185 (2018).</p>
     </div>
   </div>
+
+  <div class="hero__inner">
+    <p class="hero__eyebrow reveal">Literature search for researchers</p>
+
+    <h1 class="hero__logo reveal">
+      <span class="sr-only">Eratosthenes: AI literature search and research-gap finder for scientists, ranking papers by meaning and mapping where a field is still open</span>
+      <span class="hero__mark" id="heroMark" aria-hidden="true"></span>
+      <span class="wordmark" aria-hidden="true"><span class="era-a">Era</span>tosthenes</span>
+    </h1>
+
+    <p class="hero__tagline reveal">Finds the closest work to your idea,<br>and the gaps still open around it.</p>
+
+    <p class="hero__desc reveal">
+      Named after the chief librarian of the Library of Alexandria, Eratosthenes turns a research
+      question into many optimized academic queries, reads and scores every paper by meaning, and
+      maps the field so you can see where your next contribution fits.
+    </p>
+
+    <div class="hero__actions reveal">
+      <button class="btn btn--primary btn--lg js-signin" type="button">Start free with Google</button>
+      <a class="btn btn--ghost btn--lg" href="#showcase">See it in action</a>
+    </div>
+
+    <div class="hero__pills reveal" aria-label="What you get">
+      <span class="pill">Ranked papers</span>
+      <span class="pill">Topic maps</span>
+      <span class="pill">Research-Gap Graphs</span>
+      <span class="pill">PI finder</span>
+      <span class="pill">Citation export</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Showcase ──────────────────────────────────────────────────────────── -->
+<section id="showcase">
+  <div class="showcase-wrap reveal">
+    <h2 class="section-title">Ask. Rank. Map.</h2>
+    <p class="section-sub">One sentence in; a ranked reading list and a map of the field out.</p>
+    <div class="stage">
+      <div class="stage__bar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="stage__omni"><span class="js-inline-ld"></span>"Flow matching for rare event sampling"</span>
+      </div>
+      <div class="stage__body">
+        <div class="pane pane--left">
+          <h4>Ranked publications</h4>
+          <div class="paper">
+            <div class="paper__t">Stochastic interpolants for rare-event transition paths</div>
+            <div class="paper__m"><span>Albergo et&nbsp;al.</span><span>2024</span><span>142 cites</span><span class="score">0.91</span></div>
+          </div>
+          <div class="paper">
+            <div class="paper__t">Flow-matching samplers for metastable molecular systems</div>
+            <div class="paper__m"><span>Noé Lab</span><span>2023</span><span>88 cites</span><span class="score">0.87</span></div>
+          </div>
+          <div class="paper">
+            <div class="paper__t">Importance sampling via continuous normalizing flows</div>
+            <div class="paper__m"><span>Chen &amp; Duvenaud</span><span>2022</span><span>311 cites</span><span class="score">0.79</span></div>
+          </div>
+        </div>
+        <div class="pane">
+          <h4>Topic map: clusters and gaps</h4>
+          <div class="map" id="map"></div>
+          <div class="legend">
+            <span class="key"><span class="swatch" style="background:#BA5757"></span>Generative samplers</span>
+            <span class="key"><span class="swatch" style="background:#6E7A82"></span>Rare-event theory</span>
+            <span class="key"><span class="swatch" style="background:#1E2A31"></span>MD simulation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ──────────────────────────────────────────────────────── -->
+<section class="how" id="how-it-works">
+  <h2 class="section-title reveal">How it works</h2>
+  <div class="how__grid">
+    <article class="how__step reveal">
+      <span class="how__num">1</span>
+      <h3>Describe your idea</h3>
+      <p>Type a research question or hypothesis in a sentence, and set the Query Entropy to widen or narrow the net.</p>
+    </article>
+    <article class="how__step reveal">
+      <span class="how__num">2</span>
+      <h3>Expand and search</h3>
+      <p>The AI expands it into optimized academic queries with synonyms and broader terms, then harvests OpenAlex and arXiv.</p>
+    </article>
+    <article class="how__step reveal">
+      <span class="how__num">3</span>
+      <h3>Rank by meaning</h3>
+      <p>Every paper is scored against your intent. The AI Match score ranks by conceptual fit, not shared keywords.</p>
+    </article>
+    <article class="how__step reveal">
+      <span class="how__num">4</span>
+      <h3>Map the gaps</h3>
+      <p>Explore the topic map and the Research-Gap Graph, and find the labs and investigators behind the work.</p>
+    </article>
+  </div>
+</section>
+
+<!-- ── Features ──────────────────────────────────────────────────────────── -->
+<section class="features" id="features">
+  <h2 class="section-title reveal">Not keyword search. A research strategy.</h2>
+  <div class="features__grid">
+    <article class="feature-card reveal">
+      <h3>AI query expansion</h3>
+      <p>Your topic becomes a set of optimized academic queries with synonyms and hypernyms. Tune the Query Entropy to widen or narrow the net.</p>
+    </article>
+    <article class="feature-card reveal">
+      <h3>AI relevance match</h3>
+      <p>Each paper is read and scored against your intent, so the closest work rises to the top even when it uses different words.</p>
+    </article>
+    <article class="feature-card reveal">
+      <h3>Topic maps</h3>
+      <p>An interactive map groups the literature into themed branches, from the well-studied core out to the under-explored frontier.</p>
+    </article>
+    <article class="feature-card reveal">
+      <span class="feat-badge">Impact</span>
+      <h3>Research-Gap Graphs</h3>
+      <p>Well-studied topics form deep basins and the barriers between them are the open gaps. Each paper gets an Impact score for how much of a gap it closes.</p>
+    </article>
+    <article class="feature-card reveal">
+      <h3>Author and PI finder</h3>
+      <p>See the principal investigators behind the papers: recent output, lab focus, and fit with your research direction.</p>
+    </article>
+    <article class="feature-card feature-card--soon reveal">
+      <span class="feat-badge feat-badge--soon">Coming soon</span>
+      <h3>Research-plan generator</h3>
+      <p>The most feasible route to close a gap you have found, planned to keep trial and error to a minimum.</p>
+    </article>
+  </div>
+</section>
+
+<!-- ── FAQ ───────────────────────────────────────────────────────────────── -->
+<section class="faq" id="faq">
+  <h2 class="section-title reveal">Frequently asked questions</h2>
+  <div class="faq__list reveal">
+    <details class="faq__item">
+      <summary class="faq__q">Where do the papers come from?</summary>
+      <p class="faq__a">Eratosthenes searches OpenAlex, the open index of scholarly works, and arXiv. Journal articles, conference papers and preprints are all included.</p>
+    </details>
+    <details class="faq__item">
+      <summary class="faq__q">How is this different from a keyword search?</summary>
+      <p class="faq__a">A keyword search returns papers that share your words. Eratosthenes scores how closely the meaning of each paper matches your question, so a relevant paper that uses different terms still ranks near the top.</p>
+    </details>
+    <details class="faq__item">
+      <summary class="faq__q">What is the difference between quick search and deep search?</summary>
+      <p class="faq__a">Quick search ranks up to 60 of the most relevant papers for your query. Deep search reads up to 200, which matters for broad questions and cross-disciplinary topics.</p>
+    </details>
+    <details class="faq__item">
+      <summary class="faq__q">What is a Research-Gap Graph?</summary>
+      <p class="faq__a">It maps the papers in your search as a landscape: topics that are well studied form deep basins, and the barriers between them are the open gaps. Each paper gets an Impact score for how much of a gap it closes.</p>
+    </details>
+    <details class="faq__item">
+      <summary class="faq__q">Is Eratosthenes free?</summary>
+      <p class="faq__a">Yes. Quick search and topic maps are unlimited and free forever, with 3 deep searches and 3 Research-Gap Graphs a month. Pro, Max and Team plans raise those limits; see the <a href="pricing.html">pricing page</a>.</p>
+    </details>
+    <details class="faq__item">
+      <summary class="faq__q">Are my searches saved?</summary>
+      <p class="faq__a">Yes. Every search is saved to your account, so you can reopen any past session from the sidebar and export its citations.</p>
+    </details>
+    <details class="faq__item">
+      <summary class="faq__q">Do Eratosthenes and Benjamin share a subscription?</summary>
+      <p class="faq__a">No. You sign in to both with the same SciCoagent account, but each product has its own plan, so you only pay for what you use.</p>
+    </details>
+  </div>
+</section>
+
+<!-- ── CTA ───────────────────────────────────────────────────────────────── -->
+<section class="cta">
+  <div class="cta__inner reveal">
+    <h2>Find the prior work. Spot the gap.</h2>
+    <p>Free to start. Describe your idea and see what Eratosthenes finds.</p>
+    <button class="btn btn--primary btn--lg js-signin" type="button">Open Eratosthenes →</button>
+  </div>
+</section>
+
 </main>
 
-<footer>
-  <div class="wrap">
-    <div class="logo scico-logo" style="font-size:.8rem">Eratosthenes</div>
-    <div>© 2026 Eratosthenes · part of the SciCoagent ecosystem · A research tool · Privacy</div>
+<footer class="footer">
+  <div class="footer__inner">
+    <a href="#top" class="lockup lockup--footer js-mark" aria-label="Eratosthenes"><span><span class="era-a">Era</span>tosthenes</span></a>
+    <span class="footer__copy">An AI literature search co-agent, part of the SciCoagent ecosystem.</span>
+    <span class="footer__copy"><a href="https://scicoagent.com/terms/">Terms</a> · <a href="https://scicoagent.com/privacy/">Privacy</a> · <a href="mailto:contact@scicoagent.com">Contact</a></span>
   </div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-<script src="js/logo.js?v=20260829m"></script>
 <script src="js/config.js?v=20261030a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabaseClient.js?v=20260829m"></script>
 <script>
   // Google sign-in; if already authenticated, jump straight to the app.
   (function(){
+    function waitScreen(on){
+      var el = document.getElementById('signinWait');
+      if (!el && on) {
+        el = document.createElement('div');
+        el.id = 'signinWait'; el.className = 'signin-wait';
+        el.innerHTML = window.EratostLoader ? EratostLoader.block('Signing you in via Google', { gradient: true }) : 'Signing you in via Google';
+        document.body.appendChild(el);
+      }
+      if (el) el.classList.toggle('on', !!on);
+    }
     document.querySelectorAll('.js-signin').forEach(function(b){
       b.addEventListener('click', function(){
-        window.SciCoAuth.signInWithGoogle().catch(function(e){ console.error(e); });
+        if (!window.SciCoAuth) return;
+        waitScreen(true);
+        window.SciCoAuth.signInWithGoogle().catch(function(e){ console.error(e); waitScreen(false); });
       });
     });
+    // Back button from Google's page: the browser may restore this page as it was.
+    window.addEventListener('pageshow', function(e){ if (e.persisted) waitScreen(false); });
     if(window.SciCoAuth){
       window.SciCoAuth.onChange(function(user){ if(user){ location.href='search.html'; } });
     }
   })();
 </script>
 <script>
-  // scatter the mini topic-map points into three clusters
-  (function(){
-    var map=document.getElementById('map');if(!map)return;
-    var clusters=[{x:30,y:38,c:'#BA5757'},{x:68,y:64,c:'#8497B0'},{x:74,y:28,c:'#6A9978'}];
-    clusters.forEach(function(cl){
-      for(var i=0;i<22;i++){
-        var a=Math.random()*6.28, r=Math.random()*Math.random()*15;
-        var d=document.createElement('div');d.className='pt';
-        d.style.left=(cl.x+Math.cos(a)*r)+'%';
-        d.style.top=(cl.y+Math.sin(a)*r*1.4)+'%';
-        d.style.background=cl.c;
-        d.style.opacity=(0.45+Math.random()*0.5).toFixed(2);
-        map.appendChild(d);
-      }
-    });
-  })();
+document.addEventListener('DOMContentLoaded', function(){
+  var L = window.EratostLoader;
+
+  /* ── Logo: static mark in the nav and footer, the live loader in the hero ── */
+  if (L) {
+    document.querySelectorAll('.js-mark').forEach(function(a){ a.insertAdjacentHTML('afterbegin', L.mark()); });
+    document.querySelector('.js-inline-ld').innerHTML = L.inline({ gradient: true });
+    document.getElementById('heroMark').innerHTML = L.svg('', { gradient: true });
+
+    // The hero plays a search: the arrow spins while papers are fetched, then settles on the best
+    // score so far, gliding closer as better papers arrive, and starts again after a pause.
+    var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var RUN = [[2400, .52], [1300, .64], [1500, .81], [1700, .93]], HOLD = 4200;
+    function play(){
+      L.score(null);
+      var t = 0;
+      RUN.forEach(function(s){ t += s[0]; setTimeout(function(){ L.score(s[1]); }, t); });
+      setTimeout(play, t + HOLD);
+    }
+    if (reduced) L.score(.75); else play();
+  }
+
+  /* ── Scroll-reveal ──────────────────────────────────────────────────── */
+  if ('IntersectionObserver' in window) {
+    var obs = new IntersectionObserver(function(entries, o){
+      entries.forEach(function(e){ if (e.isIntersecting) { e.target.classList.add('in-view'); o.unobserve(e.target); } });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
+  } else {
+    document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in-view'); });
+  }
+
+  /* ── Nav: shadow on scroll, mobile toggle ───────────────────────────── */
+  var nav = document.querySelector('.nav');
+  var onScroll = function(){ nav.classList.toggle('nav--scrolled', window.scrollY > 10); };
+  onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+  var toggle = document.getElementById('nav-toggle');
+  toggle.addEventListener('click', function(){
+    var open = nav.classList.toggle('nav--open');
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+  document.querySelectorAll('#nav-links a').forEach(function(a){
+    a.addEventListener('click', function(){ nav.classList.remove('nav--open'); toggle.setAttribute('aria-expanded', 'false'); });
+  });
+
+  /* ── Mini topic map: three clusters of points ───────────────────────── */
+  var map = document.getElementById('map');
+  [{x:30,y:38,c:'#BA5757'},{x:68,y:64,c:'#6E7A82'},{x:74,y:28,c:'#1E2A31'}].forEach(function(cl){
+    for (var i = 0; i < 22; i++) {
+      var a = Math.random()*6.28, r = Math.random()*Math.random()*15, d = document.createElement('div');
+      d.className = 'pt';
+      d.style.left = (cl.x + Math.cos(a)*r) + '%';
+      d.style.top = (cl.y + Math.sin(a)*r*1.4) + '%';
+      d.style.background = cl.c;
+      d.style.opacity = (0.45 + Math.random()*0.5).toFixed(2);
+      map.appendChild(d);
+    }
+  });
+});
 </script>
 </body>
 </html>
