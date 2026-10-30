@@ -17,78 +17,177 @@
 <meta name="twitter:description" content="Eratosthenes plans: Free with unlimited search, Pro from $9 a month, Max from $24 a month and Team from $15 per seat a month, adding deep search and Research-Gap Graphs.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=block" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Cutive+Mono&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet">
 <style>
-  :root{--red:#BA5757;--red-strong:#A23F3F;--btn:#68829e;--btn-strong:#586f87;--ink:#262730;--muted:#6B7280;--line:#E6E6E6;--slate:#8497B0;--bg-soft:#F8F9FA;}
-  *{box-sizing:border-box}html,body{margin:0}
-  body{font-family:"Source Sans 3","Source Sans Pro",-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
-       background:#fff;line-height:1.55;-webkit-font-smoothing:antialiased}
-  a{color:var(--red);text-decoration:none}
-  .mi{font-family:'Material Symbols Outlined';font-weight:normal;font-size:1.1em;line-height:1;white-space:nowrap;
-      -webkit-font-feature-settings:'liga';font-feature-settings:'liga';-webkit-font-smoothing:antialiased;vertical-align:-.16em;display:inline-block}
+/* Same structure and type as Benjamin's pricing page; same palette as the Eratosthenes homepage. */
+:root{
+  --bg:#f7f4ee; --bg-alt:#eeeae1; --surface:#fffdf9; --border:#dcd5c7;
+  --text:#1e2a31; --muted:#5e6a71; --slate:#6e7a82;
+  --accent:#ba5757; --accent-dark:#9c4343;
+  --red-soft:#f3dcd9; --slate-soft:#dfe5e8;
+  --shadow:0 8px 24px -12px rgba(30,42,49,.28);
+  --radius:16px;
+  --font-serif:"Cutive Mono",monospace;
+  --font-sans:"Cutive Mono",monospace;
+  --font-prose:"Lora",Georgia,"Times New Roman",serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-sans);font-weight:700;background:var(--bg);color:var(--text);
+     line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+img,svg{display:block;max-width:100%}
 
-  .logo{display:inline-flex;align-items:flex-start;font-weight:700;line-height:1}
-  .logo .sci{font-size:1.5em}.logo .badge{font-size:1em;color:#fff;background:var(--red);border-radius:4px;padding:.05em .3em;margin-left:.12em}
-  .logo .sup{font-size:.6em;color:var(--slate);margin-left:.18em;margin-top:-.05em;font-style:italic}
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4em;
+     font-family:var(--font-sans);font-weight:600;text-decoration:none;border-radius:999px;cursor:pointer;
+     border:1px solid transparent;transition:transform .15s,box-shadow .15s,background-color .15s,color .15s;white-space:nowrap}
+.btn--primary{background:var(--red-soft);color:var(--accent-dark)}
+.btn--primary:hover{background:var(--slate-soft);color:var(--text);transform:translateY(-1px)}
+.btn--ghost{background:transparent;border-color:var(--border);color:var(--text)}
+.btn--ghost:hover{border-color:var(--text);transform:translateY(-1px)}
+.btn--lg{padding:.85rem 1.7rem;font-size:1rem}
+.btn--sm{padding:.5rem 1.1rem;font-size:.85rem}
+.btn--block{width:100%}
 
-  .page{max-width:1180px;margin:0 auto;padding:30px 16px 80px}
-  .top{display:flex;align-items:center;justify-content:space-between;gap:12px}
-  .newbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 13px;font-size:.88rem;cursor:pointer;color:var(--ink)}
-  .newbtn:hover{border-color:var(--red);color:var(--red)}
+/* ── Nav ─────────────────────────────────────────────────────────────────── */
+.nav{position:sticky;top:0;z-index:100;background:rgba(247,244,238,.72);
+     backdrop-filter:blur(10px);border-bottom:1px solid transparent;transition:border-color .25s,box-shadow .25s}
+.nav--scrolled{border-bottom-color:var(--border);box-shadow:0 4px 20px -16px rgba(30,42,49,.45)}
+.nav__inner{max-width:1100px;margin:0 auto;padding:1rem 1.5rem;
+            display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+.nav__links{display:flex;align-items:center;gap:1.75rem;font-size:.95rem;font-weight:700}
+.nav__links a{color:var(--accent-dark);transition:color .2s}
+.nav__links a:hover,.nav__links a.active{color:var(--text)}
+.nav__toggle{display:none;flex-direction:column;justify-content:center;gap:5px;
+             width:36px;height:36px;background:transparent;border:1px solid var(--border);border-radius:8px;cursor:pointer}
+.nav__toggle span{display:block;height:2px;width:18px;margin:0 auto;background:var(--text);transition:transform .2s,opacity .2s}
 
-  .head{text-align:center;margin:34px 0 8px}
-  .head h1{font-size:1.75rem;margin:0}
-  .head p{color:var(--muted);font-size:1rem;margin:8px auto 0;max-width:62ch}
+/* ── Logo lockup: the mark and the name ("Eratos" in the logo's shadow) ─── */
+.lockup{display:inline-flex;align-items:center;gap:.45em;font-family:"Cutive Mono",monospace;
+        font-weight:700;line-height:1;white-space:nowrap}
+.lockup .era-mark{width:1.75em;height:1.75em;flex:0 0 auto}
+.lockup .era-a{color:#1e2a31}
+.lockup .era-b{color:#d1d1d1}
+.lockup--nav{font-size:1.55rem}
+.lockup--footer{font-size:1.25rem}
 
-  .billing{display:flex;justify-content:center;margin-top:22px}
-  .toggle{display:inline-flex;border:1px solid var(--line);border-radius:99px;padding:3px;background:var(--bg-soft)}
-  .toggle button{border:0;background:transparent;border-radius:99px;padding:7px 16px;font:inherit;font-size:.9rem;
-      font-weight:600;color:var(--muted);cursor:pointer}
-  .toggle button[aria-pressed="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
-  .toggle .save{color:var(--red);font-weight:700;margin-left:4px}
+/* ── Scroll-reveal ───────────────────────────────────────────────────────── */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease-out,transform .7s ease-out}
+.reveal.in-view{opacity:1;transform:translateY(0)}
 
-  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:28px;align-items:start}
-  .card{border:1px solid var(--line);border-radius:14px;padding:22px 20px;display:flex;flex-direction:column;background:#fff;position:relative}
-  .card.feat{border-color:var(--red);box-shadow:0 8px 30px rgba(186,87,87,.12)}
-  .ribbon{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--red);color:#fff;white-space:nowrap;
-      font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:99px;padding:4px 12px}
-  .tname{font-size:1.15rem;font-weight:700}
-  .tsub{color:var(--muted);font-size:.86rem;margin-top:3px;min-height:2.6em}
-  .price{margin:14px 0 0;display:flex;align-items:baseline;gap:5px}
-  .price .amt{font-size:2rem;font-weight:700}
-  .price .per{color:var(--muted);font-size:.9rem}
-  .billed{color:var(--muted);font-size:.8rem;min-height:1.3em}
-  .cta{margin:16px 0 6px;display:block;width:100%;text-align:center;border-radius:9px;padding:11px 14px;
-      font:inherit;font-size:.95rem;font-weight:600;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink)}
-  .cta:hover{border-color:var(--red);color:var(--red)}
-  .cta.primary{background:var(--btn);color:#fff;border-color:var(--btn)}.cta.primary:hover{background:var(--btn-strong);color:#fff}
+/* ── Shared section ──────────────────────────────────────────────────────── */
+section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76px}
+.section-title{font-family:var(--font-serif);font-size:clamp(1.7rem,4vw,2.4rem);text-align:center;margin-bottom:.75rem}
+.section-sub{text-align:center;color:var(--muted);max-width:650px;margin:0 auto 3rem;font-size:1rem}
 
-  .flab{font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:16px 0 8px}
-  ul{list-style:none;margin:0;padding:0}
-  li{display:flex;align-items:flex-start;gap:9px;font-size:.9rem;padding:6px 0;border-top:1px solid #f0f0f0}
-  li:first-child{border-top:0}
-  li .mi{font-size:1.1rem;margin-top:.05em;flex:0 0 auto}
-  li .yes{color:var(--red)}li .no{color:#cdd0d4}
-  li .txt{flex:1}
-  li .val{color:var(--ink);font-weight:600;white-space:nowrap}
-  li .soon{color:var(--slate);font-size:.78rem;font-weight:600;white-space:nowrap}
-  .inherit{display:flex;align-items:center;gap:8px;font-size:.9rem;font-weight:600;color:var(--ink);
-      background:var(--bg-soft);border-radius:9px;padding:10px 12px;margin-bottom:4px}
-  .inherit .mi{color:var(--red)}
-  .note{color:var(--muted);font-size:.82rem;margin-top:10px}
+/* ── Pricing header ──────────────────────────────────────────────────────── */
+.pricing-hero{padding:4.5rem 1.5rem 1rem;text-align:center}
+.pricing-hero .section-sub{margin-bottom:1.5rem}
+.billing-toggle{display:inline-flex;align-items:center;gap:.25rem;margin:.5rem auto 0;
+                background:var(--bg-alt);border:1px solid var(--border);border-radius:999px;padding:.28rem}
+.billing-toggle button{font-family:var(--font-sans);font-weight:700;font-size:.9rem;border:0;background:transparent;
+                       color:var(--muted);cursor:pointer;border-radius:999px;padding:.5rem 1.2rem;transition:background .2s,color .2s}
+.billing-toggle button.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+.billing-toggle .save-hint{font-size:.72rem;font-weight:700;color:var(--accent-dark);margin-left:.35rem}
 
-  .faq{max-width:760px;margin:46px auto 0}
-  .faq h2{font-size:1.2rem;text-align:center;margin:0 0 14px}
-  .faq details{border-top:1px solid var(--line);padding:12px 2px}
-  .faq details:last-child{border-bottom:1px solid var(--line)}
-  .faq summary{cursor:pointer;font-weight:600}
-  .faq p{color:var(--muted);margin:8px 0 0;font-size:.93rem}
+/* ── Plan cards ──────────────────────────────────────────────────────────── */
+.plans{padding-top:2rem;padding-bottom:1.5rem;max-width:1260px}
+.plans__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;max-width:1200px;margin:0 auto}
+.plan-card{position:relative;display:flex;flex-direction:column;gap:1.1rem;background:var(--surface);
+           border:1px solid var(--border);border-radius:var(--radius);padding:2rem 1.75rem;transition:transform .2s,box-shadow .2s}
+.plan-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.plan-card--pro{border-color:var(--accent);box-shadow:0 0 0 2px rgba(186,87,87,.14),var(--shadow)}
+.plan-badge{position:absolute;top:-.8rem;left:50%;transform:translateX(-50%);font-size:.7rem;font-weight:700;
+            letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--accent);border-radius:999px;
+            padding:.28rem .85rem;white-space:nowrap}
+.plan-name{font-family:var(--font-serif);font-size:1.25rem}
+.plan-for{font-size:.85rem;color:var(--muted);margin-top:-.7rem}
+.plan-price{display:flex;align-items:baseline;gap:.3rem;flex-wrap:wrap}
+.plan-price .amount{font-family:var(--font-serif);font-size:2.6rem;line-height:1;color:var(--text)}
+.plan-price .unit{font-size:.95rem;color:var(--muted);font-weight:700}
+.plan-sub{font-size:.85rem;color:var(--muted);min-height:1.2em}
+.plan-save{display:inline-block;font-size:.75rem;font-weight:700;color:var(--accent-dark);background:var(--red-soft);
+           border-radius:999px;padding:.2rem .6rem;width:max-content}
+.plan-save:empty{display:none}
+.plan-feats{list-style:none;display:flex;flex-direction:column;gap:.6rem;font-size:.9rem;font-weight:400;
+            font-family:var(--font-prose);color:var(--text)}
+.plan-feats li{display:flex;align-items:flex-start;gap:.55rem}
+.plan-feats .tick{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;
+                  border-radius:50%;background:var(--slate-soft);color:var(--text);font-size:.72rem;margin-top:.12em}
+.plan-feats li.soon{color:var(--muted)}
+.plan-feats li.soon .tick{background:var(--bg-alt);color:var(--muted)}
+.plan-feats b{font-weight:600}
+.soon-pill{align-self:center;font-size:.6rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+           border:1px dashed var(--border);border-radius:999px;padding:.08rem .45rem;white-space:nowrap;font-family:var(--font-sans)}
+.plan-card .btn{margin-top:auto}
+.plan-fineprint{font-size:.75rem;color:var(--muted);text-align:center;max-width:760px;margin:1.5rem auto 0}
+.plan-fineprint a{text-decoration:underline}
 
-  .foot{text-align:center;color:var(--muted);font-size:.86rem;margin-top:34px}
-  .foot a{color:var(--muted);text-decoration:underline}
-  @media(max-width:1020px){.grid{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:600px){.grid{grid-template-columns:1fr}.head h1{font-size:1.5rem}}
+/* ── Labs & institutions ─────────────────────────────────────────────────── */
+.enterprise{max-width:1040px;padding-top:1rem}
+.enterprise__inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1.5rem;
+                   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:2rem 2.25rem}
+.enterprise__text{flex:1 1 340px}
+.enterprise__text h2{font-family:var(--font-serif);font-size:1.35rem;margin-bottom:.5rem}
+.enterprise__text p{color:var(--muted);font-size:.95rem;font-weight:400;font-family:var(--font-prose)}
+
+/* ── Features ────────────────────────────────────────────────────────────── */
+.features__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.5rem;margin-top:1rem}
+.feature-card{position:relative;border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;
+              background:var(--surface);transition:transform .2s,box-shadow .2s}
+.feature-card--pro{border-color:var(--accent)}
+.feature-card--soon{border-style:dashed}
+.feat-badge{position:absolute;top:1.1rem;right:1.1rem;font-size:.6rem;font-weight:700;letter-spacing:.06em;
+            text-transform:uppercase;color:#fff;background:var(--accent);border-radius:999px;padding:.16rem .5rem}
+.feat-badge--soon{color:var(--muted);background:var(--bg-alt);border:1px dashed var(--border)}
+.feature-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.feature-card h3{font-family:var(--font-serif);font-size:1.1rem;margin-bottom:.5rem}
+.feature-card .feat-badge ~ h3{padding-right:3.5rem}
+.feature-card p{color:var(--muted);font-size:.95rem;font-weight:400;font-family:var(--font-prose)}
+@media(min-width:900px){.features__grid{grid-template-columns:repeat(4,1fr)}}
+
+/* ── FAQ ─────────────────────────────────────────────────────────────────── */
+.faq{max-width:760px}
+.faq__item{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:1.1rem 1.35rem;margin-bottom:1rem}
+.faq__item summary{cursor:pointer;font-weight:700;font-size:1rem;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.faq__item summary::-webkit-details-marker{display:none}
+.faq__item summary::after{content:"+";color:var(--accent);font-size:1.3rem;transition:transform .2s}
+.faq__item[open] summary::after{transform:rotate(45deg)}
+.faq__item p{margin-top:.85rem;color:var(--muted);font-size:.95rem;font-weight:400;font-family:var(--font-prose)}
+.faq__item a{color:var(--accent-dark);text-decoration:underline}
+
+/* ── CTA ─────────────────────────────────────────────────────────────────── */
+.cta__inner{text-align:center;background:var(--red-soft);transition:background .35s ease;border-radius:24px;padding:3.5rem 2rem;color:var(--text)}
+.cta__inner h2{font-family:var(--font-serif);font-size:clamp(1.5rem,3.5vw,2.1rem);margin-bottom:.5rem}
+.cta__inner p{opacity:.8;margin-bottom:1.75rem}
+.cta__inner:hover{background:var(--slate-soft)}
+.cta__inner .btn--primary{background:transparent;color:var(--accent-dark);border:2px solid var(--accent-dark)}
+.cta__inner:hover .btn--primary{color:var(--text);border-color:var(--text)}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.footer{border-top:1px solid var(--border);padding:2rem 1.5rem}
+.footer__inner{max-width:1100px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem}
+.footer__copy{color:var(--muted);font-size:.9rem}
+.footer__copy a:hover{color:var(--accent-dark)}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media(max-width:760px){
+  .nav__links{position:absolute;top:100%;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);
+              flex-direction:column;align-items:stretch;gap:1rem;padding:1.25rem 1.5rem;display:none}
+  .nav--open .nav__links{display:flex}
+  .nav__links a{text-align:center}
+  .nav__toggle{display:flex}
+  .nav--open .nav__toggle span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+  .nav--open .nav__toggle span:nth-child(2){opacity:0}
+  .nav--open .nav__toggle span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+  section{padding:3.5rem 1rem}
+  .pricing-hero{padding:3rem 1rem 1rem}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .reveal{transition:none!important;opacity:1!important;transform:none!important}
+}
 </style>
 <!-- ── Microsoft Clarity ────────────────────────────────────────────────────
      Session recordings + heatmaps for Eratosthenes (eratost.scicoagent.com). The project ID is the last
@@ -103,148 +202,294 @@
   y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
 })(window, document, "clarity", "script", "y4p1zoary7");
 </script>
+<script src="js/loader.js?v=20261031a"></script>
 </head>
 <body>
-<div class="page">
 
-  <div class="top">
-    <div class="logo scico-logo" style="font-size:1.1rem">SciCo Search</div>
-    <button class="newbtn" onclick="location.href='search.html'"><span class="mi">arrow_back</span> Back to app</button>
+<!-- ── Nav ──────────────────────────────────────────────────────────────── -->
+<header class="nav" id="top">
+  <div class="nav__inner">
+    <a href="index.html" class="lockup lockup--nav js-mark" aria-label="Eratosthenes home"><span><span class="era-a">Eratos</span><span class="era-b">thenes</span></span></a>
+    <nav class="nav__links" id="nav-links">
+      <a href="index.html#showcase">Demo</a>
+      <a href="index.html#how-it-works">How it works</a>
+      <a href="index.html#features">Features</a>
+      <a href="index.html#faq">FAQ</a>
+      <a href="pricing.html" class="active">Pricing</a>
+      <button class="btn btn--primary btn--sm js-signin" type="button">Sign in with Google</button>
+    </nav>
+    <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
   </div>
+</header>
 
-  <div class="head">
-    <h1>Plans &amp; Pricing</h1>
-    <p>Search the literature free, forever. Upgrade for deep search and Research-Gap Graphs that show where a field is still open.</p>
+<main>
+
+<!-- ── Pricing header ─────────────────────────────────────────────────────── -->
+<section class="pricing-hero" id="pricing">
+  <h1 class="section-title reveal">Search free. Map the gaps with Pro.</h1>
+  <p class="section-sub reveal">Quick search and topic maps are free, forever. Paid plans add more deep searches and Research-Gap Graphs that show where a field is still open.</p>
+  <div class="billing-toggle reveal" role="group" aria-label="Billing period">
+    <button type="button" data-period="monthly">Monthly</button>
+    <button type="button" data-period="annual" class="active">Annual<span class="save-hint">save up to 40%</span></button>
   </div>
+</section>
 
-  <div class="billing">
-    <div class="toggle" role="group" aria-label="Billing period">
-      <button type="button" data-period="monthly" aria-pressed="false">Monthly</button>
-      <button type="button" data-period="annual" aria-pressed="true">Annual<span class="save">save up to 40%</span></button>
-    </div>
-  </div>
+<!-- ── Plan cards. Prices: monthly / annual (per month). Keep in sync with backend/backend/quota.py PLANS. -->
+<section class="plans" aria-label="Plans">
+  <div class="plans__grid">
 
-  <!-- Prices: monthly / annual (per month). Keep in sync with backend/backend/quota.py PLANS. -->
-  <div class="grid">
-
-    <!-- FREE -->
-    <div class="card">
-      <div class="tname">Free</div>
-      <div class="tsub">For everyday literature discovery.</div>
-      <div class="price"><span class="amt">$0</span><span class="per">/ forever</span></div>
-      <div class="billed">No card needed</div>
-      <a class="cta" href="index.html">Start free</a>
-      <div class="flab">What's included</div>
-      <ul>
-        <li><span class="mi yes">all_inclusive</span><span class="txt">Quick search</span><span class="val">Unlimited</span></li>
-        <li><span class="mi yes">all_inclusive</span><span class="txt">Topic maps</span><span class="val">Unlimited</span></li>
-        <li><span class="mi yes">check</span><span class="txt">Deep search</span><span class="val">3 / mo</span></li>
-        <li><span class="mi yes">check</span><span class="txt">Research-Gap Graphs with Impact scores</span><span class="val">3 / mo</span></li>
-        <li><span class="mi yes">check</span><span class="txt">Author &amp; PI finder</span><span class="val">Included</span></li>
-        <li><span class="mi yes">check</span><span class="txt">Saved sessions and citation export</span><span class="val">Included</span></li>
+    <!-- Free -->
+    <article class="plan-card reveal">
+      <h2 class="plan-name">Free</h2>
+      <p class="plan-for">For everyday literature discovery.</p>
+      <div class="plan-price"><span class="amount">$0</span><span class="unit">forever</span></div>
+      <p class="plan-sub">No card needed</p>
+      <ul class="plan-feats">
+        <li><span class="tick">∞</span> Unlimited quick search</li>
+        <li><span class="tick">∞</span> Unlimited topic maps</li>
+        <li><span class="tick">✓</span> 3 deep searches a month</li>
+        <li><span class="tick">✓</span> 3 Research-Gap Graphs a month, with Impact scores</li>
+        <li><span class="tick">✓</span> Author and PI finder</li>
+        <li><span class="tick">✓</span> Saved sessions and citation export</li>
       </ul>
-    </div>
+      <button class="btn btn--ghost btn--lg btn--block js-signin" type="button">Start free</button>
+    </article>
 
-    <!-- PRO -->
-    <div class="card feat">
-      <div class="ribbon">Recommended</div>
-      <div class="tname">Pro</div>
-      <div class="tsub">For researchers mapping their field.</div>
-      <div class="price"><span class="amt" data-monthly="$15" data-annual="$9">$9</span><span class="per">/ month</span></div>
-      <div class="billed" data-monthly="Billed monthly" data-annual="$108 billed yearly">$108 billed yearly</div>
-      <button class="cta primary js-upgrade" data-plan="pro">Join the Pro waitlist</button>
-      <div class="flab">Everything in Free, plus</div>
-      <ul>
-        <li><span class="mi yes">check</span><span class="txt">Deep search</span><span class="val">30 / mo</span></li>
-        <li><span class="mi yes">check</span><span class="txt">Research-Gap Graphs with Impact scores</span><span class="val">30 / mo</span></li>
+    <!-- Pro -->
+    <article class="plan-card plan-card--pro reveal">
+      <span class="plan-badge">Recommended</span>
+      <h2 class="plan-name">Eratosthenes Pro</h2>
+      <p class="plan-for">For researchers mapping their field.</p>
+      <div class="plan-price"><span class="amount" data-monthly="$15" data-annual="$9">$9</span><span class="unit">/month</span></div>
+      <p class="plan-sub" data-monthly="Billed monthly" data-annual="Billed $108 yearly">Billed $108 yearly</p>
+      <span class="plan-save" data-monthly="" data-annual="Save $72 / year">Save $72 / year</span>
+      <ul class="plan-feats">
+        <li><span class="tick">✓</span> <b>Everything in Free</b></li>
+        <li><span class="tick">✓</span> 30 deep searches a month</li>
+        <li><span class="tick">✓</span> 30 Research-Gap Graphs a month, with Impact scores</li>
       </ul>
-    </div>
+      <button class="btn btn--primary btn--lg btn--block js-upgrade" type="button" data-plan="pro">Join the Pro waitlist</button>
+    </article>
 
-    <!-- MAX -->
-    <div class="card">
-      <div class="tname">Max</div>
-      <div class="tsub">For group leaders and heavy users.</div>
-      <div class="price"><span class="amt" data-monthly="$39" data-annual="$24">$24</span><span class="per">/ month</span></div>
-      <div class="billed" data-monthly="Billed monthly" data-annual="$288 billed yearly">$288 billed yearly</div>
-      <button class="cta js-upgrade" data-plan="max">Join the Max waitlist</button>
-      <div class="flab">Everything in Pro, plus</div>
-      <ul>
-        <li><span class="mi yes">all_inclusive</span><span class="txt">Deep search</span><span class="val">Unlimited*</span></li>
-        <li><span class="mi yes">all_inclusive</span><span class="txt">Research-Gap Graphs with Impact scores</span><span class="val">Unlimited*</span></li>
-        <li><span class="mi yes">schedule</span><span class="txt">Research-plan generator: the most feasible route to close a gap</span><span class="soon">Coming soon</span></li>
+    <!-- Max -->
+    <article class="plan-card reveal">
+      <h2 class="plan-name">Eratosthenes Max</h2>
+      <p class="plan-for">For group leaders and heavy users.</p>
+      <div class="plan-price"><span class="amount" data-monthly="$39" data-annual="$24">$24</span><span class="unit">/month</span></div>
+      <p class="plan-sub" data-monthly="Billed monthly" data-annual="Billed $288 yearly">Billed $288 yearly</p>
+      <span class="plan-save" data-monthly="" data-annual="Save $180 / year">Save $180 / year</span>
+      <ul class="plan-feats">
+        <li><span class="tick">✓</span> <b>Everything in Pro</b></li>
+        <li><span class="tick">∞</span> Unlimited deep search*</li>
+        <li><span class="tick">∞</span> Unlimited Research-Gap Graphs*</li>
+        <li class="soon"><span class="tick">◷</span> Research-plan generator: the most feasible route to close a gap <span class="soon-pill">Coming soon</span></li>
       </ul>
-    </div>
+      <button class="btn btn--ghost btn--lg btn--block js-upgrade" type="button" data-plan="max">Join the Max waitlist</button>
+    </article>
 
-    <!-- TEAM -->
-    <div class="card">
-      <div class="tname">Team</div>
-      <div class="tsub">For labs and research groups.</div>
-      <div class="price"><span class="amt" data-monthly="$24" data-annual="$15">$15</span><span class="per">/ seat / month</span></div>
-      <div class="billed" data-monthly="Billed monthly, from 3 seats" data-annual="$180 per seat billed yearly, from 3 seats">$180 per seat billed yearly, from 3 seats</div>
-      <button class="cta js-upgrade" data-plan="team">Join the Team waitlist</button>
-      <div class="flab">For every member</div>
-      <div class="inherit"><span class="mi">groups</span> Everything in Pro, per seat</div>
-      <ul>
-        <li><span class="mi yes">check</span><span class="txt">One invoice for the whole group</span><span class="val"></span></li>
-        <li><span class="mi yes">check</span><span class="txt">Add or remove seats anytime</span><span class="val"></span></li>
+    <!-- Team -->
+    <article class="plan-card reveal">
+      <h2 class="plan-name">Eratosthenes Team</h2>
+      <p class="plan-for">For labs and research groups.</p>
+      <div class="plan-price"><span class="amount" data-monthly="$24" data-annual="$15">$15</span><span class="unit">/seat/month</span></div>
+      <p class="plan-sub" data-monthly="Billed monthly, from 3 seats" data-annual="Billed $180 per seat yearly, from 3 seats">Billed $180 per seat yearly, from 3 seats</p>
+      <span class="plan-save" data-monthly="" data-annual="Save $108 / seat / year">Save $108 / seat / year</span>
+      <ul class="plan-feats">
+        <li><span class="tick">✓</span> <b>Everything in Pro, for every member</b></li>
+        <li><span class="tick">✓</span> One invoice for the whole group</li>
+        <li><span class="tick">✓</span> Add or remove seats anytime</li>
       </ul>
-    </div>
+      <button class="btn btn--ghost btn--lg btn--block js-upgrade" type="button" data-plan="team">Join the Team waitlist</button>
+    </article>
 
   </div>
-
-  <p class="foot">*Fair use: up to 300 per month. Quotas reset on the 1st of each month (UTC). Prices in USD; taxes may apply.<br>
+  <p class="plan-fineprint reveal">*Fair use: up to 300 a month. Quotas reset on the 1st of each month (UTC). Prices in USD; taxes may apply.
     Checkout opens soon. Until then, join a waitlist and we will email you when your plan is ready.
     By subscribing you agree to the <a href="https://scicoagent.com/terms/">Terms of Service</a> and <a href="https://scicoagent.com/privacy/">Privacy Policy</a>.</p>
+</section>
 
-  <div class="faq">
-    <h2>Questions</h2>
-    <details><summary>What is the difference between quick search and deep search?</summary>
-      <p>Quick search ranks up to 60 of the most relevant papers for your query. Deep search reads up to 200, which matters for broad questions and cross-disciplinary topics.</p></details>
-    <details><summary>What is a Research-Gap Graph?</summary>
-      <p>It maps the papers in your search as a landscape: topics that are well studied form deep basins, and the barriers between them are the open gaps. Each paper gets an Impact score for how much of a gap it closes. Opening a graph you already built does not count again.</p></details>
-    <details><summary>Can I cancel?</summary>
-      <p>Yes, anytime. Your plan stays active until the end of the period you paid for and is not renewed after that.</p></details>
-    <details><summary>Do Eratosthenes and Benjamin share a subscription?</summary>
-      <p>No. You sign in to both with the same account, but each product has its own plan, so you only pay for what you use.</p></details>
+<!-- ── Labs & institutions ────────────────────────────────────────────────── -->
+<section class="enterprise" aria-label="Labs and institutions">
+  <div class="enterprise__inner reveal">
+    <div class="enterprise__text">
+      <h2>Labs &amp; institutions</h2>
+      <p>Team plans start at 3 seats, with one invoice for the group. For a department or an institution-wide plan, get in touch and we will set it up with you.</p>
+    </div>
+    <a class="btn btn--primary btn--lg" href="mailto:contact@scicoagent.com?subject=Eratosthenes%20for%20labs%20and%20institutions">Talk to us</a>
   </div>
-</div>
+</section>
 
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-<script src="js/logo.js?v=20260829m"></script>
+<!-- ── Features ───────────────────────────────────────────────────────────── -->
+<section class="features" id="features">
+  <h2 class="section-title reveal">Every feature Eratosthenes offers</h2>
+  <p class="section-sub reveal">The same search and ranking on every plan. Paid plans raise the monthly limits on deep search and Research-Gap Graphs.</p>
+  <div class="features__grid">
+    <article class="feature-card reveal">
+      <h3>Literature search co-agent</h3>
+      <p>Meet Eratosthenes, named after the chief librarian of the Library of Alexandria, who measured the Earth with a shadow.</p>
+    </article>
+    <article class="feature-card reveal">
+      <h3>AI query expansion</h3>
+      <p>Your topic becomes a set of optimized academic queries with synonyms and broader terms. Tune the Query Entropy to widen or narrow the net.</p>
+    </article>
+    <article class="feature-card reveal">
+      <h3>AI relevance match</h3>
+      <p>Every paper is scored against your intent, so the closest work rises to the top even when it uses different words.</p>
+    </article>
+    <article class="feature-card reveal">
+      <h3>Topic maps</h3>
+      <p>An interactive map groups the literature into themed branches, from the well-studied core out to the frontier.</p>
+    </article>
+    <article class="feature-card feature-card--pro reveal">
+      <span class="feat-badge">Pro</span>
+      <h3>Deep search</h3>
+      <p>Reads up to 200 papers instead of 60, for broad questions and cross-disciplinary topics.</p>
+    </article>
+    <article class="feature-card feature-card--pro reveal">
+      <span class="feat-badge">Pro</span>
+      <h3>Research-Gap Graphs</h3>
+      <p>Well-studied topics form deep basins and the barriers between them are the open gaps. Each paper gets an Impact score.</p>
+    </article>
+    <article class="feature-card reveal">
+      <h3>Author and PI finder</h3>
+      <p>See the investigators behind the papers: recent output, lab focus, and fit with your direction.</p>
+    </article>
+    <article class="feature-card feature-card--soon reveal">
+      <span class="feat-badge feat-badge--soon">Coming soon</span>
+      <h3>Research-plan generator</h3>
+      <p>The most feasible route to close a gap you have found, planned to keep trial and error to a minimum.</p>
+    </article>
+  </div>
+</section>
+
+<!-- ── FAQ ────────────────────────────────────────────────────────────────── -->
+<section class="faq" id="faq">
+  <h2 class="section-title reveal">Questions</h2>
+  <div class="reveal">
+    <details class="faq__item">
+      <summary>What does the free plan include?</summary>
+      <p>Unlimited quick search and topic maps, free forever, plus 3 deep searches and 3 Research-Gap Graphs a month. The author and PI finder, saved sessions and citation export are included too.</p>
+    </details>
+    <details class="faq__item">
+      <summary>What is the difference between quick search and deep search?</summary>
+      <p>Quick search ranks up to 60 of the most relevant papers for your query. Deep search reads up to 200, which matters for broad questions and cross-disciplinary topics.</p>
+    </details>
+    <details class="faq__item">
+      <summary>What is a Research-Gap Graph?</summary>
+      <p>It maps the papers in your search as a landscape: topics that are well studied form deep basins, and the barriers between them are the open gaps. Each paper gets an Impact score for how much of a gap it closes. Opening a graph you already built does not count again.</p>
+    </details>
+    <details class="faq__item">
+      <summary>When do my limits reset?</summary>
+      <p>On the 1st of each month (UTC). Max is unlimited under fair use, up to 300 deep searches and 300 Research-Gap Graphs a month.</p>
+    </details>
+    <details class="faq__item">
+      <summary>Can I buy plans for my lab or institution?</summary>
+      <p>Yes. Team plans start at 3 seats, with everything in Pro for every member and one invoice for the group. For a department or institution, <a href="mailto:contact@scicoagent.com">get in touch</a>.</p>
+    </details>
+    <details class="faq__item">
+      <summary>Can I cancel?</summary>
+      <p>Yes, anytime. Your plan stays active until the end of the period you paid for and is not renewed after that.</p>
+    </details>
+    <details class="faq__item">
+      <summary>Do Eratosthenes and Benjamin share a subscription?</summary>
+      <p>No. You sign in to both with the same SciCoagent account, but each product has its own plan, so you only pay for what you use.</p>
+    </details>
+  </div>
+</section>
+
+<!-- ── CTA ────────────────────────────────────────────────────────────────── -->
+<section class="cta">
+  <div class="cta__inner reveal">
+    <h2>Find the prior work. Spot the gap.</h2>
+    <p>Free to start, no card required. Describe your idea and see what Eratosthenes finds.</p>
+    <button class="btn btn--primary btn--lg js-signin" type="button">Open Eratosthenes →</button>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer__inner">
+    <a href="index.html" class="lockup lockup--footer js-mark" aria-label="Eratosthenes home"><span><span class="era-a">Eratos</span><span class="era-b">thenes</span></span></a>
+    <span class="footer__copy">An AI literature search co-agent, part of the SciCoagent ecosystem.</span>
+    <span class="footer__copy"><a href="https://scicoagent.com/terms/">Terms</a> · <a href="https://scicoagent.com/privacy/">Privacy</a> · <a href="mailto:contact@scicoagent.com">Contact</a></span>
+  </div>
+</footer>
+
 <script src="js/config.js?v=20261030a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabaseClient.js?v=20260829m"></script>
 <script>
-  (function(){
-    // Monthly / annual toggle (annual by default). Remembered per browser; works without storage.
-    function setPeriod(p){
-      document.querySelectorAll('.toggle button').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.period===p)); });
-      document.querySelectorAll('[data-monthly][data-annual]').forEach(function(el){ el.textContent = el.dataset[p]; });
-      try{ localStorage.setItem('scico.pricing.period', p); }catch(_){}
-    }
-    document.querySelectorAll('.toggle button').forEach(function(b){
-      b.addEventListener('click', function(){ setPeriod(b.dataset.period); });
-    });
-    var saved = null;
-    try{ saved = localStorage.getItem('scico.pricing.period'); }catch(_){}
-    setPeriod(saved === 'monthly' ? 'monthly' : 'annual');
+(function(){
+  var L = window.EratostLoader;
+  if (L) document.querySelectorAll('.js-mark').forEach(function(a){ a.insertAdjacentHTML('afterbegin', L.mark()); });
 
-    // Checkout is not wired yet: signed-out visitors sign in first; signed-in users join the waitlist
-    // by email, with the plan and billing period filled in.
-    document.querySelectorAll('.js-upgrade').forEach(function(b){
-      b.addEventListener('click', async function(){
-        var plan = b.dataset.plan || 'pro';
-        var period = (document.querySelector('.toggle button[aria-pressed="true"]')||{}).dataset;
-        period = period ? period.period : 'annual';
-        var user = window.SciCoAuth ? await window.SciCoAuth.getUser() : null;
-        if(!user){ window.SciCoAuth.signInWithGoogle(); return; }
-        window.location.href = 'mailto:contact@scicoagent.com'
-          + '?subject=' + encodeURIComponent('Eratosthenes ' + plan + ' waitlist (' + period + ')')
-          + '&body=' + encodeURIComponent('Please add my account (' + (user.email||'') + ') to the ' + plan
-            + ' waitlist, billed ' + period + '.');
-      });
+  // Sign in, or go straight to the app when already signed in (the nav button then says so).
+  var signedIn = false;
+  function openApp(){
+    if (signedIn) { location.href = 'search.html'; return; }
+    if (window.SciCoAuth) window.SciCoAuth.signInWithGoogle().catch(function(e){ console.error(e); });
+  }
+  document.querySelectorAll('.js-signin').forEach(function(b){ b.addEventListener('click', openApp); });
+  if (window.SciCoAuth) window.SciCoAuth.getUser().then(function(user){
+    if (!user) return;
+    signedIn = true;
+    var nb = document.querySelector('.nav .js-signin');
+    if (nb) nb.textContent = 'Back to app';
+  }).catch(function(){});
+
+  // Monthly / annual toggle (annual by default). Remembered per browser; works without storage.
+  function setPeriod(p){
+    document.querySelectorAll('.billing-toggle button').forEach(function(b){
+      var on = b.dataset.period === p;
+      b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on));
     });
-  })();
+    document.querySelectorAll('[data-monthly][data-annual]').forEach(function(el){ el.textContent = el.dataset[p]; });
+    try{ localStorage.setItem('scico.pricing.period', p); }catch(_){}
+  }
+  document.querySelectorAll('.billing-toggle button').forEach(function(b){
+    b.addEventListener('click', function(){ setPeriod(b.dataset.period); });
+  });
+  var saved = null;
+  try{ saved = localStorage.getItem('scico.pricing.period'); }catch(_){}
+  setPeriod(saved === 'monthly' ? 'monthly' : 'annual');
+
+  // Checkout is not wired yet: signed-out visitors sign in first; signed-in users join the waitlist
+  // by email, with the plan and billing period filled in.
+  document.querySelectorAll('.js-upgrade').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var plan = b.dataset.plan || 'pro';
+      var active = document.querySelector('.billing-toggle button.active');
+      var period = active ? active.dataset.period : 'annual';
+      var user = window.SciCoAuth ? await window.SciCoAuth.getUser() : null;
+      if(!user){ window.SciCoAuth.signInWithGoogle(); return; }
+      window.location.href = 'mailto:contact@scicoagent.com'
+        + '?subject=' + encodeURIComponent('Eratosthenes ' + plan + ' waitlist (' + period + ')')
+        + '&body=' + encodeURIComponent('Please add my account (' + (user.email||'') + ') to the ' + plan
+          + ' waitlist, billed ' + period + '.');
+    });
+  });
+
+  // Scroll-reveal, nav shadow, mobile menu
+  document.addEventListener('DOMContentLoaded', function(){
+    if ('IntersectionObserver' in window) {
+      var obs = new IntersectionObserver(function(entries, o){
+        entries.forEach(function(e){ if (e.isIntersecting) { e.target.classList.add('in-view'); o.unobserve(e.target); } });
+      }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+      document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
+    } else document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in-view'); });
+    var nav = document.querySelector('.nav');
+    var onScroll = function(){ nav.classList.toggle('nav--scrolled', window.scrollY > 10); };
+    onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+    var toggle = document.getElementById('nav-toggle');
+    toggle.addEventListener('click', function(){
+      var open = nav.classList.toggle('nav--open');
+      toggle.setAttribute('aria-expanded', String(open));
+    });
+  });
+})();
 </script>
 </body>
 </html>

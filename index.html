@@ -125,10 +125,11 @@ img,svg{display:block;max-width:100%}
                   background:var(--text);transition:transform .2s,opacity .2s}
 
 /* ── Logo lockup: the mark and the wordmark ──────────────────────────────── */
-.lockup{display:inline-flex;align-items:center;gap:.45em;font-family:"KaTeX_Main",var(--font-prose);
+.lockup{display:inline-flex;align-items:center;gap:.45em;font-family:"Cutive Mono",monospace;
         font-weight:700;line-height:1;color:var(--text);white-space:nowrap}
 .lockup .era-mark{width:1.75em;height:1.75em;flex:0 0 auto}
-.lockup .era-a{color:var(--accent)}
+.lockup .era-a{color:#1e2a31}   /* "Eratos": in the logo's shadow */
+.lockup .era-b{color:#d1d1d1}   /* "thenes": the Earth's day side */
 .lockup--nav{font-size:1.55rem}
 .lockup--footer{font-size:1.25rem}
 /* The name under the logo: Cutive Mono like Benjamin's name, in the Earth's day-side grey. The
@@ -219,7 +220,8 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
               background:var(--surface);transition:transform .2s,box-shadow .2s}
 .feature-card--soon{border-style:dashed}
 .feature-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
-.feature-card h3{font-family:var(--font-serif);font-size:1.1rem;margin-bottom:.5rem;padding-right:3.5rem}
+.feature-card h3{font-family:var(--font-serif);font-size:1.1rem;margin-bottom:.5rem}
+.feature-card .feat-badge ~ h3{padding-right:3.5rem}
 .feature-card p{color:var(--muted);font-size:.95rem}
 .feat-badge{position:absolute;top:1.1rem;right:1.1rem;font-size:.6rem;font-weight:700;letter-spacing:.06em;
             text-transform:uppercase;color:#fff;background:var(--accent);border-radius:999px;padding:.16rem .5rem}
@@ -308,7 +310,7 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
 <!-- ── Nav ──────────────────────────────────────────────────────────────── -->
 <header class="nav" id="top">
   <div class="nav__inner">
-    <a href="#top" class="lockup lockup--nav js-mark" aria-label="Eratosthenes"><span><span class="era-a">Era</span>tosthenes</span></a>
+    <a href="#top" class="lockup lockup--nav js-mark" aria-label="Eratosthenes"><span><span class="era-a">Eratos</span><span class="era-b">thenes</span></span></a>
     <nav class="nav__links" id="nav-links">
       <a href="#showcase">Demo</a>
       <a href="#how-it-works">How it works</a>
@@ -536,7 +538,7 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
 
 <footer class="footer">
   <div class="footer__inner">
-    <a href="#top" class="lockup lockup--footer js-mark" aria-label="Eratosthenes"><span><span class="era-a">Era</span>tosthenes</span></a>
+    <a href="#top" class="lockup lockup--footer js-mark" aria-label="Eratosthenes"><span><span class="era-a">Eratos</span><span class="era-b">thenes</span></span></a>
     <span class="footer__copy">An AI literature search co-agent, part of the SciCoagent ecosystem.</span>
     <span class="footer__copy"><a href="https://scicoagent.com/terms/">Terms</a> · <a href="https://scicoagent.com/privacy/">Privacy</a> · <a href="mailto:contact@scicoagent.com">Contact</a></span>
   </div>
