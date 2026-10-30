@@ -576,17 +576,6 @@ document.addEventListener('DOMContentLoaded', function(){
     document.querySelector('.js-inline-ld').innerHTML = L.inline({ gradient: true });
     document.getElementById('heroMark').innerHTML = L.svg('', { gradient: true });
 
-    // The hero plays a search: the arrow spins while papers are fetched, then settles on the best
-    // score so far, gliding closer as better papers arrive, and starts again after a pause.
-    var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var RUN = [[2400, .52], [1300, .64], [1500, .81], [1700, .93]], HOLD = 4200;
-    function play(){
-      L.score(null);
-      var t = 0;
-      RUN.forEach(function(s){ t += s[0]; setTimeout(function(){ L.score(s[1]); }, t); });
-      setTimeout(play, t + HOLD);
-    }
-    if (reduced) L.score(.75); else play();
   }
 
   /* ── Scroll-reveal ──────────────────────────────────────────────────── */
