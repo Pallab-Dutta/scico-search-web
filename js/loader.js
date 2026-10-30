@@ -1,5 +1,5 @@
 /* Eratosthenes loading mark, drawn from the logo (Eratost-01.svg) as his experiment.
-   The ring is the Earth. Each arrow is a stick standing out of it. Sunlight arrives as parallel rays
+   The ring is the Earth. Each arrow is a stick standing out of it. Sunlight (not drawn) arrives as parallel rays
    from a fixed direction (the logo's 45 degrees), and each stick casts a shadow along the Earth's
    surface. The teal stick (the query vector) stands still, like Alexandria, with a fixed shadow.
    The orange stick (a paper vector) sweeps round: its shadow vanishes when the sun is straight
@@ -20,8 +20,8 @@
    further from the sun), reaching the night-side grey at the day/night line.
    With prefers-reduced-motion the orange stick stays put and gently pulses. */
 (function () {
-  const TEAL = "#0C5455", ORANGE = "#D77B4B", SUNRAY = "#E0A030";
-  let RING = "#BDC6C9", NIGHT = "#A2ACB0", SHADE = "#1E2A31";   // can be changed with configure()
+  const TEAL = "#0C5455", ORANGE = "#D77B4B";
+  let RING = "#D1D1D1", NIGHT = "#6E7A82", SHADE = "#1E2A31";   // can be changed with configure()
   const CX = 306, CY = 396;          // hub
   const R_RING = 181.6;              // ring centre line (stroke 20)
   const R_SURF = R_RING + 10;        // outer surface, where the sticks stand
@@ -111,23 +111,8 @@
       ".era-ld-block{display:flex;flex-direction:column;align-items:center;padding:26px 0 18px}" +
       ".era-ld-block .era-ld{width:168px;height:168px}" +
       ".era-ld-label{margin-top:14px;font-size:.95rem;font-weight:600;color:var(--muted,#6B7280);text-align:center}" +
-      ".era-ld-inline{display:inline-block;width:1.9em;height:1.9em;margin:-.3em -.15em;vertical-align:-.55em;flex:0 0 auto}" +
-      ".era-ld-inline .era-rays{display:none}";
+      ".era-ld-inline{display:inline-block;width:1.9em;height:1.9em;margin:-.3em -.15em;vertical-align:-.55em;flex:0 0 auto}";
     (document.head || document.documentElement).appendChild(st);
-  }
-
-  // Faint parallel sunrays on the day side, heading towards the Earth.
-  function rays() {
-    const wx = -Math.sin(rad(SUN)), wy = Math.cos(rad(SUN)), vx = Math.cos(rad(SUN)), vy = Math.sin(rad(SUN));
-    let s = "";
-    for (const o of [-150, -75, 75, 150]) {
-      const near = Math.sqrt(R_SURF * R_SURF - o * o) + 8, far = 268;
-      const p = r => [CX + o * wx + r * vx, CY - (o * wy + r * vy)];
-      const [x1, y1] = p(far), [x2, y2] = p(near);
-      s += '<line x1="' + f(x1) + '" y1="' + f(y1) + '" x2="' + f(x2) + '" y2="' + f(y2) + '"/>';
-    }
-    return '<g class="era-rays" stroke="' + SUNRAY + '" stroke-width="7" stroke-linecap="round" ' +
-      'stroke-dasharray="6 14" opacity=".85">' + s + '</g>';
   }
 
   const arrow = c =>   // as drawn in the logo, at 45 degrees
@@ -163,7 +148,7 @@
       '<path d="' + area(0) + '" fill="url(#' + g + ')"/>' +
       '<path class="era-ar-o" d="' + area(th) + '" fill="url(#' + g + ')"/>';
     return '<svg class="era-ld ' + (cls || "") + '" viewBox="6 96 600 600" role="img" aria-label="Loading">' +
-      shade + rays() + areas +
+      shade + areas +
       '<circle cx="306" cy="396" r="181.6" fill="#fff" stroke="' + RING + '" stroke-width="20"/>' +
       (withArea ? '<path d="' + nightDisc() + '" fill="' + SHADE + '" fill-opacity=".09"/>' : "") +
       '<path d="' + nightPath() + '" fill="none" stroke="' + NIGHT + '" stroke-width="20"/>' +
