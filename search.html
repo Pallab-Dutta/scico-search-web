@@ -118,6 +118,7 @@
       <hr/>
 
       <div id="progress" style="display:none">
+        <div id="eraLoader"></div>
         <div class="phase">
           <span class="mi">travel_explore</span>
           <div><div class="phase-t" id="phaseT">Starting…</div><div class="phase-s" id="phaseS"></div></div>
@@ -136,6 +137,7 @@
 <script src="js/api.js?v=20260829m"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="js/logo.js?v=20260829m"></script>
+<script src="js/loader.js?v=20261030a"></script>
 <script src="js/shell.js?v=20260829m"></script>
 <script>
   const $ = id => document.getElementById(id);
@@ -155,7 +157,7 @@
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') paramsPop.classList.remove('open'); });
 
   function statRow(msg, running){
-    const icon = running ? '<span class="mi spin">progress_activity</span>' : '<span class="mi ok">check</span>';
+    const icon = running ? EratostLoader.inline() : '<span class="mi ok">check</span>';
     return `<div class="stat${running?' running':''}">${icon}<span class="qx">${esc(msg)}</span></div>`;
   }
   // Live paper row shown to EVERYONE as papers rank on the fly (no waiting).
@@ -173,6 +175,7 @@
     const depth = $('deep').checked ? 'deep' : 'shallow';
     const creativity = (+entropy.value)/100;
     $('progress').style.display='block';
+    $('eraLoader').innerHTML = EratostLoader.block('Searching the literature…');
     $('livePapers').innerHTML=''; $('liveHead').textContent='Harvesting literature…';
     $('phaseT').textContent='Phase 1 · Harvesting best literature';
     $('phaseS').textContent='Original focus: '+q;
@@ -206,9 +209,10 @@
         }
       });
       if(sessionId) location.href='results.html?session='+encodeURIComponent(sessionId);
-      else running=false;
+      else { running=false; $('eraLoader').innerHTML=''; }
     }catch(err){
       running=false;
+      $('eraLoader').innerHTML='';
       $('liveHead').textContent='Could not complete the search.';
       if(err.code===402 || err.code===429){
         const d=err.detail||{};
