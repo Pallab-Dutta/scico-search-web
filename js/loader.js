@@ -26,7 +26,7 @@
   const R_RING = 181.6;              // ring centre line (stroke 20)
   const R_SURF = R_RING + 10;        // outer surface, where the sticks stand
   const R_TIP = 290.2;               // arrow tip distance from the hub (both arrows)
-  const SUN = 45;                    // direction of the sun, degrees anticlockwise from the teal arrow
+  let SUN = 58;                      // direction of the sun, degrees anticlockwise from pointing right
   const POSE = 45;                   // orange arrow angle in the logo
   const PERIOD = 3600;               // ms per turn
 
@@ -123,14 +123,14 @@
   const reduced = () => !!(mq && mq.matches);
 
   // One clock for every loader on the page, so a status line that is redrawn on each progress
-  // message keeps turning smoothly. Clockwise, slowing briefly at the logo pose (sun overhead).
-  let STILL = 45;          // teal (still) arrow angle: pointing at the sun, so it casts no shadow
+  // message keeps turning smoothly. Clockwise, slowing briefly where it points at the sun.
+  let STILL = 58;          // still arrow angle: pointing at the sun, so it casts no shadow
   let fixedAngle = null;   // set by configure({ angle }) to hold the orange arrow still
   function spinAt(now) {
-    if (reduced()) return POSE;
+    if (reduced()) return SUN;
     const x = (now % PERIOD) / PERIOD;
     const e = 0.75 * (0.5 - 0.5 * Math.cos(Math.PI * x)) + 0.25 * x;
-    return POSE - 360 * e;
+    return SUN - 360 * e;          // slowest when it points at the sun, wherever the sun is
   }
 
   // Once papers arrive, the orange arrow stops spinning and settles at an angle set by the best
@@ -242,6 +242,7 @@
     if (o.moving_color) ORANGE = o.moving_color;
     if (o.hub) HUB = o.hub;
     DARK = hex(SHADE); LIGHT = hex(NIGHT);
+    if ("sun" in o) SUN = +o.sun || 0;   // turns the sunlight (pass still too, to keep that arrow on the rays)
     if ("still" in o) STILL = +o.still || 0;
     if ("angle" in o) fixedAngle = o.angle === null ? null : +o.angle;
     start();
@@ -252,6 +253,9 @@
     configure,
     score,
     best: () => best,
+    sun: () => SUN,       // sunlight direction, degrees
+    still: () => STILL,   // still arrow angle
+    angle: () => cur,     // rotating arrow angle right now
     block: (label, opts) => '<div class="era-ld-block" role="status">' + svg("", opts) +
       (label ? '<div class="era-ld-label">' + esc(label) + '</div>' : "") + '</div>',
     inline: opts => '<span class="era-ld-inline">' + svg("", opts) + '</span>',

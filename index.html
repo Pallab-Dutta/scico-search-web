@@ -131,9 +131,14 @@ img,svg{display:block;max-width:100%}
 .lockup .era-a{color:var(--accent)}
 .lockup--nav{font-size:1.55rem}
 .lockup--footer{font-size:1.25rem}
-.wordmark{font-family:"KaTeX_Main",var(--font-prose);font-weight:700;font-size:clamp(2.6rem,9vw,4.8rem);
-          line-height:1;color:var(--text);letter-spacing:.005em}
-.wordmark .era-a{color:var(--accent)}
+/* The name under the logo: Cutive Mono like Benjamin's name, in the Earth's day-side grey. The
+   letters the logo's shadow falls on turn the shadow colour (the .wm-dark copy, clipped to the
+   shadow by js/sunshadow.js). */
+.wordmark{position:relative;font-family:"Cutive Mono",monospace;font-weight:700;font-size:min(50px,11.5vw);
+          line-height:1.1;letter-spacing:0;color:#d1d1d1;white-space:nowrap}
+.wordmark .wm-dark{position:absolute;left:0;top:0;color:#1e2a31;pointer-events:none;clip-path:inset(100%)}
+/* The shadow the logo casts across the page (drawn by js/sunshadow.js) */
+#sunShadow{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:50;mix-blend-mode:multiply}
 
 /* ── Scroll-reveal ───────────────────────────────────────────────────────── */
 .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease-out,transform .7s ease-out}
@@ -159,7 +164,7 @@ img,svg{display:block;max-width:100%}
 .hwm-score{font-family:var(--font-sans);font-weight:700;color:rgba(186,87,87,.30);margin-left:.4em}
 .hero__eyebrow{display:inline-block;font-size:.85rem;font-weight:600;letter-spacing:.12em;
                text-transform:uppercase;color:var(--text);margin-bottom:1.6rem}
-.hero__logo{display:flex;flex-direction:column;align-items:center;gap:1.1rem;margin:0 0 1.5rem}
+.hero__logo{display:flex;flex-direction:column;align-items:center;gap:5px;margin:0 0 1.5rem}
 .hero__mark{display:block;width:min(210px,52vw);height:auto}
 .hero__mark .era-ld{width:100%;height:auto;aspect-ratio:1}
 .hero__tagline{font-family:var(--font-serif);font-size:clamp(1.15rem,2.4vw,1.5rem);color:var(--text);margin-bottom:1rem}
@@ -295,7 +300,8 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
   y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
 })(window, document, "clarity", "script", "y4p1zoary7");
 </script>
-<script src="js/loader.js?v=20261030k"></script>
+<script src="js/loader.js?v=20261031a"></script>
+<script src="js/sunshadow.js?v=20261031a"></script>
 </head>
 <body>
 
@@ -356,7 +362,7 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
     <h1 class="hero__logo reveal">
       <span class="sr-only">Eratosthenes: AI literature search and research-gap finder for scientists, ranking papers by meaning and mapping where a field is still open</span>
       <span class="hero__mark" id="heroMark" aria-hidden="true"></span>
-      <span class="wordmark" aria-hidden="true"><span class="era-a">Era</span>tosthenes</span>
+      <span class="wordmark" aria-hidden="true">Eratosthenes<span class="wm-dark">Eratosthenes</span></span>
     </h1>
 
     <p class="hero__tagline reveal">Finds the closest work to your idea,<br>and the gaps still open around it.</p>
