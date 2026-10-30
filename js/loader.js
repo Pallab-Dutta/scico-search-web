@@ -20,7 +20,7 @@
    further from the sun), reaching the night-side grey at the day/night line.
    With prefers-reduced-motion the orange stick stays put and gently pulses. */
 (function () {
-  const TEAL = "#0C5455", ORANGE = "#D77B4B";
+  let TEAL = "#0C5455", ORANGE = "#D77B4B", HUB = "#D77B4B";   // can be changed with configure()
   let RING = "#D1D1D1", NIGHT = "#6E7A82", SHADE = "#1E2A31";   // can be changed with configure()
   const CX = 306, CY = 396;          // hub
   const R_RING = 181.6;              // ring centre line (stroke 20)
@@ -195,7 +195,7 @@
         '<line x1="306" y1="396" x2="567.4" y2="396" stroke="' + TEAL + '" stroke-width="10" stroke-linecap="round"/>' +
         '<polygon fill="' + TEAL + '" points="561.6,415.9 596.2,396 561.6,376.1"/></g>' +
       '<g class="era-orange" transform="rotate(' + f(POSE - th) + ' 306 396)">' + arrow(ORANGE) + '</g>' +
-      '<circle cx="306" cy="396" r="43.7" fill="' + ORANGE + '"/>' +
+      '<circle cx="306" cy="396" r="43.7" fill="' + HUB + '"/>' +
       '</svg>';
   }
 
@@ -236,6 +236,9 @@
     if (o.ring) RING = o.ring;
     if (o.night) NIGHT = o.night;
     if (o.shade) SHADE = o.shade;
+    if (o.still_color) TEAL = o.still_color;
+    if (o.moving_color) ORANGE = o.moving_color;
+    if (o.hub) HUB = o.hub;
     DARK = hex(SHADE); LIGHT = hex(NIGHT);
     if ("still" in o) STILL = +o.still || 0;
     if ("angle" in o) fixedAngle = o.angle === null ? null : +o.angle;
