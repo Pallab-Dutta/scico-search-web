@@ -15,6 +15,9 @@
    Pass { fade: true } for the third version: ground shadows only, with each shadow's colour set by
    the sun's angle from overhead: darkest when the stick points at the sun, fading to the night-side
    grey as the stick turns perpendicular to the rays, just before it crosses into the night.
+   Pass { gradient: true } for the fourth version: the same law applied point by point along each
+   shadow, so a shadow is darkest at its stick and lightens towards its far end (which is always
+   further from the sun), reaching the night-side grey at the day/night line.
    With prefers-reduced-motion the orange stick stays put and gently pulses. */
 (function () {
   const TEAL = "#0C5455", ORANGE = "#D77B4B", RING = "#BDC6C9", NIGHT = "#A2ACB0";
@@ -56,6 +59,17 @@
   function shadeAt(th) {
     const k = Math.min(1, Math.abs(((th - SUN) % 360 + 540) % 360 - 180) / 90);
     return "rgb(" + DARK.map((v, i) => Math.round(v + (LIGHT[i] - v) * k)).join(",") + ")";
+  }
+  // Gradient that colours any point on the ring by its own sun angle (the law above). It runs along
+  // the sun direction from the sub-solar point (0 degrees) to the hub's level (90 degrees); stops
+  // every 10 degrees keep it true to the law, which is linear in angle, not in distance.
+  function lawGradient(id) {
+    const vx = Math.cos(rad(SUN)), vy = Math.sin(rad(SUN));
+    let stops = "";
+    for (let a = 0; a <= 90; a += 10)
+      stops += '<stop offset="' + (1 - Math.cos(rad(a))).toFixed(4) + '" stop-color="' + shadeAt(SUN + a) + '"/>';
+    return '<linearGradient id="' + id + '" gradientUnits="userSpaceOnUse" x1="' + f(CX + R_SURF * vx) + '" y1="' + f(CY - R_SURF * vy) +
+      '" x2="' + CX + '" y2="' + CY + '">' + stops + '</linearGradient>';
   }
   const shadowPath = th => { const s = shadow(th); return s ? arc(s[0], s[1]) : ""; };
   // The region a stick shades, outside the Earth: stick, the ray through its tip, and the ground.
@@ -135,7 +149,8 @@
   let n = 0;
   function svg(cls, opts) {
     start();
-    const th = angleAt(performance.now()), withArea = !!(opts && opts.area), fade = !!(opts && opts.fade), g = "era-fade-" + (++n);
+    const th = angleAt(performance.now()), withArea = !!(opts && opts.area), fade = !!(opts && opts.fade),
+      grad = !!(opts && opts.gradient), g = "era-fade-" + (++n), lg = "era-law-" + n;
     // Shade is darkest at the ground and fades with height, so long shadows dissolve before the edge.
     const shade = !withArea ? "" :
       '<defs><radialGradient id="' + g + '" gradientUnits="userSpaceOnUse" cx="306" cy="396" r="300">' +
@@ -150,9 +165,11 @@
       '<circle cx="306" cy="396" r="181.6" fill="#fff" stroke="' + RING + '" stroke-width="20"/>' +
       (withArea ? '<path d="' + nightDisc() + '" fill="' + SHADE + '" fill-opacity=".09"/>' : "") +
       '<path d="' + nightPath() + '" fill="none" stroke="' + NIGHT + '" stroke-width="20"/>' +
-      '<path class="era-sh" d="' + shadowPath(0) + '"' + (fade ? ' style="stroke:' + shadeAt(0) + '"' : "") + '/>' +
+      (grad ? '<defs>' + lawGradient(lg) + '</defs>' : "") +
+      '<path class="era-sh" d="' + shadowPath(0) + '"' + (fade ? ' style="stroke:' + shadeAt(0) + '"' : "") +
+        (grad ? ' style="stroke:url(#' + lg + ')"' : "") + '/>' +
       '<path class="era-sh era-sh-o' + (fade ? " era-fade" : "") + '" d="' + shadowPath(th) + '"' +
-        (fade ? ' style="stroke:' + shadeAt(th) + '"' : "") + '/>' +
+        (fade ? ' style="stroke:' + shadeAt(th) + '"' : "") + (grad ? ' style="stroke:url(#' + lg + ')"' : "") + '/>' +
       '<line x1="306" y1="396" x2="567.4" y2="396" stroke="' + TEAL + '" stroke-width="10" stroke-linecap="round"/>' +
       '<polygon fill="' + TEAL + '" points="561.6,415.9 596.2,396 561.6,376.1"/>' +
       '<g class="era-orange" transform="rotate(' + f(POSE - th) + ' 306 396)">' + arrow(ORANGE) + '</g>' +
