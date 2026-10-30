@@ -4,7 +4,7 @@
 
 SciCo-Search is a commercial AI research assistant for discovering scientific
 literature and the labs and principal investigators behind it.
-Live at https://search.scicoagent.com
+Live at https://eratost.scicoagent.com
 
 This repository hosts the public web client only. All rights are reserved: no
 license is granted to use, copy, modify, distribute, or create derivative works

@@ -1,6 +1,6 @@
 # Eratosthenes
 
-> Eratosthenes (also called SciCo-Search) is an AI research assistant for academic literature search. It turns a research topic into a set of optimized academic queries, reads and ranks the papers by how well they match your intent rather than by keyword overlap, maps the field into themed branches so under-explored research gaps stand out, and profiles the principal investigators and labs behind the work. It is built for PhD students, postdocs, and researchers scoping a literature review, entering a new field, or looking for labs to work with. Live at https://search.scicoagent.com.
+> Eratosthenes (also called SciCo-Search) is an AI research assistant for academic literature search. It turns a research topic into a set of optimized academic queries, reads and ranks the papers by how well they match your intent rather than by keyword overlap, maps the field into themed branches so under-explored research gaps stand out, and profiles the principal investigators and labs behind the work. It is built for PhD students, postdocs, and researchers scoping a literature review, entering a new field, or looking for labs to work with. Live at https://eratost.scicoagent.com.
 
 ## What Eratosthenes does
 
@@ -32,8 +32,8 @@ All plans include unlimited quick search and topic maps. Quotas reset monthly. P
 
 ## Key pages
 
-- [Home](https://search.scicoagent.com/): what Eratosthenes does and how a search works.
-- [Pricing](https://search.scicoagent.com/pricing.html): plans, monthly quotas, and prices.
+- [Home](https://eratost.scicoagent.com/): what Eratosthenes does and how a search works.
+- [Pricing](https://eratost.scicoagent.com/pricing.html): plans, monthly quotas, and prices.
 
 ## About
 
