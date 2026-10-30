@@ -137,7 +137,7 @@
 <script src="js/api.js?v=20260829m"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="js/logo.js?v=20260829m"></script>
-<script src="js/loader.js?v=20261030h"></script>
+<script src="js/loader.js?v=20261030i"></script>
 <script src="js/shell.js?v=20260829m"></script>
 <script>
   const $ = id => document.getElementById(id);
@@ -176,6 +176,7 @@
     const depth = $('deep').checked ? 'deep' : 'shallow';
     const creativity = (+entropy.value)/100;
     $('progress').style.display='block';
+    EratostLoader.score(null);   // spin until the first papers are scored
     $('eraLoader').innerHTML = EratostLoader.block('Searching the literature…', ERA_LD);
     $('livePapers').innerHTML=''; $('liveHead').textContent='Harvesting literature…';
     $('phaseT').textContent='Phase 1 · Harvesting best literature';
@@ -204,6 +205,8 @@
             $('pfill').style.width = pct+'%';
             $('liveHead').textContent = `Top matches so far — ${data.passed} passed the relevance cutoff`;
             $('livePapers').innerHTML = (data.top||[]).map(livePaperRow).join('');
+            // The orange arrow settles towards the teal one as better-scoring papers arrive.
+            (data.top||[]).forEach(p => EratostLoader.score(Number(p.ai_score)));
             if(IS_ADMIN) $('statRows').innerHTML = rows.map(r=>statRow(r)).join('') + statRow(`Reading & scoring — ${data.passed} passed`, true);
           } else if(type==='done'){ sessionId=data.session_id; $('pfill').style.width='100%'; $('liveHead').textContent='Finalizing your results…';
           } else if(type==='error'){ $('liveHead').textContent='Search failed: '+(data.message||'error'); if(IS_ADMIN) $('statRows').innerHTML += statRow('Search failed: '+(data.message||'error')); }

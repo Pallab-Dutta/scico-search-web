@@ -124,14 +124,47 @@
 
   // One clock for every loader on the page, so a status line that is redrawn on each progress
   // message keeps turning smoothly. Clockwise, slowing briefly at the logo pose (sun overhead).
-  let STILL = 0;           // teal (still) arrow angle; 0 points right, as in the logo
+  let STILL = 45;          // teal (still) arrow angle: pointing at the sun, so it casts no shadow
   let fixedAngle = null;   // set by configure({ angle }) to hold the orange arrow still
-  function angleAt(now) {
-    if (fixedAngle !== null) return fixedAngle;
+  function spinAt(now) {
     if (reduced()) return POSE;
     const x = (now % PERIOD) / PERIOD;
     const e = 0.75 * (0.5 - 0.5 * Math.cos(Math.PI * x)) + 0.25 * x;
     return POSE - 360 * e;
+  }
+
+  // Once papers arrive, the orange arrow stops spinning and settles at an angle set by the best
+  // score so far: 1 lines it up with the teal arrow, 0 puts it opposite (180 degrees clockwise).
+  // A better paper later makes it glide closer; weaker ones change nothing.
+  const SETTLE_MS = 700;   // time constant of the glide
+  let best = null, cur = POSE, last = 0, entering = false;
+  const wrap = d => ((d % 360) + 540) % 360 - 180;
+  const targetFor = r => STILL - (1 - r) * 180;
+  function angleAt(now) {
+    if (fixedAngle !== null) cur = fixedAngle;
+    else if (best === null) cur = spinAt(now);
+    else if (reduced()) cur = targetFor(best);
+    else {
+      const dt = Math.min(200, Math.max(0, now - last));
+      let diff = wrap(targetFor(best) - cur);
+      if (entering) {                   // first settle: keep turning clockwise, as it was spinning
+        if (diff > 0) diff -= 360;
+        if (diff > -1) entering = false;
+      }
+      cur += diff * (1 - Math.exp(-dt / SETTLE_MS));
+    }
+    last = now;
+    return cur;
+  }
+  // score(r): offer a paper's score (0..1); the arrow follows the best one seen.
+  // score(null): forget the scores and spin again (call it when a new search starts).
+  function score(r) {
+    if (r === null || r === undefined) { best = null; return; }
+    r = Math.max(0, Math.min(1, +r));
+    if (isNaN(r)) return;
+    if (best === null) { last = performance.now(); entering = true; }
+    if (best === null || r > best) best = r;
+    start();
   }
 
   let n = 0;
@@ -196,7 +229,8 @@
 
   // For tuning only: change the colours, turn the still teal arrow ({ still }), or hold the orange
   // arrow at an angle ({ angle }; null lets it turn). Angles are degrees anticlockwise from
-  // pointing right; the logo has teal at 0 and orange at 45, with the sun at 45. Loaders created
+  // pointing right; the logo has teal at 0 and orange at 45, with the sun at 45 (the loader keeps
+  // teal at 45, pointing at the sun). Loaders created
   // afterwards use the new colours.
   function configure(o) {
     if (o.ring) RING = o.ring;
@@ -211,6 +245,8 @@
   window.EratostLoader = {
     svg,
     configure,
+    score,
+    best: () => best,
     block: (label, opts) => '<div class="era-ld-block" role="status">' + svg("", opts) +
       (label ? '<div class="era-ld-label">' + esc(label) + '</div>' : "") + '</div>',
     inline: opts => '<span class="era-ld-inline">' + svg("", opts) + '</span>',
