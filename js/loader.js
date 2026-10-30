@@ -9,6 +9,9 @@
    EratostLoader.svg(cls)        -> the <svg> markup (animated by one shared clock)
    EratostLoader.block(label)    -> large centred loader with a caption (search page)
    EratostLoader.inline()        -> small loader that sits in a line of text
+   Pass { area: true } to any of them for the second version: the space each stick shades (between
+   the stick, the sunray grazing its tip and the ground) is drawn as a fading shadow, and the Earth's
+   night half is shaded, as in classic drawings of the experiment.
    With prefers-reduced-motion the orange stick stays put and gently pulses. */
 (function () {
   const TEAL = "#0C5455", ORANGE = "#D77B4B", RING = "#BDC6C9", NIGHT = "#A2ACB0";
@@ -45,6 +48,31 @@
     return "M" + f(x1) + " " + f(y1) + "A" + R_RING + " " + R_RING + " 0 0 " + (d < 0 ? 1 : 0) + " " + f(x2) + " " + f(y2);
   }
   const shadowPath = th => { const s = shadow(th); return s ? arc(s[0], s[1]) : ""; };
+  // The region a stick shades, outside the Earth: stick, the ray through its tip, and the ground.
+  // When that ray misses the Earth, the region runs off into space between it and the ray that
+  // grazes the Earth at the day/night line.
+  const surfTo = (a, b) => {           // arc along the surface from angle a to angle b
+    const d = ((b - a) % 360 + 540) % 360 - 180, [x, y] = pt(R_SURF, b);
+    return "A" + f(R_SURF) + " " + f(R_SURF) + " 0 0 " + (d < 0 ? 1 : 0) + " " + f(x) + " " + f(y);
+  };
+  function area(th) {
+    const s = shadow(th);
+    if (!s) return "";
+    const [px, py] = pt(R_SURF, th), [tx, ty] = pt(R_TIP, th), [ex, ey] = pt(R_SURF, s[1]);
+    let d = "M" + f(px) + " " + f(py) + "L" + f(tx) + " " + f(ty);
+    if (Math.abs(((s[1] - SUN) % 360 + 540) % 360 - 180) < 89.99) {
+      d += "L" + f(ex) + " " + f(ey);                                // the ray lands on the ground
+    } else {
+      const far = 520, dx = -far * Math.cos(rad(SUN)), dy = far * Math.sin(rad(SUN));
+      d += "L" + f(tx + dx) + " " + f(ty + dy) + "L" + f(ex + dx) + " " + f(ey + dy) + "L" + f(ex) + " " + f(ey);
+    }
+    return d + surfTo(s[1], th) + "Z";
+  }
+  const nightDisc = () => {
+    const [x1, y1] = pt(R_RING, SUN + 90), [x2, y2] = pt(R_RING, SUN + 270);
+    return "M" + f(x1) + " " + f(y1) + "A" + R_RING + " " + R_RING + " 0 0 0 " + f(x2) + " " + f(y2) + "Z";
+  };
+
   // Night half of the ring, as two quarter arcs (a single 180 degree arc is ambiguous in SVG).
   const nightPath = () => arc(SUN + 90, SUN + 180) + arc(SUN + 180, SUN + 270).replace("M", " M");
 
@@ -52,7 +80,7 @@
     const st = document.createElement("style");
     st.id = "eratost-loader-style";
     st.textContent =
-      ".era-ld{display:block;overflow:visible}" +
+      ".era-ld{display:block;overflow:hidden}" +
       ".era-ld .era-sh{fill:none;stroke:" + SHADE + ";stroke-width:20}" +
       "@keyframes era-pulse{0%,100%{opacity:1}50%{opacity:.45}}" +
       "@media (prefers-reduced-motion:reduce){.era-ld .era-orange{animation:era-pulse 1.8s ease-in-out infinite}}" +
@@ -94,12 +122,23 @@
     return POSE - 360 * e;
   }
 
-  function svg(cls) {
+  let n = 0;
+  function svg(cls, opts) {
     start();
-    const th = angleAt(performance.now());
+    const th = angleAt(performance.now()), withArea = !!(opts && opts.area), g = "era-fade-" + (++n);
+    // Shade is darkest at the ground and fades with height, so long shadows dissolve before the edge.
+    const shade = !withArea ? "" :
+      '<defs><radialGradient id="' + g + '" gradientUnits="userSpaceOnUse" cx="306" cy="396" r="300">' +
+        '<stop offset=".6" stop-color="' + SHADE + '" stop-opacity=".32"/>' +
+        '<stop offset=".8" stop-color="' + SHADE + '" stop-opacity=".16"/>' +
+        '<stop offset=".98" stop-color="' + SHADE + '" stop-opacity="0"/></radialGradient></defs>';
+    const areas = !withArea ? "" :
+      '<path d="' + area(0) + '" fill="url(#' + g + ')"/>' +
+      '<path class="era-ar-o" d="' + area(th) + '" fill="url(#' + g + ')"/>';
     return '<svg class="era-ld ' + (cls || "") + '" viewBox="6 96 600 600" role="img" aria-label="Loading">' +
-      rays() +
+      shade + rays() + areas +
       '<circle cx="306" cy="396" r="181.6" fill="#fff" stroke="' + RING + '" stroke-width="20"/>' +
+      (withArea ? '<path d="' + nightDisc() + '" fill="' + SHADE + '" fill-opacity=".09"/>' : "") +
       '<path d="' + nightPath() + '" fill="none" stroke="' + NIGHT + '" stroke-width="20"/>' +
       '<path class="era-sh" d="' + shadowPath(0) + '"/>' +
       '<path class="era-sh era-sh-o" d="' + shadowPath(th) + '"/>' +
@@ -119,10 +158,12 @@
     } else {
       idleSince = 0;
       const th = angleAt(now), tr = "rotate(" + f(POSE - th) + " 306 396)", d = shadowPath(th);
+      let ar = null;
       for (const el of live) {
-        const o = el.querySelector(".era-orange"), s = el.querySelector(".era-sh-o");
+        const o = el.querySelector(".era-orange"), s = el.querySelector(".era-sh-o"), a = el.querySelector(".era-ar-o");
         if (o) o.setAttribute("transform", tr);
         if (s) s.setAttribute("d", d);
+        if (a) a.setAttribute("d", ar || (ar = area(th)));
       }
     }
     requestAnimationFrame(frame);
@@ -138,8 +179,8 @@
 
   window.EratostLoader = {
     svg,
-    block: label => '<div class="era-ld-block" role="status">' + svg() +
+    block: (label, opts) => '<div class="era-ld-block" role="status">' + svg("", opts) +
       (label ? '<div class="era-ld-label">' + esc(label) + '</div>' : "") + '</div>',
-    inline: () => '<span class="era-ld-inline">' + svg() + '</span>',
+    inline: opts => '<span class="era-ld-inline">' + svg("", opts) + '</span>',
   };
 })();
