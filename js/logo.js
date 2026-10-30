@@ -1,5 +1,5 @@
 /* Renders the product wordmark "Eratosthenes" as on the homepage logo: Cutive Mono (Benjamin's
-   typeface), "Eratos" in the shadow colour and "thenes" in the Earth's day-side grey, as if the
+   typeface), "Eratost" in the shadow colour and "henes" in the Earth's day-side grey, as if the
    logo's shadow had fallen on the first half of the name. Any element with class "scico-logo" is
    filled in; its CSS font-size controls the size. One source of truth shared by the sidebar
    (shell.js) and the app pages, so the mark looks IDENTICAL everywhere regardless of each page's
@@ -31,7 +31,7 @@
     (document.head || document.documentElement).appendChild(st);
   }
 
-  const HTML = '<span class="era-a">Eratos</span><span class="era-b">thenes</span>';
+  const HTML = '<span class="era-a">Eratost</span><span class="era-b">henes</span>';
 
   function render(el) {
     if (el) el.innerHTML = HTML;
