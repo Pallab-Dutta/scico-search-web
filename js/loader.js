@@ -20,8 +20,8 @@
    further from the sun), reaching the night-side grey at the day/night line.
    With prefers-reduced-motion the orange stick stays put and gently pulses. */
 (function () {
-  const TEAL = "#0C5455", ORANGE = "#D77B4B", RING = "#BDC6C9", NIGHT = "#A2ACB0";
-  const SHADE = "#1E2A31", SUNRAY = "#E0A030";
+  const TEAL = "#0C5455", ORANGE = "#D77B4B", SUNRAY = "#E0A030";
+  let RING = "#BDC6C9", NIGHT = "#A2ACB0", SHADE = "#1E2A31";   // can be changed with configure()
   const CX = 306, CY = 396;          // hub
   const R_RING = 181.6;              // ring centre line (stroke 20)
   const R_SURF = R_RING + 10;        // outer surface, where the sticks stand
@@ -55,7 +55,7 @@
   }
   // Shadow colour for a stick at angle th: SHADE when it points at the sun, NIGHT at 90 degrees.
   const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
-  const DARK = hex(SHADE), LIGHT = hex(NIGHT);
+  let DARK = hex(SHADE), LIGHT = hex(NIGHT);
   function shadeAt(th) {
     const k = Math.min(1, Math.abs(((th - SUN) % 360 + 540) % 360 - 180) / 90);
     return "rgb(" + DARK.map((v, i) => Math.round(v + (LIGHT[i] - v) * k)).join(",") + ")";
@@ -139,7 +139,9 @@
 
   // One clock for every loader on the page, so a status line that is redrawn on each progress
   // message keeps turning smoothly. Clockwise, slowing briefly at the logo pose (sun overhead).
+  let fixedAngle = null;   // set by configure({ angle }) to hold the orange arrow still
   function angleAt(now) {
+    if (fixedAngle !== null) return fixedAngle;
     if (reduced()) return POSE;
     const x = (now % PERIOD) / PERIOD;
     const e = 0.75 * (0.5 - 0.5 * Math.cos(Math.PI * x)) + 0.25 * x;
@@ -205,8 +207,21 @@
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
 
+  // For tuning only: change the colours or hold the orange arrow at an angle (degrees, measured
+  // anticlockwise from the teal arrow; 45 is the logo pose, null lets it turn). Loaders created
+  // afterwards use the new colours.
+  function configure(o) {
+    if (o.ring) RING = o.ring;
+    if (o.night) NIGHT = o.night;
+    if (o.shade) SHADE = o.shade;
+    DARK = hex(SHADE); LIGHT = hex(NIGHT);
+    if ("angle" in o) fixedAngle = o.angle === null ? null : +o.angle;
+    start();
+  }
+
   window.EratostLoader = {
     svg,
+    configure,
     block: (label, opts) => '<div class="era-ld-block" role="status">' + svg("", opts) +
       (label ? '<div class="era-ld-label">' + esc(label) + '</div>' : "") + '</div>',
     inline: opts => '<span class="era-ld-inline">' + svg("", opts) + '</span>',

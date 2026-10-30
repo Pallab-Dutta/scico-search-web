@@ -137,12 +137,13 @@
 <script src="js/api.js?v=20260829m"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="js/logo.js?v=20260829m"></script>
-<script src="js/loader.js?v=20261030e"></script>
+<script src="js/loader.js?v=20261030f"></script>
 <script src="js/shell.js?v=20260829m"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
 
+  const ERA_LD = { gradient: true };   // loader style: shadow gradient by the sun-angle law
   Shell.init();   // sidebar + auth guard + session history
 
   // Query Entropy slider -> creativity (0..1)
@@ -157,7 +158,7 @@
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') paramsPop.classList.remove('open'); });
 
   function statRow(msg, running){
-    const icon = running ? EratostLoader.inline() : '<span class="mi ok">check</span>';
+    const icon = running ? EratostLoader.inline(ERA_LD) : '<span class="mi ok">check</span>';
     return `<div class="stat${running?' running':''}">${icon}<span class="qx">${esc(msg)}</span></div>`;
   }
   // Live paper row shown to EVERYONE as papers rank on the fly (no waiting).
@@ -175,7 +176,7 @@
     const depth = $('deep').checked ? 'deep' : 'shallow';
     const creativity = (+entropy.value)/100;
     $('progress').style.display='block';
-    $('eraLoader').innerHTML = EratostLoader.block('Searching the literature…');
+    $('eraLoader').innerHTML = EratostLoader.block('Searching the literature…', ERA_LD);
     $('livePapers').innerHTML=''; $('liveHead').textContent='Harvesting literature…';
     $('phaseT').textContent='Phase 1 · Harvesting best literature';
     $('phaseS').textContent='Original focus: '+q;
