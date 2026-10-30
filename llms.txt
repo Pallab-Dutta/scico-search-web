@@ -23,11 +23,12 @@ Keyword search engines return papers that share your words, and ranking them by 
 
 ## Pricing
 
-All plans include unlimited shallow search and report generation. Quotas reset monthly. Prices are in US dollars; see the pricing page for current amounts.
+All plans include unlimited quick search and topic maps. Quotas reset monthly. Prices are in US dollars; annual billing saves up to 40%.
 
-- Free: unlimited shallow search and reports, plus a small monthly allowance of deep searches and deep reports.
-- Individual: more deep searches and deep reports, PI profiling, research-gap identification, hypothesis refinement, and help writing an article's introduction.
-- Team: the Individual toolkit for every member of a lab or group, with per-seat billing at a lower price per seat.
+- Free ($0): unlimited quick search and topic maps, 3 deep searches and 3 Research-Gap Graphs a month, the author and PI finder, saved sessions and citation export.
+- Pro ($15 a month, or $9 a month billed yearly): 30 deep searches and 30 Research-Gap Graphs a month.
+- Max ($39 a month, or $24 a month billed yearly): unlimited deep searches and Research-Gap Graphs (fair use, up to 300 a month), and the research-plan generator when it launches.
+- Team ($24 per seat a month, or $15 per seat a month billed yearly, from 3 seats): Pro for every member, on one invoice.
 
 ## Key pages
 

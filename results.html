@@ -641,6 +641,7 @@
       data=await window.SciCoAPI.getSession(SID);
       renderDisc(data);
     }catch(err){
+      if(err.code===429||err.code===402){ $('discStatus').innerHTML='You have used this month\'s Research-Gap Graphs. <a href="pricing.html">See plans &amp; pricing</a> for more; graphs you already built stay available.'; return; }
       $('discStatus').textContent = err.code===401 ? 'Please sign in again.' : ('Could not build the graph ('+(err.message||'error')+').');
     }
   }
