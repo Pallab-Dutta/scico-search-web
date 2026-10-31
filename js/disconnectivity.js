@@ -101,7 +101,9 @@
   let MINB = 1;          // hide branches holding fewer papers than this (both styles); 1 = show all
   let GC_ALT = false;    // gap-closer scoring: false = route + time (default), true = original + time
   let ADMIN = false;     // admins/developers get every view and control; everyone else a fixed setup
-  let RES = 1;           // admin: density resolution (bandwidth multiplier); 1 = the standard landscape
+  let RES = 1;           // admin density: 1 / 0.75 / 0.5 = KDE bandwidth multiplier; "knn3" / "knn5" / "knn8" =
+                         // kNN field in the intrinsic dimension with k neighbours. 1 = the standard landscape.
+  let SIG = false;       // admin, kNN field: keep only barriers larger than 1.65x their combined error
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
                          // the bottom are not squashed under one tall barrier. Tick labels stay true.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
@@ -170,9 +172,20 @@
       // depth, junctions raised to the barrier that separates their basins. Present on free-energy
       // payloads; absent (undefined) on older ones, which then render the legacy leaves-at-0 way.
       const hydrate = node => node.leaf
-        ? { leaf: true, paper: papers[node.i], fe: node.fe }
+        ? { leaf: true, paper: papers[node.i], fe: node.fe, i: node.i }
         : { leaf: false, height: node.height, fe: node.fe, col: node.col, children: (node.children || []).map(hydrate) };
       const root = hydrate(d.tree);
+      // Significance (kNN field, admin toggle): a barrier smaller than 1.65x its combined error is not a
+      // barrier (Density Peak Advanced's test); post-order, so a merged junction sits at its higher child.
+      const sigOn = SIG && Array.isArray(d.sigma) && typeof d.chord_sigma === "number";
+      if (sigOn) (function prune(n) {
+        if (n.leaf) return d.sigma[n.i] || d.chord_sigma;
+        const sk = n.children.map(prune);
+        let top = 0;
+        n.children.forEach((c, q) => { if (c.fe > n.children[top].fe) top = q; });
+        if (n.fe - n.children[top].fe < 1.65 * Math.hypot(d.chord_sigma, sk[top])) n.fe = n.children[top].fe;
+        return d.chord_sigma;
+      })(root);
       const edges = (d.edges || []).map(e => ({ a: papers[e.a], b: papers[e.b], w: e.w }));
       let loo = null, reduce = null;
       if (Array.isArray(d.loo) && d.loo.length === papers.length) {
@@ -232,6 +245,8 @@
           if (qa && qb) at = { x: qa.x + (qb.x - qa.x) * t, y: qa.y + (qb.y - qa.y) * t };
         }
         const cp = g.close_pair && papers[g.close_pair[0]] && papers[g.close_pair[1]] ? { a: papers[g.close_pair[0]], b: papers[g.close_pair[1]] } : null;
+        // With the significance test on, gaps whose barrier is within the error are not shown.
+        if (sigOn && (+g.barrier || 0) < 1.65 * Math.SQRT2 * d.chord_sigma) return null;
         return { type: "rgap", id: "rg" + i, pair: { a: A, b: B }, close: cp, name: null, at, barrier: +g.barrier || 0,
                  closeMax: +g.close_max || 0, closeTotal: +g.close_total || 0, sizes: g.sizes || [0, 0] };
       }).filter(Boolean).sort((u, v) => v.closeTotal - u.closeTotal);
@@ -243,7 +258,8 @@
       cand.sort((u, v) => u[0] - v[0]).forEach(([dd, r, tg]) => {
         if (dd < 0.15 && !usedR.has(r) && !usedT.has(tg)) { r.name = tg.label; usedR.add(r); usedT.add(tg); }
       });
-      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid, hasAlt, rgaps };
+      const estInfo = d.estimator === "knn" ? { d: d.intrinsic_dim, k: d.knn_k, kstar: d.kstar_median, sigma: d.chord_sigma } : null;
+      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid, hasAlt, rgaps, estInfo };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -967,7 +983,7 @@
   // the metric 3D view, and no MST.
   function userSetup() {
     if (ADMIN) return;
-    GC_ALT = true; LEVELLED = true; METRIC = true; NLEV = 100; MINB = 1; LOGLV = true; RES = 1;
+    GC_ALT = true; LEVELLED = true; METRIC = true; NLEV = 100; MINB = 1; LOGLV = true; RES = 1; SIG = false;
     if (MODE === "mst") MODE = "dg";
   }
 
@@ -1028,15 +1044,18 @@
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">` +
       `<input type="checkbox" class="dg-overlay"${OVERLAY ? " checked" : ""}/> Highlight gap-closers</label>` +
       (ADMIN && model.hasFE && MODE !== "mst" ? styleControls() : "") +
-      (ADMIN && model.hasFE ? `<label title="Density resolution: the KDE bandwidth as a multiple of the standard one. Narrower resolves sub-groups inside clusters (more barriers); each setting is built once and cached." style="display:inline-flex;align-items:center;gap:5px">resolution` +
-        `<select class="dg-res" style="font:inherit">` + [[1, "1× (standard)"], [0.75, "0.75×"], [0.5, "0.5×"]].map(([v, t]) => `<option value="${v}"${v === RES ? " selected" : ""}>${t}</option>`).join("") + `</select></label>` : "") +
+      (ADMIN && model.hasFE ? `<label title="Density estimate behind the landscape. KDE: Gaussian kernels (bandwidth x 1, 0.75, 0.5). kNN field: k-nearest-neighbour density in the data's intrinsic dimension (TwoNN), with error bars. Each setting is built once per session and cached." style="display:inline-flex;align-items:center;gap:5px">density` +
+        `<select class="dg-res" style="font:inherit">` + [[1, "KDE 1× (standard)"], [0.75, "KDE 0.75×"], [0.5, "KDE 0.5×"], ["knn3", "kNN field, k = 3"], ["knn5", "kNN field, k = 5"], ["knn8", "kNN field, k = 8"]]
+          .map(([v, t]) => `<option value="${v}"${String(v) === String(RES) ? " selected" : ""}>${t}</option>`).join("") + `</select></label>` +
+        (model.estInfo ? `<span title="TwoNN intrinsic dimension; k used for the field; DADApy's adaptive k* (median, alpha 0.05) for reference; error of each ln density">intrinsic dim ${(+model.estInfo.d).toFixed(1)} · k ${model.estInfo.k} · ref k* ${model.estInfo.kstar} · σ ${(+model.estInfo.sigma).toFixed(2)}</span>` +
+          `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Keep only barriers larger than 1.65 times their combined error (Density Peak Advanced test); research gaps within the error are hidden."><input type="checkbox" class="dg-sig"${SIG ? " checked" : ""}/> significant barriers only</label>` : "") : "") +
       (ADMIN && model.hasAlt ? `<label title="Route + time: a paper only closes gaps whose route runs through it, between works published by its year. Original + time: the earlier scoring (its own tree) with the same time rule." style="display:inline-flex;align-items:center;gap:5px">gap-closers` +
         `<select class="dg-gcalt" style="font:inherit"><option value="0"${GC_ALT ? "" : " selected"}>route + time</option><option value="1"${GC_ALT ? " selected" : ""}>original + time</option></select></label>` : "") +
       `</div>`;
 
     // Admin resolution not built yet: build it (cached on the session), show the loader, then redraw.
     if (needRes) {
-      const wait = window.EratostLoader ? EratostLoader.block(`Building the landscape at ${RES}× resolution…`, { gradient: true }) : "Building…";
+      const wait = window.EratostLoader ? EratostLoader.block(String(RES).startsWith("knn") ? `Building the kNN density field (k = ${String(RES).slice(3)})…` : `Building the landscape at ${RES}× resolution…`, { gradient: true }) : "Building…";
       mountEl.innerHTML = tools + `<div class="dg-3d-wait">${wait}</div>`;
       wireToolbar(session, mountEl);
       if (typeof window.dgEnsureRes === "function" && !ENSURING) {
@@ -1119,7 +1138,8 @@
     hook("dg-minb", el => { MINB = +el.value; });
     hook("dg-axis", el => { LOGLV = el.value === "1"; });
     hook("dg-gcalt", el => { GC_ALT = el.value === "1"; });
-    hook("dg-res", el => { RES = +el.value; });
+    hook("dg-res", el => { RES = el.value.startsWith("knn") ? el.value : +el.value; });
+    hook("dg-sig", el => { SIG = el.checked; });
     mountEl.querySelectorAll(".dg-mode").forEach(r =>
       r.addEventListener("change", () => { if (r.checked) { MODE = r.value; draw(session, mountEl); } }));
     const chk = mountEl.querySelector(".dg-log");
