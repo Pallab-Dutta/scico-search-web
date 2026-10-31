@@ -264,7 +264,7 @@
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261031a"></script>
 <script src="js/shell.js?v=20261031b"></script>
-<script src="js/disconnectivity.js?v=20261102d"></script>
+<script src="js/disconnectivity.js?v=20261102e"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -663,9 +663,9 @@
     try{
       $('discStatus').innerHTML=loadHTML('Loading the Gap Graph…');
       let data=await window.SciCoAPI.getSession(SID);
-      // Cached on the session: show it. Graphs saved before the current version (7: research gaps with their
-      // targeting impact, log-space densities) are rebuilt once; rebuilding a saved graph is free.
-      if(data.disconnectivity && data.disconnectivity.tree && (data.disconnectivity.dg_version||1)>=7){ renderDisc(data); return; }
+      // Cached on the session: show it. Graphs saved before the current version (8: research gaps measured
+      // from each side's deepest well) are rebuilt once; rebuilding a saved graph is free.
+      if(data.disconnectivity && data.disconnectivity.tree && (data.disconnectivity.dg_version||1)>=8){ renderDisc(data); return; }
       $('discStatus').innerHTML=loadHTML('Building the research-gap landscape…');
       const { job_id }=await window.SciCoAPI.disconnectivity(SID);
       await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('discStatus').innerHTML=loadHTML(d.message); } });

@@ -128,6 +128,15 @@
   const kids = n => n.children || [];
   function leafNodes(n) { const out = []; (function g(m) { isLeaf(m) ? out.push(m) : kids(m).forEach(g); })(n); return out; }
   function leafPapers(n) { return leafNodes(n).map(m => m.paper || m); }
+  // Deepest well (lowest energy) under a node, by an energy accessor. A junction is a REAL barrier
+  // when it lies above the deepest well on EACH side (not merely above its children's merge levels:
+  // a paper sitting in a saddle region joins one side at the saddle level, which would hide the
+  // barrier). `insig` marks barriers the kNN significance test rejected.
+  function deepestWell(n, v) { return n.leaf || !n.children ? v(n) : Math.min(...n.children.map(c => deepestWell(c, v))); }
+  function isRealBarrier(n, v) {
+    if (n.insig || !n.children || n.children.length < 2) return false;
+    return v(n) > Math.max(...n.children.map(c => deepestWell(c, v))) + 1e-4;
+  }
 
   // The red gap-node that JOINS two papers = their lowest common ancestor (its height is their
   // cophenetic / minimax barrier). Post-order: the deepest internal node whose subtree first holds
@@ -180,13 +189,18 @@
       // Significance (kNN field, admin toggle): a barrier smaller than 1.65x its combined error is not a
       // barrier (Density Peak Advanced's test); post-order, so a merged junction sits at its higher child.
       const sigOn = SIG && Array.isArray(d.sigma) && typeof d.chord_sigma === "number";
+      // The barrier is measured from the deepest well on each side (as for real barriers); the error is
+      // that of the saddle combined with that of the shallower side's deepest well.
       if (sigOn) (function prune(n) {
-        if (n.leaf) return d.sigma[n.i] || d.chord_sigma;
-        const sk = n.children.map(prune);
+        if (n.leaf) return { w: n.fe, s: d.sigma[n.i] || d.chord_sigma };
+        const sub = n.children.map(prune);
         let top = 0;
-        n.children.forEach((c, q) => { if (c.fe > n.children[top].fe) top = q; });
-        if (n.fe - n.children[top].fe < 1.65 * Math.hypot(d.chord_sigma, sk[top])) n.fe = n.children[top].fe;
-        return d.chord_sigma;
+        sub.forEach((x, q) => { if (x.w > sub[top].w) top = q; });
+        if (n.fe - sub[top].w < 1.65 * Math.hypot(d.chord_sigma, sub[top].s)) {
+          n.insig = true;
+          n.fe = Math.max(...n.children.map(c => c.fe));      // drawn as a merge, not a barrier
+        }
+        return sub.reduce((a, b) => (b.w < a.w ? b : a));
       })(root);
       const edges = (d.edges || []).map(e => ({ a: papers[e.a], b: papers[e.b], w: e.w }));
       let loo = null, reduce = null;
@@ -475,7 +489,7 @@
       });
       // Red node only at a REAL transition state (strictly above both sub-basins); a zero-barrier merge
       // is just a corner within one basin, not a saddle, so it gets no dot.
-      if (val(n) > Math.max(...kids(n).map(c => val(c))) + 1e-4) {
+      if (isRealBarrier(n, val)) {
         dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>`;
         meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: val(n), papers: leafPapers(n) };
       }
@@ -797,7 +811,7 @@
         const a = P(c._w);
         lines.push({ d: (a.d + q.d) / 2, svg: `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${q.x.toFixed(1)}" y2="${q.y.toFixed(1)}" stroke="#1e2a31" stroke-width="1.4" stroke-linecap="round"/>` });
       });
-      if ((n.fe || 0) > Math.max(...kids(n).map(c => c.fe || 0)) + 1e-4) {
+      if (isRealBarrier(n, c => c.fe || 0)) {
         dots.push({ d: q.d, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>` });
         meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: n.fe || 0, papers: leafPapers(n) };
       }
