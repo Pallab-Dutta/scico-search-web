@@ -655,9 +655,9 @@
     try{
       $('discStatus').innerHTML=loadHTML('Loading the Gap Graph…');
       let data=await window.SciCoAPI.getSession(SID);
-      // Cached on the session: show it. Graphs saved before version 2 (similar papers side by side,
-      // gap-closers measured on the drawn surface) are rebuilt once; rebuilding a saved graph is free.
-      if(data.disconnectivity && data.disconnectivity.tree && (data.disconnectivity.dg_version||1)>=3){ renderDisc(data); return; }
+      // Cached on the session: show it. Graphs saved before the current version (4: adjacency-only
+      // transitions, on-the-path gap-closers) are rebuilt once; rebuilding a saved graph is free.
+      if(data.disconnectivity && data.disconnectivity.tree && (data.disconnectivity.dg_version||1)>=4){ renderDisc(data); return; }
       $('discStatus').innerHTML=loadHTML('Building the research-gap landscape…');
       const { job_id }=await window.SciCoAPI.disconnectivity(SID);
       await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('discStatus').innerHTML=loadHTML(d.message); } });
