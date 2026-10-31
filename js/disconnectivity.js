@@ -98,7 +98,9 @@
   let LEVELLED = false;  // flat view drawn disconnectionDPS-style: energy in steps, basins lumped per step
   let METRIC = false;    // 3D view drawn as a metric disconnectivity graph: vertical posts per basin
   let NLEV = 40;         // number of energy levels for both styles
-  let MINB = 2;          // hide branches holding fewer papers than this (both styles)
+  let MINB = 1;          // hide branches holding fewer papers than this (both styles); 1 = show all
+  let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
+                         // the bottom are not squashed under one tall barrier. Tick labels stay true.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
 
   // Smallest positive barrier in the current map — the reference for the positive log ("dex") scale.
@@ -474,16 +476,30 @@
     let emin = Infinity;
     L(model.root).forEach(l => { emin = Math.min(emin, fe(l)); });
     const emax = fe(model.root), span = (emax - emin) || 1;
-    const step = span * 1.0001 / Math.max(1, NLEV - 1);      // top level sits just above the root barrier
-    const E = k => emin + k * step;
+    // Axis transform: compressed = log(1 + (e - emin)/s), s = 1% of the range; linear otherwise. Levels are
+    // evenly spaced in the transformed axis; frac(e) is a height in [0, 1] on that axis.
+    const sc = Math.max(1e-4, 0.01 * span);
+    const T = e => LOGLV ? Math.log(1 + Math.max(0, e - emin) / sc) : Math.max(0, e - emin);
+    const Ti = t => LOGLV ? emin + sc * (Math.exp(t) - 1) : emin + t;
+    const tmax = T(emax) || 1, stepT = tmax * 1.0001 / Math.max(1, NLEV - 1);   // top level just above the root
+    const E = k => Ti(k * stepT);
+    const frac = e => T(e) / tmax, at = f => Ti(f * tmax);
     const cut = (n, e) => fe(n) < e ? [n] : isLeaf(n) ? [] : kids(n).flatMap(c => cut(c, e));
     const make = (b, k) => {
       const lv = L(b), low = lv.reduce((a, c) => fe(c) < fe(a) ? c : a);
       const nd = { b, k, e: E(k), size: lv.length, low, papers: lv.map(l => l.paper || l), kids: [] };
-      if (k > 0) nd.kids = cut(b, E(k - 1)).filter(c => L(c).length >= MINB).map(c => make(c, k - 1));
+      if (k > 0) {
+        const subs = cut(b, E(k - 1)), inSub = new Set();
+        subs.forEach(c => L(c).forEach(l => inSub.add(l)));
+        // A minimum lying between this level and the one below is its own branch, ending at its own
+        // energy (as disconnectionDPS draws it), not lumped into a basin.
+        const feet = MINB > 1 ? [] : lv.filter(l => !inSub.has(l)).map(l =>
+          ({ b: l, k: k - 1, e: fe(l), size: 1, low: l, papers: [l.paper || l], kids: [], foot: true }));
+        nd.kids = subs.filter(c => L(c).length >= MINB).map(c => make(c, k - 1)).concat(feet);
+      }
       return nd;
     };
-    return { top: make(model.root, NLEV - 1), E, emin, emax };
+    return { top: make(model.root, NLEV - 1), E, emin, emax, frac, at };
   }
   // Meta for a levelled node: a single paper reads like a paper; a lumped end reads as a basin.
   function levelMeta(model, nd) {
@@ -505,7 +521,7 @@
     const colW = Math.max(7, Math.min(64, (W - left - rightPad) / slots));
     const DW = Math.max(W, left + slots * colW + rightPad);
     const x00 = Math.max(0, (DW - left - rightPad - slots * colW) / 2);   // centre a narrow tree
-    const yAt = e => top + (1 - (e - lt.emin) / ((lt.emax - lt.emin) || 1)) * energyH;
+    const yAt = e => top + (1 - lt.frac(e)) * energyH;
     (function arrange(n, x0) {
       const ks = n.kids.slice().sort((a, b) => fe(a.low) - fe(b.low)), ord = [];
       ks.forEach((c, i) => (i === 0 || i % 2) ? ord.push(c) : ord.unshift(c));
@@ -536,11 +552,14 @@
     })(lt.top, yAt(lt.top.e));
     lines += `<line x1="${lt.top._x.toFixed(1)}" y1="${yAt(lt.top.e).toFixed(1)}" x2="${lt.top._x.toFixed(1)}" y2="${(yAt(lt.top.e) - 14).toFixed(1)}" stroke="#1e2a31" stroke-width="1.3"/>`;
     const ax = left - 16, bottomY = top + energyH;
-    const axis = `<line x1="${ax}" y1="${top}" x2="${ax}" y2="${bottomY}" stroke="#bbb"/>` +
-      `<text x="${ax - 6}" y="${bottomY + 3}" text-anchor="end" font-size="10" fill="#888">${lt.emin.toFixed(2)}</text>` +
-      `<text x="${ax - 6}" y="${top + 3}" text-anchor="end" font-size="10" fill="#888">${lt.emax.toFixed(2)}</text>` +
-      `<text transform="translate(14 ${(top + energyH / 2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="10" fill="#888">free energy −ln p ↑ (in ${NLEV} levels)</text>`;
-    const hint = `<text x="${left}" y="${H - 12}" font-size="10.5" fill="#999">Textbook style: energy in ${NLEV} steps, branches under ${MINB} papers hidden · grey ends = several papers lumped · exact view: untick “Levelled”</text>`;
+    const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => {
+      const y = top + (1 - f) * energyH;
+      return `<line x1="${ax - 4}" y1="${y.toFixed(1)}" x2="${ax}" y2="${y.toFixed(1)}" stroke="#bbb"/>` +
+        `<text x="${ax - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">${lt.at(f).toFixed(2)}</text>`;
+    }).join("");
+    const axis = `<line x1="${ax}" y1="${top}" x2="${ax}" y2="${bottomY}" stroke="#bbb"/>` + ticks +
+      `<text transform="translate(12 ${(top + energyH / 2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="10" fill="#888">free energy −ln p ↑ (${NLEV} levels${LOGLV ? ", compressed axis" : ""})</text>`;
+    const hint = `<text x="${left}" y="${H - 12}" font-size="10.5" fill="#999">Textbook style: energy in ${NLEV} steps${LOGLV ? " on a compressed axis" : ""}${MINB > 1 ? `, branches under ${MINB} papers hidden` : ""} · grey ends = papers with no barrier between them · exact view: untick “Levelled”</text>`;
     return { inner: `<g class="dg-base">` + axis + lines + dots + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W: DW };
   }
 
@@ -614,6 +633,7 @@
     const leaves = leafNodes(tree);
     leaves.forEach(l => {                                  // shadow on the map + a faint drop line up to the well
       const top = P(l._w), sh = P([l._w[0], l._w[1], 0]);
+      if (METRIC) { floor += `<circle cx="${sh.x.toFixed(1)}" cy="${sh.y.toFixed(1)}" r="2.2" fill="#8e989e"/>`; return; }
       floor += `<line x1="${sh.x.toFixed(1)}" y1="${sh.y.toFixed(1)}" x2="${top.x.toFixed(1)}" y2="${top.y.toFixed(1)}" stroke="#cdd3d7" stroke-width="1" stroke-dasharray="2 3"/>` +
                `<circle cx="${sh.x.toFixed(1)}" cy="${sh.y.toFixed(1)}" r="2.2" fill="#8e989e"/>`;
     });
@@ -622,7 +642,7 @@
     // paper's map position (Smeeton, Oakley & Wales' metric disconnectivity graph). Same barriers, drawn
     // in NLEV steps; the exact tree below stays the default.
     if (METRIC) {
-      const lt = levelTree(model), z = e => (e || 0) / fmax * ZH;
+      const lt = levelTree(model), z = e => lt.frac(e || 0) * ZH;
       const seg = (u, v, wdt) => lines.push({ d: (u.d + v.d) / 2, svg: `<line x1="${u.x.toFixed(1)}" y1="${u.y.toFixed(1)}" x2="${v.x.toFixed(1)}" y2="${v.y.toFixed(1)}" stroke="#1e2a31" stroke-width="${wdt}" stroke-linecap="round"/>` });
       const place3 = n => { const q0 = pos.get(n.low.paper || n.low) || { x: 0.5, y: 0.5 }; n._w3 = [q0.x - 0.5, 0.5 - q0.y, z(n.e)]; return P(n._w3); };
       (function walk(n, runTop) {                           // runTop: top of the current vertical post run
@@ -675,7 +695,7 @@
       `<text x="${(a0.x - 6).toFixed(1)}" y="${(a0.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">0</text>` +
       `<text x="${(a1.x - 6).toFixed(1)}" y="${(a1.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">${fmax.toFixed(2)}</text>` +
       `<text x="${(a1.x + 6).toFixed(1)}" y="${(a1.y - 6).toFixed(1)}" font-size="10" fill="#888">free energy −ln p ↑</text>`;
-    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = Topic Map density · ${METRIC ? `metric style: ${NLEV} energy steps, posts at each basin's deepest paper` : "heights exact; map distances between far regions are approximate"}</text>`;
+    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = Topic Map density · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : "heights exact; map distances between far regions are approximate"}</text>`;
 
     // Hover story for each gap-closer, as in the flat view: its bridged pair traced up to their junction.
     const leafOf = new Map();
@@ -945,7 +965,8 @@
     return (MODE === "3d"
         ? box("dg-metric", METRIC, "Metric posts", "Metric disconnectivity graph: energy in steps, each basin a vertical post at its deepest paper")
         : box("dg-levels", LEVELLED, "Levelled (textbook)", "disconnectionDPS style: energy in steps, basins lumped per step")) +
-      (on ? sel("dg-nlev", NLEV, [[20, "20"], [40, "40"], [60, "60"], [100, "100"]], "levels") +
+      (on ? sel("dg-axis", LOGLV ? 1 : 0, [[1, "compressed"], [0, "linear"]], "axis") +
+            sel("dg-nlev", NLEV, [[20, "20"], [40, "40"], [60, "60"], [100, "100"]], "levels") +
             sel("dg-minb", MINB, [[1, "all"], [2, "≥ 2"], [3, "≥ 3"], [5, "≥ 5"]], "branches with papers") : "");
   }
 
@@ -955,6 +976,7 @@
     hook("dg-metric", el => { METRIC = el.checked; });
     hook("dg-nlev", el => { NLEV = +el.value; });
     hook("dg-minb", el => { MINB = +el.value; });
+    hook("dg-axis", el => { LOGLV = el.value === "1"; });
     mountEl.querySelectorAll(".dg-mode").forEach(r =>
       r.addEventListener("change", () => { if (r.checked) { MODE = r.value; draw(session, mountEl); } }));
     const chk = mountEl.querySelector(".dg-log");
