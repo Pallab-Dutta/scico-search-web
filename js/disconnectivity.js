@@ -90,7 +90,8 @@
 
   let LOG = true;      // barrier axis / edge length scale: true = log(gap) (compact), false = linear.
   let MODE = "dg";     // "dg" = disconnectivity, "mst" = minimum spanning tree graph.
-  let FEV = false;     // free-energy DG view active: axis is already -ln p (energy), so never re-log it.
+  let FEV = false;      // free-energy DG view active: axis is already -ln p (energy), so never re-log it.
+  let REDUCE_FE = false; // gap-closer barriers measured on the free-energy surface (nats), not cosine.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
 
   // Smallest positive barrier in the current map — the reference for the positive log ("dex") scale.
@@ -184,7 +185,10 @@
         energy = new Map(); papers.forEach((p, i) => energy.set(p, d.energy[i]));
       }
       const hasFE = (typeof root.fe === "number") && energy != null;
-      return { root, edges, loo, reduce, reducePair, energy, hasFE };
+      // reduce_units "fe": the gap a paper closes is measured on the drawn free-energy surface (nats),
+      // the same units as the axis; older payloads measured it in cosine distance.
+      const reduceFE = d.reduce_units === "fe";
+      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -260,11 +264,12 @@
         // How much this paper REDUCES the barrier: the largest single gap it holds shut (removing it
         // reopens by this much), same units as a gap node; the total gap-closing is the full-set SUM
         // over pairs (a larger scale).
-        bridge = `gap-closer · holds a barrier of ${fmtBar(m.reduce)} shut (removing it reopens this gap)`
+        bridge = `gap-closer · holds a barrier of ${REDUCE_FE ? (+m.reduce).toFixed(2) + " (−ln p)" : fmtBar(m.reduce)} shut (removing it reopens this gap)`
                + (m.total > 0 ? ` · total gap-closing ${(+m.total).toFixed(2)}` : "");
         // Name the two works this paper bridges — the endpoints of the pass it holds shut = the gap
         // it closes BETWEEN. (Absent on legacy/held-only payloads.)
-        if (m.pair) gapPair = `closes the gap between “${esc(trunc(m.pair.a.title, 40))}” and “${esc(trunc(m.pair.b.title, 40))}”`;
+        if (m.pair) gapPair = `closes the gap between “${esc(trunc(m.pair.a.title, 40))}” and “${esc(trunc(m.pair.b.title, 40))}”` +
+          (m.hl ? " (highlighted)" : "");
       } else if (m.overlayKind === "betweenness" && m.overlay > 0) {
         bridge = `connector · routes ${m.overlay} paper-pairs`;
       } else if (m.total > 0) {
@@ -332,13 +337,14 @@
     // lines never cross); a junction is placed at the MEAN x of its children — centred above them — and
     // at its own free-energy height. This is the classical symmetric disconnectivity-graph layout.
     let li = 0;
-    (function lay(n) {
+    (function lay(n, parent) {
+      n._parent = parent || null;                          // for tracing a paper up to a junction on hover
       if (isLeaf(n)) { n._x = left + colW * (li++) + colW / 2; n._y = yAt(val(n)); return n._x; }
-      const xs = kids(n).map(lay);
+      const xs = kids(n).map(c => lay(c, n));
       n._x = xs.reduce((a, b) => a + b, 0) / xs.length;
       n._y = yAt(val(n));
       return n._x;
-    })(tree);
+    })(tree, null);
 
     // De-collision: on a chained (caterpillar) tree two spine junctions can land at nearly the same
     // point. Nudge overlapping dots apart HORIZONTALLY only (energy/y is exact and never moved), so the
@@ -371,7 +377,8 @@
       if (isLeaf(n)) {
         const p = n.paper || n, st = paperStyle(p, scores);
         dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${n._y.toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>`;
-        meta[id] = { type: "paper", paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0, fe: (FE && model.energy) ? model.energy.get(p) : null };
+        n._id = id;
+        meta[id] = { type: "paper", node: n, paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0, fe: (FE && model.energy) ? model.energy.get(p) : null };
         guides += `<line x1="${n._x.toFixed(1)}" y1="${(n._y + 6).toFixed(1)}" x2="${n._x.toFixed(1)}" y2="${bottomY.toFixed(1)}" stroke="#e8e8e8" stroke-width="1"/>`;
         labels += `<text transform="translate(${n._x.toFixed(1)} ${(bottomY + 8).toFixed(1)}) rotate(90)" font-size="10" fill="#555">${esc(trunc(p.title, 22))}</text>`;
         return { x: n._x, y: n._y };
@@ -394,6 +401,29 @@
     // Root stub above the top junction.
     branches += `<path d="M${tree._x.toFixed(1)} ${tree._y.toFixed(1)} V${(tree._y - 16).toFixed(1)}" stroke="#111" stroke-width="1.5" fill="none"/>`;
 
+    // HOVER STORY for each gap-closer: the two papers it bridges, traced up their branches to the
+    // junction where they meet (the barrier it holds shut). Drawn on hover by wireTooltip.
+    const leafOf = new Map();
+    leaves.forEach(l => leafOf.set(l.paper || l, l));
+    const climb = (leaf, stop) => {                        // same angled shape as the drawn branches
+      let d = "", c = leaf;
+      while (c && c !== stop && c._parent) {
+        const n = c._parent, dy = c._y - n._y, sy = n._y + (dy > 4 ? Math.min(STEM, dy * 0.6) : dy);
+        d += `M${c._x.toFixed(1)} ${c._y.toFixed(1)} L${c._x.toFixed(1)} ${sy.toFixed(1)} L${n._x.toFixed(1)} ${n._y.toFixed(1)} `;
+        c = n;
+      }
+      return d;
+    };
+    Object.values(meta).forEach(m => {
+      if (m.type !== "paper" || !m.pair) return;
+      const la = leafOf.get(m.pair.a), lb = leafOf.get(m.pair.b);
+      if (!la || !lb) return;
+      const j = lcaNode(tree, m.pair.a, m.pair.b);
+      if (!j) return;
+      const lab = l => ({ x: l._x, y: l._y, title: (l.paper || l).title });
+      m.hl = { path: climb(la, j) + climb(lb, j), a: lab(la), b: lab(lb), self: lab(m.node), j: { x: j._x, y: j._y }, bottomY };
+    });
+
     // Vertical energy axis (0 = deepest well at the bottom, root at the top).
     const ax = left - 16;
     const axis =
@@ -404,7 +434,7 @@
       `<text x="${ax - 6}" y="${top + 3}" text-anchor="end" font-size="10" fill="#888">${useLog && BMIN > 0 ? Math.log10(maxH / BMIN).toFixed(2) + " dex" : maxH.toFixed(2)}</text>` +
       `<text transform="translate(14 ${(top + energyH / 2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="10" fill="#888">${FE ? "free energy  −ln p  ↑ (less stable / higher barrier)" : "barrier ↑ (larger gap)"}</text>`;
 
-    return { inner: guides + branches + axis + dots + labels, H, meta, W: DW };
+    return { inner: `<g class="dg-base">` + guides + branches + axis + dots + labels + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W: DW };
   }
 
   /* ---- View B: minimum spanning tree graph (force-directed) ---- */
@@ -503,6 +533,23 @@
     return { inner: lines + gapdots + ndots + labels + hint, H, meta, W };
   }
 
+  /* ---- Gap-closer story on hover: dim the graph, trace the bridged pair up to their junction ---- */
+  function showGap(mountEl, m) {
+    const base = mountEl.querySelector(".dg-base"), layer = mountEl.querySelector(".dg-hl");
+    if (!base || !layer) return;
+    if (!m || !m.hl) { base.style.opacity = ""; layer.innerHTML = ""; return; }
+    const h = m.hl, RED = "#d64545", INK = "#1e2a31";
+    const ring = (q, col) => `<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="9" fill="none" stroke="${col}" stroke-width="2.5"/>` +
+      `<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="4.5" fill="${col}"/>`;
+    const title = (q, col) => `<text transform="translate(${q.x.toFixed(1)} ${(h.bottomY + 8).toFixed(1)}) rotate(90)" font-size="10.5" font-weight="700" fill="${col}">${esc(trunc(q.title, 22))}</text>`;
+    base.style.opacity = ".22";
+    layer.innerHTML =
+      `<path d="${h.path}" stroke="${RED}" stroke-width="3" fill="none" stroke-linejoin="round"/>` +
+      `<circle cx="${h.j.x.toFixed(1)}" cy="${h.j.y.toFixed(1)}" r="7" fill="${RED}" stroke="#fff" stroke-width="1.5"/>` +
+      ring(h.a, RED) + ring(h.b, RED) + ring(h.self, INK) +
+      title(h.a, RED) + title(h.b, RED) + title(h.self, INK);
+  }
+
   /* ---- Shared shell: toolbar, svg wrapper, tooltip ---- */
   function wireTooltip(mountEl, meta) {
     const tip = document.createElement("div");
@@ -518,8 +565,8 @@
     mountEl.querySelectorAll(".dg-node").forEach(el => {
       el.style.cursor = "pointer";
       const baseR = el.getAttribute("r");
-      el.addEventListener("mouseenter", () => { tipBody.innerHTML = tipHTML(meta[el.dataset.id]); tip.style.display = "block"; el.setAttribute("r", (+baseR + 2).toFixed(1)); });
-      el.addEventListener("mouseleave", () => { tip.style.display = "none"; el.setAttribute("r", baseR); });
+      el.addEventListener("mouseenter", () => { tipBody.innerHTML = tipHTML(meta[el.dataset.id]); tip.style.display = "block"; el.setAttribute("r", (+baseR + 2).toFixed(1)); showGap(mountEl, meta[el.dataset.id]); });
+      el.addEventListener("mouseleave", () => { tip.style.display = "none"; el.setAttribute("r", baseR); showGap(mountEl, null); });
       el.addEventListener("mousemove", e => {
         const r = mountEl.getBoundingClientRect();
         let x = e.clientX - r.left + 14, y = e.clientY - r.top + 14;
@@ -538,6 +585,7 @@
     // Free-energy DG view: the axis IS the energy (−ln p), so the Log toggle is inert here (re-logging
     // an energy axis collapses the barriers). It stays live for MST, whose axis is cosine distance.
     FEV = !!(model.hasFE && MODE === "dg");
+    REDUCE_FE = !!model.reduceFE;
 
     // Log ("dex") reference = the smallest positive barrier in the picture. Gap-closers now lift ONTO
     // real red junctions (LCA node heights ⊆ these edge weights), so the tree's own gaps are the whole
