@@ -92,6 +92,8 @@
   let MODE = "dg";     // "dg" = disconnectivity, "mst" = minimum spanning tree graph.
   let FEV = false;      // free-energy DG view active: axis is already -ln p (energy), so never re-log it.
   let REDUCE_FE = false; // gap-closer barriers measured on the free-energy surface (nats), not cosine.
+  let AZ = -35, EL = 28; // 3D view angles in degrees (turn about the vertical; tilt: 0 = side, 90 = top)
+  let ENSURING = false;  // 3D view is waiting for the page to build the Topic Map positions
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
 
   // Smallest positive barrier in the current map — the reference for the positive log ("dex") scale.
@@ -153,7 +155,7 @@
       // payloads; absent (undefined) on older ones, which then render the legacy leaves-at-0 way.
       const hydrate = node => node.leaf
         ? { leaf: true, paper: papers[node.i], fe: node.fe }
-        : { leaf: false, height: node.height, fe: node.fe, children: (node.children || []).map(hydrate) };
+        : { leaf: false, height: node.height, fe: node.fe, col: node.col, children: (node.children || []).map(hydrate) };
       const root = hydrate(d.tree);
       const edges = (d.edges || []).map(e => ({ a: papers[e.a], b: papers[e.b], w: e.w }));
       let loo = null, reduce = null;
@@ -188,7 +190,21 @@
       // reduce_units "fe": the gap a paper closes is measured on the drawn free-energy surface (nats),
       // the same units as the axis; older payloads measured it in cosine distance.
       const reduceFE = d.reduce_units === "fe";
-      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE };
+      // Knowledge-map positions for the 3D view: the Topic Map's 2D point for each paper. Both lists are
+      // the session's papers in the same order, so match by index and confirm by title (title lookup as
+      // a fallback). Null until the Topic Map exists.
+      const tm = session.topic_map, pts = tm && Array.isArray(tm.points) ? tm.points : null;
+      let pos = null;
+      if (pts && pts.length) {
+        pos = new Map();
+        const byTitle = new Map();
+        pts.forEach(q => { if (!byTitle.has(q.title)) byTitle.set(q.title, q); });
+        papers.forEach((p, i) => {
+          const q = (pts[i] && pts[i].title === p.title) ? pts[i] : byTitle.get(p.title);
+          if (q) pos.set(p, { x: +q.x, y: +q.y });
+        });
+      }
+      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -437,6 +453,132 @@
     return { inner: `<g class="dg-base">` + guides + branches + axis + dots + labels + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W: DW };
   }
 
+  /* ---- View C: the same tree in 3D, standing on the knowledge map ----
+     X, Y = each paper's position on the Topic Map; Z = free energy. Every connection and height is the
+     disconnectivity tree's own. A junction (transition state) stands where its col lies: on the map
+     line between the two papers whose chord carries it, the same fraction of the way along.
+     Side view (tilt 0) reads like the flat graph; top view (tilt 90) is the knowledge map. */
+  const R3 = Math.PI / 180;
+  function fieldColour(t) {                                // same cream -> slate -> red map as the Topic Map
+    t = Math.max(0, Math.min(1, t));
+    const A = [251, 250, 248], B = [132, 151, 176], C = [186, 87, 87];
+    const [a, b, f] = t < 0.5 ? [A, B, t / 0.5] : [B, C, (t - 0.5) / 0.5];
+    return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * f)).join(",") + ")";
+  }
+  function buildDG3(model, W, scores) {
+    const tree = model.root, papers = model.papers || [], pos = model.pos;
+    const H = 600, ZH = 0.8;
+    let fmax = 0;
+    (function m(n) { fmax = Math.max(fmax, n.fe || 0); kids(n).forEach(m); })(tree);
+    fmax = fmax || 1;
+    const P0 = i => (papers[i] && pos.get(papers[i])) || null;
+
+    // World coordinates: map x,y in [0,1] (y runs down the screen on the Topic Map) -> a centred floor;
+    // z = free energy scaled to ZH. Post-order, so a junction without a col can fall back on its children.
+    (function place(n, parent) {
+      n._parent = parent || null;
+      kids(n).forEach(c => place(c, n));
+      let x, y;
+      if (isLeaf(n)) {
+        const q = pos.get(n.paper || n);
+        x = q ? q.x : 0.5; y = q ? q.y : 0.5;
+      } else if (n.col && P0(n.col[0]) && P0(n.col[1])) {
+        const qa = P0(n.col[0]), qb = P0(n.col[1]), t = +n.col[2] || 0;
+        x = qa.x + (qb.x - qa.x) * t; y = qa.y + (qb.y - qa.y) * t;
+      } else {
+        const cs = kids(n);
+        x = cs.reduce((a, c) => a + c._mx, 0) / cs.length; y = cs.reduce((a, c) => a + c._my, 0) / cs.length;
+      }
+      n._mx = x; n._my = y;
+      n._w = [x - 0.5, 0.5 - y, (n.fe || 0) / fmax * ZH];
+    })(tree, null);
+
+    // Orthographic camera: turn by AZ about the vertical, then tilt by EL.
+    const ca = Math.cos(AZ * R3), sa = Math.sin(AZ * R3), ce = Math.cos(EL * R3), se = Math.sin(EL * R3);
+    const S = Math.min(W, H) * 0.6;
+    const rot = w => { const x1 = w[0] * ca - w[1] * sa, y1 = w[0] * sa + w[1] * ca; return [x1, w[2] * ce + y1 * se, y1 * ce - w[2] * se]; };
+    const c0 = rot([0, 0, ZH / 2]);
+    const P = w => { const r = rot(w); return { x: W / 2 + S * (r[0] - c0[0]), y: H / 2 - S * (r[1] - c0[1]), d: r[2] }; };
+    const xy = q => q.x.toFixed(1) + " " + q.y.toFixed(1);
+
+    // Floor: the Topic Map's density field, the map border, and each paper's shadow on it.
+    let floor = "";
+    const grid = model.grid;
+    if (grid && grid.length > 1) {
+      const G = grid.length, step = Math.max(1, Math.ceil(G / 28));
+      for (let r = 0; r < G - 1; r += step) for (let c = 0; c < G - 1; c += step) {
+        const r1 = Math.min(G - 1, r + step), c1 = Math.min(G - 1, c + step);
+        const v = (grid[r][c] + grid[r][c1] + grid[r1][c] + grid[r1][c1]) / 4;
+        if (v < 0.03) continue;
+        const pts = [[c, r], [c1, r], [c1, r1], [c, r1]].map(([cc, rr]) => P([cc / (G - 1) - 0.5, 0.5 - rr / (G - 1), 0]));
+        const col = fieldColour(v);
+        floor += `<polygon points="${pts.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ")}" fill="${col}" stroke="${col}" stroke-width=".6" fill-opacity=".7" stroke-opacity=".7"/>`;
+      }
+    }
+    const corners = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]].map(([a, b]) => P([a, b, 0]));
+    floor += `<polygon points="${corners.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ")}" fill="none" stroke="#c9cfd3" stroke-width="1"/>`;
+
+    const lines = [], dots = [], meta = {};
+    let uid = 0;
+    const leaves = leafNodes(tree);
+    leaves.forEach(l => {                                  // shadow on the map + a faint drop line up to the well
+      const top = P(l._w), sh = P([l._w[0], l._w[1], 0]);
+      floor += `<line x1="${sh.x.toFixed(1)}" y1="${sh.y.toFixed(1)}" x2="${top.x.toFixed(1)}" y2="${top.y.toFixed(1)}" stroke="#cdd3d7" stroke-width="1" stroke-dasharray="2 3"/>` +
+               `<circle cx="${sh.x.toFixed(1)}" cy="${sh.y.toFixed(1)}" r="2.2" fill="#8e989e"/>`;
+    });
+
+    // Branches (each child to its junction) and nodes, painted far to near.
+    (function walk(n) {
+      const id = "t" + (uid++), q = P(n._w);
+      if (isLeaf(n)) {
+        const p = n.paper || n, st = paperStyle(p, scores);
+        n._id = id;
+        dots.push({ d: q.d, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>` });
+        meta[id] = { type: "paper", node: n, paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0, fe: model.energy ? model.energy.get(p) : null };
+        return;
+      }
+      kids(n).forEach(c => {
+        walk(c);
+        const a = P(c._w);
+        lines.push({ d: (a.d + q.d) / 2, svg: `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${q.x.toFixed(1)}" y2="${q.y.toFixed(1)}" stroke="#1e2a31" stroke-width="1.4" stroke-linecap="round"/>` });
+      });
+      if ((n.fe || 0) > Math.max(...kids(n).map(c => c.fe || 0)) + 1e-4) {
+        dots.push({ d: q.d, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>` });
+        meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: n.fe || 0, papers: leafPapers(n) };
+      }
+    })(tree);
+    const rootTop = P([tree._w[0], tree._w[1], tree._w[2] + 0.05]), rootQ = P(tree._w);
+    lines.push({ d: rootQ.d, svg: `<line x1="${rootQ.x.toFixed(1)}" y1="${rootQ.y.toFixed(1)}" x2="${rootTop.x.toFixed(1)}" y2="${rootTop.y.toFixed(1)}" stroke="#1e2a31" stroke-width="1.4"/>` });
+    const paint = arr => arr.sort((u, v) => v.d - u.d).map(o => o.svg).join("");
+
+    // Energy axis on one corner of the floor (hidden from straight above, where it collapses to a point).
+    const a0 = P([-0.5, 0.5, 0]), a1 = P([-0.5, 0.5, ZH]);
+    const axis = EL > 80 ? "" : `<line x1="${a0.x.toFixed(1)}" y1="${a0.y.toFixed(1)}" x2="${a1.x.toFixed(1)}" y2="${a1.y.toFixed(1)}" stroke="#9aa3a8" stroke-width="1"/>` +
+      `<text x="${(a0.x - 6).toFixed(1)}" y="${(a0.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">0</text>` +
+      `<text x="${(a1.x - 6).toFixed(1)}" y="${(a1.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">${fmax.toFixed(2)}</text>` +
+      `<text x="${(a1.x + 6).toFixed(1)}" y="${(a1.y - 6).toFixed(1)}" font-size="10" fill="#888">free energy −ln p ↑</text>`;
+    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = Topic Map density · heights exact; map distances between far regions are approximate</text>`;
+
+    // Hover story for each gap-closer, as in the flat view: its bridged pair traced up to their junction.
+    const leafOf = new Map();
+    leaves.forEach(l => leafOf.set(l.paper || l, l));
+    const climb = (leaf, stop) => {
+      let d = "", c = leaf;
+      while (c && c !== stop && c._parent) { d += `M${xy(P(c._w))} L${xy(P(c._parent._w))} `; c = c._parent; }
+      return d;
+    };
+    Object.values(meta).forEach(m => {
+      if (m.type !== "paper" || !m.pair) return;
+      const la = leafOf.get(m.pair.a), lb = leafOf.get(m.pair.b), j = la && lb && lcaNode(tree, m.pair.a, m.pair.b);
+      if (!j) return;
+      const lab = l => { const q = P(l._w); return { x: q.x, y: q.y, title: (l.paper || l).title }; };
+      const jq = P(j._w);
+      m.hl = { path: climb(la, j) + climb(lb, j), a: lab(la), b: lab(lb), self: lab(m.node), j: { x: jq.x, y: jq.y }, near: true };
+    });
+
+    return { inner: `<g class="dg-base">` + floor + axis + paint(lines) + paint(dots) + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W, is3d: true };
+  }
+
   /* ---- View B: minimum spanning tree graph (force-directed) ---- */
   // Deterministic spring layout in unit space (seeded on a circle -> reproducible, no jitter on
   // redraw). Rest length per edge ∝ gap magnitude, so bigger gaps push their papers further apart.
@@ -541,7 +683,9 @@
     const h = m.hl, RED = "#d64545", INK = "#1e2a31";
     const ring = (q, col) => `<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="9" fill="none" stroke="${col}" stroke-width="2.5"/>` +
       `<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="4.5" fill="${col}"/>`;
-    const title = (q, col) => `<text transform="translate(${q.x.toFixed(1)} ${(h.bottomY + 8).toFixed(1)}) rotate(90)" font-size="10.5" font-weight="700" fill="${col}">${esc(trunc(q.title, 22))}</text>`;
+    const title = (q, col) => h.near
+      ? `<text x="${(q.x + 11).toFixed(1)}" y="${(q.y - 9).toFixed(1)}" font-size="11" font-weight="700" fill="${col}" stroke="#fff" stroke-width="3" paint-order="stroke">${esc(trunc(q.title, 40))}</text>`
+      : `<text transform="translate(${q.x.toFixed(1)} ${(h.bottomY + 8).toFixed(1)}) rotate(90)" font-size="10.5" font-weight="700" fill="${col}">${esc(trunc(q.title, 22))}</text>`;
     base.style.opacity = ".22";
     layer.innerHTML =
       `<path d="${h.path}" stroke="${RED}" stroke-width="3" fill="none" stroke-linejoin="round"/>` +
@@ -552,7 +696,9 @@
 
   /* ---- Shared shell: toolbar, svg wrapper, tooltip ---- */
   function wireTooltip(mountEl, meta) {
+    mountEl.querySelectorAll(".dg-tip").forEach(t => t.remove());
     const tip = document.createElement("div");
+    tip.className = "dg-tip";
     tip.style.cssText = "position:absolute;display:none;max-width:260px;background:#151515;color:#fff;" +
       "padding:8px 10px;border-radius:7px;font:12px/1.4 system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.28);" +
       "pointer-events:none;z-index:20";
@@ -584,7 +730,8 @@
 
     // Free-energy DG view: the axis IS the energy (−ln p), so the Log toggle is inert here (re-logging
     // an energy axis collapses the barriers). It stays live for MST, whose axis is cosine distance.
-    FEV = !!(model.hasFE && MODE === "dg");
+    if (MODE === "3d" && !model.hasFE) MODE = "dg";        // 3D needs the free-energy payload
+    FEV = !!(model.hasFE && (MODE === "dg" || MODE === "3d"));
     REDUCE_FE = !!model.reduceFE;
 
     // Log ("dex") reference = the smallest positive barrier in the picture. Gap-closers now lift ONTO
@@ -611,7 +758,8 @@
     const scores = hasReduce ? looScores(model.reduce)
                  : (model.loo && model.loo.size) ? looScores(model.loo)
                  : bridgeScore(model);
-    const built = MODE === "mst" ? buildMST(model, W, scores) : buildDG(model, W, scores);
+    const need3dMap = MODE === "3d" && !(model.pos && model.pos.size);
+    const built = need3dMap ? null : MODE === "mst" ? buildMST(model, W, scores) : MODE === "3d" ? buildDG3(model, W, scores) : buildDG(model, W, scores);
 
     const radio = (v, lbl) =>
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">` +
@@ -619,29 +767,98 @@
     const tools =
       `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:8px;` +
       `font:12px system-ui,sans-serif;color:#555">` +
-      `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")} ${radio("mst", "MST")}</span>` +
+      `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")} ${radio("mst", "MST")}${model.hasFE ? " " + radio("3d", "3D on the map") : ""}</span>` +
+      (MODE === "3d" ? `<span style="display:inline-flex;gap:6px">` +
+        [["side", "Side"], ["top", "Top"], ["reset", "Reset"]].map(([k, l]) =>
+          `<button type="button" class="dg-cam" data-cam="${k}" style="font:inherit;border:1px solid #ddd;background:#fff;border-radius:6px;padding:2px 9px;cursor:pointer">${l}</button>`).join("") +
+        `</span>` : "") +
       `<label style="cursor:${FEV ? "default" : "pointer"};display:inline-flex;align-items:center;gap:6px;user-select:none${FEV ? ";opacity:.45" : ""}" title="${FEV ? "The free-energy axis is already −ln p; log scaling applies to the MST view." : ""}">` +
       `<input type="checkbox" class="dg-log"${LOG ? " checked" : ""}${FEV ? " disabled" : ""}/> ${FEV ? "Log scale (n/a — energy axis)" : "Log scale (compress large gaps)"}</label>` +
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">` +
       `<input type="checkbox" class="dg-overlay"${OVERLAY ? " checked" : ""}/> Highlight gap-closers</label>` +
       `</div>`;
 
+    // 3D needs each paper's knowledge-map position. Without a Topic Map yet, ask the page to build it
+    // (free), show the loader meanwhile, and redraw when it arrives.
+    if (need3dMap) {
+      const wait = window.EratostLoader ? EratostLoader.block("Placing the papers on the knowledge map…", { gradient: true }) : "Placing the papers on the knowledge map…";
+      mountEl.innerHTML = tools + `<div class="dg-3d-wait">${wait}</div>`;
+      wireToolbar(session, mountEl);
+      if (typeof window.dgEnsureMap !== "function") {
+        mountEl.querySelector(".dg-3d-wait").textContent = "Open the Topic Map tab once, then come back to see the 3D view.";
+      } else if (!ENSURING) {
+        ENSURING = true;
+        window.dgEnsureMap().then(s2 => {
+          ENSURING = false;
+          if (s2 && _last && _last.mountEl === mountEl) { _last.session = s2; draw(s2, mountEl); }
+        }).catch(() => {
+          ENSURING = false;
+          const w = mountEl.querySelector(".dg-3d-wait");
+          if (w) w.textContent = "Could not place the papers on the map. Open the Topic Map tab, then try again.";
+        });
+      }
+      return;
+    }
+
     // Draw at the layout's natural width (which may exceed the viewport) and let the shell scroll
     // horizontally, so a wide energy axis never has to squeeze nodes on top of each other.
     const DW = built.W || W;
     mountEl.innerHTML = tools +
       `<div style="overflow-x:auto;overflow-y:hidden;max-width:100%">` +
-      `<svg viewBox="0 0 ${DW} ${built.H}" width="${DW}" height="${built.H}" preserveAspectRatio="xMinYMin meet" ` +
-      `style="font-family:system-ui,sans-serif;display:block">` + built.inner + `</svg></div>`;
+      `<svg class="dg-svg" viewBox="0 0 ${DW} ${built.H}" width="${DW}" height="${built.H}" preserveAspectRatio="xMinYMin meet" ` +
+      `style="font-family:system-ui,sans-serif;display:block${built.is3d ? ";cursor:grab;touch-action:none;user-select:none" : ""}">` + built.inner + `</svg></div>`;
 
+    wireToolbar(session, mountEl);
+    wireTooltip(mountEl, built.meta);
+    if (built.is3d) wire3D(mountEl, model, scores, W);
+  }
+
+  function wireToolbar(session, mountEl) {
     mountEl.querySelectorAll(".dg-mode").forEach(r =>
       r.addEventListener("change", () => { if (r.checked) { MODE = r.value; draw(session, mountEl); } }));
     const chk = mountEl.querySelector(".dg-log");
     if (chk) chk.addEventListener("change", () => { LOG = chk.checked; draw(session, mountEl); });
     const ovr = mountEl.querySelector(".dg-overlay");
     if (ovr) ovr.addEventListener("change", () => { OVERLAY = ovr.checked; draw(session, mountEl); });
+  }
 
-    wireTooltip(mountEl, built.meta);
+  // 3D: drag to turn (left/right) and tilt (up/down); Side, Top and Reset set the camera. Only the
+  // picture is redrawn while dragging, so the drag keeps its grip.
+  function wire3D(mountEl, model, scores, W) {
+    const svg = mountEl.querySelector("svg.dg-svg");
+    if (!svg) return;
+    let queued = false;
+    const redraw = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        const b = buildDG3(model, W, scores);
+        svg.innerHTML = b.inner;
+        wireTooltip(mountEl, b.meta);
+      });
+    };
+    let drag = null;
+    svg.addEventListener("pointerdown", e => {
+      drag = { x: e.clientX, y: e.clientY };
+      svg.setPointerCapture(e.pointerId);
+      svg.style.cursor = "grabbing";
+    });
+    svg.addEventListener("pointermove", e => {
+      if (!drag) return;
+      AZ += (e.clientX - drag.x) * 0.45;
+      EL = Math.max(0, Math.min(90, EL + (e.clientY - drag.y) * 0.35));
+      drag = { x: e.clientX, y: e.clientY };
+      redraw();
+    });
+    const end = () => { drag = null; svg.style.cursor = "grab"; };
+    svg.addEventListener("pointerup", end);
+    svg.addEventListener("pointercancel", end);
+    mountEl.querySelectorAll(".dg-cam").forEach(btn => btn.addEventListener("click", () => {
+      const k = btn.dataset.cam;
+      if (k === "side") EL = 0; else if (k === "top") { EL = 90; AZ = 0; } else { AZ = -35; EL = 28; }
+      redraw();
+    }));
   }
 
   let _last = null;

@@ -264,7 +264,7 @@
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261031a"></script>
 <script src="js/shell.js?v=20261031b"></script>
-<script src="js/disconnectivity.js?v=20261031a"></script>
+<script src="js/disconnectivity.js?v=20261101a"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -639,6 +639,17 @@
     $('discStatus').textContent='';
     window.renderDisconnectivity(data, $('discHost'));  // reads data.disconnectivity (server tree + LOO)
   }
+  // The Gap Graph's 3D view stands the tree on the Topic Map. If the map hasn't been built yet, build it
+  // (free) and hand back the refreshed session; the Topic Map tab then reuses it.
+  window.dgEnsureMap = async function(){
+    if(!TOPIC){
+      const { job_id }=await window.SciCoAPI.topicMap(SID);
+      await window.SciCoAPI.streamJob(job_id,{});
+    }
+    const data=await window.SciCoAPI.getSession(SID);
+    TOPIC=data.topic_map||TOPIC;
+    return data;
+  };
   async function startDisc(){
     if(!SID){ $('discStatus').textContent='No session specified.'; return; }
     try{
@@ -646,7 +657,7 @@
       let data=await window.SciCoAPI.getSession(SID);
       // Cached on the session: show it. Graphs saved before version 2 (similar papers side by side,
       // gap-closers measured on the drawn surface) are rebuilt once; rebuilding a saved graph is free.
-      if(data.disconnectivity && data.disconnectivity.tree && (data.disconnectivity.dg_version||1)>=2){ renderDisc(data); return; }
+      if(data.disconnectivity && data.disconnectivity.tree && (data.disconnectivity.dg_version||1)>=3){ renderDisc(data); return; }
       $('discStatus').innerHTML=loadHTML('Building the research-gap landscape…');
       const { job_id }=await window.SciCoAPI.disconnectivity(SID);
       await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('discStatus').innerHTML=loadHTML(d.message); } });
