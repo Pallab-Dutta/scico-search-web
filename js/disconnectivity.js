@@ -249,7 +249,7 @@
         const cp = g.close_pair && papers[g.close_pair[0]] && papers[g.close_pair[1]] ? { a: papers[g.close_pair[0]], b: papers[g.close_pair[1]] } : null;
         // With the significance test on, gaps whose barrier is within the error are not shown.
         if (sigOn && (+g.barrier || 0) < 1.65 * Math.SQRT2 * d.chord_sigma) return null;
-        return { type: "rgap", id: "rg" + i, pair: { a: A, b: B }, close: cp, name: null, at, barrier: +g.barrier || 0,
+        return { type: "rgap", id: "rg" + i, pair: { a: A, b: B }, close: cp, name: null, at, level: +g.level || 1, barrier: +g.barrier || 0,
                  closeMax: +g.close_max || 0, closeTotal: +g.close_total || 0, sizes: g.sizes || [0, 0] };
       }).filter(Boolean).sort((u, v) => v.closeTotal - u.closeTotal);
       rgaps.forEach((r, i) => { r.num = i + 1; });
@@ -261,7 +261,8 @@
         if (dd < 0.15 && !usedR.has(r) && !usedT.has(tg)) { r.name = tg.label; usedR.add(r); usedT.add(tg); }
       });
       const estInfo = d.estimator === "knn" ? { d: d.intrinsic_dim, k: d.knn_k, kstar: d.kstar_median, sigma: d.chord_sigma } : null;
-      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid, hasAlt, rgaps, estInfo };
+      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid, hasAlt, rgaps, estInfo,
+               estKind: d.estimator || "kde" };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -811,7 +812,7 @@
       `<text x="${(a0.x - 6).toFixed(1)}" y="${(a0.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">0</text>` +
       `<text x="${(a1.x - 6).toFixed(1)}" y="${(a1.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">${fmax.toFixed(2)}</text>` +
       `<text x="${(a1.x + 6).toFixed(1)}" y="${(a1.y - 6).toFixed(1)}" font-size="10" fill="#888">free energy −ln p ↑</text>`;
-    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = ${FLOOR_HD ? "free energy of the heights, interpolated between papers" : "Topic Map density"} · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : "heights exact; map distances between far regions are approximate"}</text>`;
+    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = ${FLOOR_HD ? "free energy of the heights, interpolated between papers" : "Topic Map density"} · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : model.estKind === "map2d" ? "landscape of the 2D map itself: heights and floor are one surface" : "heights exact; map distances between far regions are approximate"}</text>`;
 
     // Hover story for each gap-closer, as in the flat view: its bridged pair traced up to their junction.
     const leafOf = new Map();
@@ -956,10 +957,18 @@
       `<span style="display:block;color:#666;margin-top:2px">barrier ${r.barrier.toFixed(2)} · basins of ${r.sizes[0]} and ${r.sizes[1]} papers` +
       (r.close ? ` · if targeted, closes “${esc(trunc(r.close.a.title, 30))}” ↔ “${esc(trunc(r.close.b.title, 30))}” by ${r.closeMax.toFixed(2)}` : "") +
       ` · total ${r.closeTotal.toFixed(1)}</span></span></div>`;
-    return `<div class="dg-gaps" style="margin-top:12px;font:12px/1.45 system-ui,sans-serif;color:#333">` +
-      `<div style="font-weight:700;margin-bottom:2px">Research gaps <span style="font-weight:400;color:#888">· ranked by impact if targeted · hover to highlight</span></div>` +
-      `<div style="color:#888;margin-bottom:4px">Targeting a gap = a new paper at its location. Impact = how much it would lower the barriers between existing papers (same energy units as the graph).</div>` +
-      rg.map(row).join("") + `</div>`;
+    const head = (sub, note) => `<div class="dg-gaps" style="margin-top:12px;font:12px/1.45 system-ui,sans-serif;color:#333">` +
+      `<div style="font-weight:700;margin-bottom:2px">Research gaps <span style="font-weight:400;color:#888">· ${sub} · hover to highlight</span></div>` +
+      `<div style="color:#888;margin-bottom:4px">${note}Targeting a gap = a new paper at its location. Impact = how much it would lower the barriers between existing papers (same energy units as the graph).</div>`;
+    if (model.estKind === "map2d") {
+      // 2D-map landscape: EVERY saddle is a gap, listed by its level in the tree (1 = top split).
+      const levels = [...new Set(rg.map(r => r.level))].sort((a, b) => a - b);
+      return head("every saddle, by level in the tree",
+          "Landscape of the 2D Topic Map (a projection, same density as the map): it describes the map, not the full embedding space. ") +
+        levels.map(l => `<div style="font-weight:700;color:#555;margin:8px 0 2px">Level ${l}${l === 1 ? " · top split" : ""}</div>` +
+          rg.filter(r => r.level === l).sort((u, v) => v.barrier - u.barrier).map(row).join("")).join("") + `</div>`;
+    }
+    return head("ranked by impact if targeted", "") + rg.map(row).join("") + `</div>`;
   }
 
   /* ---- Gap-closer story on hover: dim the graph, trace the bridged pair up to their junction ---- */
@@ -1077,7 +1086,7 @@
       `<input type="checkbox" class="dg-overlay"${OVERLAY ? " checked" : ""}/> Highlight gap-closers</label>` +
       (ADMIN && model.hasFE && MODE !== "mst" ? styleControls() : "") +
       (ADMIN && model.hasFE ? `<label title="Density estimate behind the landscape. KDE: Gaussian kernels (bandwidth x 1, 0.75, 0.5). kNN field: k-nearest-neighbour density in the data's intrinsic dimension (TwoNN), with error bars. Each setting is built once per session and cached." style="display:inline-flex;align-items:center;gap:5px">density` +
-        `<select class="dg-res" style="font:inherit">` + [[1, "KDE 1× (standard)"], [0.75, "KDE 0.75×"], [0.5, "KDE 0.5×"], ["knn3", "kNN field, k = 3"], ["knn5", "kNN field, k = 5"], ["knn8", "kNN field, k = 8"]]
+        `<select class="dg-res" style="font:inherit">` + [[1, "KDE 1× (standard)"], [0.75, "KDE 0.75×"], [0.5, "KDE 0.5×"], ["knn3", "kNN field, k = 3"], ["knn5", "kNN field, k = 5"], ["knn8", "kNN field, k = 8"], ["map2d", "2D map (Topic Map density)"]]
           .map(([v, t]) => `<option value="${v}"${String(v) === String(RES) ? " selected" : ""}>${t}</option>`).join("") + `</select></label>` +
         (model.estInfo ? `<span title="TwoNN intrinsic dimension; k used for the field; DADApy's adaptive k* (median, alpha 0.05) for reference; error of each ln density">intrinsic dim ${(+model.estInfo.d).toFixed(1)} · k ${model.estInfo.k} · ref k* ${model.estInfo.kstar} · σ ${(+model.estInfo.sigma).toFixed(2)}</span>` +
           `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Keep only barriers larger than 1.65 times their combined error (Density Peak Advanced test); research gaps within the error are hidden."><input type="checkbox" class="dg-sig"${SIG ? " checked" : ""}/> significant barriers only</label>` : "") : "") +
@@ -1087,7 +1096,7 @@
 
     // Admin resolution not built yet: build it (cached on the session), show the loader, then redraw.
     if (needRes) {
-      const wait = window.EratostLoader ? EratostLoader.block(String(RES).startsWith("knn") ? `Building the kNN density field (k = ${String(RES).slice(3)})…` : `Building the landscape at ${RES}× resolution…`, { gradient: true }) : "Building…";
+      const wait = window.EratostLoader ? EratostLoader.block(RES === "map2d" ? "Building the landscape of the 2D map…" : String(RES).startsWith("knn") ? `Building the kNN density field (k = ${String(RES).slice(3)})…` : `Building the landscape at ${RES}× resolution…`, { gradient: true }) : "Building…";
       mountEl.innerHTML = tools + `<div class="dg-3d-wait">${wait}</div>`;
       wireToolbar(session, mountEl);
       if (typeof window.dgEnsureRes === "function" && !ENSURING) {
@@ -1170,7 +1179,7 @@
     hook("dg-minb", el => { MINB = +el.value; });
     hook("dg-axis", el => { LOGLV = el.value === "1"; });
     hook("dg-gcalt", el => { GC_ALT = el.value === "1"; });
-    hook("dg-res", el => { RES = el.value.startsWith("knn") ? el.value : +el.value; });
+    hook("dg-res", el => { RES = (el.value.startsWith("knn") || el.value === "map2d") ? el.value : +el.value; });
     hook("dg-sig", el => { SIG = el.checked; });
     hook("dg-floorhd", el => { FLOOR_HD = el.checked; });
     mountEl.querySelectorAll(".dg-mode").forEach(r =>

@@ -57,7 +57,8 @@
     // res (admins): a KDE bandwidth multiplier (0.75, 0.5) or "knn<k>" for the kNN field with k neighbours;
     // omitted / 1 = the standard graph.
     disconnectivity(id, res) {
-      const q = (typeof res === "string" && res.startsWith("knn")) ? "?est=knn&k=" + parseInt(res.slice(3), 10)
+      const q = res === "map2d" ? "?est=map2d"
+              : (typeof res === "string" && res.startsWith("knn")) ? "?est=knn&k=" + parseInt(res.slice(3), 10)
               : (res && res !== 1 ? "?res=" + res : "");
       return req("POST", "/sessions/" + encodeURIComponent(id) + "/disconnectivity" + q);
     },
