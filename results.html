@@ -264,7 +264,7 @@
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261031a"></script>
 <script src="js/shell.js?v=20261031b"></script>
-<script src="js/disconnectivity.js?v=20261101e"></script>
+<script src="js/disconnectivity.js?v=20261101f"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -637,7 +637,8 @@
       $('discHost').innerHTML=''; return;
     }
     $('discStatus').textContent='';
-    window.renderDisconnectivity(data, $('discHost'));  // reads data.disconnectivity (server tree + LOO)
+    // Admins see every view and control; everyone else the fixed setup (Levelled + metric 3D).
+    window.renderDisconnectivity(data, $('discHost'), { admin: IS_ADMIN });
   }
   // The Gap Graph's 3D view stands the tree on the Topic Map. If the map hasn't been built yet, build it
   // (free) and hand back the refreshed session; the Topic Map tab then reuses it.
@@ -713,6 +714,7 @@
     try{
       const data=await window.SciCoAPI.getSession(SID);
       try{ const me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
+      if(window.dgSetAdmin) window.dgSetAdmin(IS_ADMIN);   // the Gap Graph may already be on screen
       // Query internals (expanded queries + Boolean relaxation) are for admins only.
       if(!IS_ADMIN && $('logsSection')) $('logsSection').style.display='none';
       const pub=data.publications||{};

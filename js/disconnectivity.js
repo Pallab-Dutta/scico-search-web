@@ -100,6 +100,7 @@
   let NLEV = 40;         // number of energy levels for both styles
   let MINB = 1;          // hide branches holding fewer papers than this (both styles); 1 = show all
   let GC_ALT = false;    // gap-closer scoring: false = route + time (default), true = original + time
+  let ADMIN = false;     // admins/developers get every view and control; everyone else a fixed setup
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
                          // the bottom are not squashed under one tall barrier. Tick labels stay true.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
@@ -591,7 +592,7 @@
     }).join("");
     const axis = `<line x1="${ax}" y1="${top}" x2="${ax}" y2="${bottomY}" stroke="#bbb"/>` + ticks +
       `<text transform="translate(12 ${(top + energyH / 2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="10" fill="#888">free energy −ln p ↑ (${NLEV} levels${LOGLV ? ", compressed axis" : ""})</text>`;
-    const hint = `<text x="${left}" y="${H - 12}" font-size="10.5" fill="#999">Textbook style: energy in ${NLEV} steps${LOGLV ? " on a compressed axis" : ""}${MINB > 1 ? `, branches under ${MINB} papers hidden` : ""} · grey ends = papers with no barrier between them · exact view: untick “Levelled”</text>`;
+    const hint = `<text x="${left}" y="${H - 12}" font-size="10.5" fill="#999">Textbook style: energy in ${NLEV} steps${LOGLV ? " on a compressed axis" : ""}${MINB > 1 ? `, branches under ${MINB} papers hidden` : ""} · grey ends = papers with no barrier between them${ADMIN ? " · exact view: untick “Levelled”" : ""}</text>`;
     return { inner: `<g class="dg-base">` + axis + lines + dots + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W: DW };
   }
 
@@ -895,7 +896,16 @@
     });
   }
 
+  // Everyone except admins: original + time gap-closers, the Levelled textbook graph at 100 levels,
+  // the metric 3D view, and no MST.
+  function userSetup() {
+    if (ADMIN) return;
+    GC_ALT = true; LEVELLED = true; METRIC = true; NLEV = 100; MINB = 1; LOGLV = true;
+    if (MODE === "mst") MODE = "dg";
+  }
+
   function draw(session, mountEl) {
+    userSetup();
     const model = getModel(session);
     mountEl.style.position = "relative";
     if (!model) { mountEl.innerHTML = '<p style="color:#888">Need ≥2 papers with embeddings to draw the tree.</p>'; return; }
@@ -940,17 +950,17 @@
     const tools =
       `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:8px;` +
       `font:12px system-ui,sans-serif;color:#555">` +
-      `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")} ${radio("mst", "MST")}${model.hasFE ? " " + radio("3d", "3D on the map") : ""}</span>` +
+      `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")}${ADMIN ? " " + radio("mst", "MST") : ""}${model.hasFE ? " " + radio("3d", "3D on the map") : ""}</span>` +
       (MODE === "3d" ? `<span style="display:inline-flex;gap:6px">` +
         [["side", "Side"], ["top", "Top"], ["reset", "Reset"]].map(([k, l]) =>
           `<button type="button" class="dg-cam" data-cam="${k}" style="font:inherit;border:1px solid #ddd;background:#fff;border-radius:6px;padding:2px 9px;cursor:pointer">${l}</button>`).join("") +
         `</span>` : "") +
-      `<label style="cursor:${FEV ? "default" : "pointer"};display:inline-flex;align-items:center;gap:6px;user-select:none${FEV ? ";opacity:.45" : ""}" title="${FEV ? "The free-energy axis is already −ln p; log scaling applies to the MST view." : ""}">` +
-      `<input type="checkbox" class="dg-log"${LOG ? " checked" : ""}${FEV ? " disabled" : ""}/> ${FEV ? "Log scale (n/a — energy axis)" : "Log scale (compress large gaps)"}</label>` +
+      (ADMIN ? `<label style="cursor:${FEV ? "default" : "pointer"};display:inline-flex;align-items:center;gap:6px;user-select:none${FEV ? ";opacity:.45" : ""}" title="${FEV ? "The free-energy axis is already −ln p; log scaling applies to the MST view." : ""}">` +
+      `<input type="checkbox" class="dg-log"${LOG ? " checked" : ""}${FEV ? " disabled" : ""}/> ${FEV ? "Log scale (n/a — energy axis)" : "Log scale (compress large gaps)"}</label>` : "") +
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">` +
       `<input type="checkbox" class="dg-overlay"${OVERLAY ? " checked" : ""}/> Highlight gap-closers</label>` +
-      (model.hasFE && MODE !== "mst" ? styleControls() : "") +
-      (model.hasAlt ? `<label title="Route + time: a paper only closes gaps whose route runs through it, between works published by its year. Original + time: the earlier scoring (its own tree) with the same time rule." style="display:inline-flex;align-items:center;gap:5px">gap-closers` +
+      (ADMIN && model.hasFE && MODE !== "mst" ? styleControls() : "") +
+      (ADMIN && model.hasAlt ? `<label title="Route + time: a paper only closes gaps whose route runs through it, between works published by its year. Original + time: the earlier scoring (its own tree) with the same time rule." style="display:inline-flex;align-items:center;gap:5px">gap-closers` +
         `<select class="dg-gcalt" style="font:inherit"><option value="0"${GC_ALT ? "" : " selected"}>route + time</option><option value="1"${GC_ALT ? " selected" : ""}>original + time</option></select></label>` : "") +
       `</div>`;
 
@@ -1062,7 +1072,17 @@
   }
 
   let _last = null;
-  function renderDisconnectivity(session, mountEl) { _last = { session, mountEl }; draw(session, mountEl); }
+  function renderDisconnectivity(session, mountEl, opts) {
+    if (opts && "admin" in opts) ADMIN = !!opts.admin;
+    _last = { session, mountEl };
+    draw(session, mountEl);
+  }
+  // The page learns whether the viewer is an admin after /me answers; redraw if that changes the setup.
+  window.dgSetAdmin = function (admin) {
+    if (!!admin === ADMIN) return;
+    ADMIN = !!admin;
+    if (_last) draw(_last.session, _last.mountEl);
+  };
   if (!window.__dgResize) {
     window.__dgResize = true;
     let t; window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { if (_last) draw(_last.session, _last.mountEl); }, 120); });
