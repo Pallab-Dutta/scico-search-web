@@ -94,6 +94,11 @@
   let REDUCE_FE = false; // gap-closer barriers measured on the free-energy surface (nats), not cosine.
   let AZ = -35, EL = 28; // 3D view angles in degrees (turn about the vertical; tilt: 0 = side, 90 = top)
   let ENSURING = false;  // 3D view is waiting for the page to build the Topic Map positions
+  // Optional textbook styles (off by default; the exact views stay the reference):
+  let LEVELLED = false;  // flat view drawn disconnectionDPS-style: energy in steps, basins lumped per step
+  let METRIC = false;    // 3D view drawn as a metric disconnectivity graph: vertical posts per basin
+  let NLEV = 40;         // number of energy levels for both styles
+  let MINB = 2;          // hide branches holding fewer papers than this (both styles)
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
 
   // Smallest positive barrier in the current map — the reference for the positive log ("dex") scale.
@@ -306,6 +311,10 @@
     }
     const reps = m.papers.slice().sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0));
     const list = reps.slice(0, 4).map(p => `<li>${esc(trunc(p.title, 42))}</li>`).join("");
+    if (m.type === "basin")                                 // a lumped branch end in the levelled styles
+      return `<b>Basin of ${reps.length} papers</b>` +
+        `<div class="dg-sub">deepest well ${(+m.depth).toFixed(2)} · merges below ${(+m.level).toFixed(2)}</div>` +
+        `<ul class="dg-list">${list}${reps.length > 4 ? `<li>+${reps.length - 4} more…</li>` : ""}</ul>`;
     const head = m.split
       ? `barrier ${fmtBar(m.barrier)} · splits ${m.split[0]} ↔ ${m.split[1]} papers`
       : `barrier ${fmtBar(m.barrier)} · ${reps.length} papers below`;
@@ -453,6 +462,88 @@
     return { inner: `<g class="dg-base">` + guides + branches + axis + dots + labels + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W: DW };
   }
 
+  /* ---- Levelled tree (disconnectionDPS / metric-DG convention), built from the exact tree ----
+     The energy axis is cut into NLEV evenly spaced levels. At each level, papers whose connecting
+     barrier lies below it form one superbasin (one node). A superbasin's node at level k links to its
+     sub-basins at level k-1; a branch with no sub-basins below drops to its deepest paper's own energy.
+     Branches holding fewer than MINB papers are hidden. Same barriers as the exact tree; only drawn
+     in steps, as the classic programs do. */
+  function levelTree(model) {
+    const fe = n => n.fe || 0, cache = new Map();
+    const L = n => { if (!cache.has(n)) cache.set(n, leafNodes(n)); return cache.get(n); };
+    let emin = Infinity;
+    L(model.root).forEach(l => { emin = Math.min(emin, fe(l)); });
+    const emax = fe(model.root), span = (emax - emin) || 1;
+    const step = span * 1.0001 / Math.max(1, NLEV - 1);      // top level sits just above the root barrier
+    const E = k => emin + k * step;
+    const cut = (n, e) => fe(n) < e ? [n] : isLeaf(n) ? [] : kids(n).flatMap(c => cut(c, e));
+    const make = (b, k) => {
+      const lv = L(b), low = lv.reduce((a, c) => fe(c) < fe(a) ? c : a);
+      const nd = { b, k, e: E(k), size: lv.length, low, papers: lv.map(l => l.paper || l), kids: [] };
+      if (k > 0) nd.kids = cut(b, E(k - 1)).filter(c => L(c).length >= MINB).map(c => make(c, k - 1));
+      return nd;
+    };
+    return { top: make(model.root, NLEV - 1), E, emin, emax };
+  }
+  // Meta for a levelled node: a single paper reads like a paper; a lumped end reads as a basin.
+  function levelMeta(model, nd) {
+    if (nd.size === 1) {
+      const p = nd.papers[0];
+      return { type: "paper", paper: p, overlay: 0, overlayKind: "", reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0, fe: model.energy ? model.energy.get(p) : null };
+    }
+    return { type: "basin", papers: nd.papers, depth: nd.low.fe || 0, level: nd.e };
+  }
+
+  /* Textbook flat view: disconnectionDPS layout. A branch is as wide as the number of branch ends under
+     it; at every split the deepest sub-basin goes in the centre and the others alternate right and left,
+     so the global minimum runs down the middle. Straight lines join consecutive levels. */
+  function buildLevels(model, W) {
+    const lt = levelTree(model), fe = n => n.fe || 0;
+    const width = n => n._w || (n._w = n.kids.length ? n.kids.reduce((a, c) => a + width(c), 0) : 1);
+    const slots = width(lt.top);
+    const left = 60, top = 30, energyH = 500, H = top + energyH + 40, rightPad = 30;
+    const colW = Math.max(7, Math.min(64, (W - left - rightPad) / slots));
+    const DW = Math.max(W, left + slots * colW + rightPad);
+    const x00 = Math.max(0, (DW - left - rightPad - slots * colW) / 2);   // centre a narrow tree
+    const yAt = e => top + (1 - (e - lt.emin) / ((lt.emax - lt.emin) || 1)) * energyH;
+    (function arrange(n, x0) {
+      const ks = n.kids.slice().sort((a, b) => fe(a.low) - fe(b.low)), ord = [];
+      ks.forEach((c, i) => (i === 0 || i % 2) ? ord.push(c) : ord.unshift(c));
+      let x = x0;
+      ord.forEach(c => { arrange(c, x); x += c._w; });
+      n.kids = ord;
+      n._x = ord.length ? ord.reduce((a, c) => a + c._x, 0) / ord.length : left + x00 + (x0 + 0.5) * colW;
+    })(lt.top, 0);
+
+    let lines = "", dots = "", uid = 0;
+    const meta = {};
+    const ln = (x1, y1, x2, y2) => `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#1e2a31" stroke-width="1.3" stroke-linecap="round"/>`;
+    (function walk(n, runTop) {                             // runTop: where the current straight run began
+      if (n.kids.length === 1 && n.kids[0]._x === n._x) { walk(n.kids[0], runTop); return; }
+      const y = yAt(n.e);
+      if (runTop !== y) lines += ln(n._x, runTop, n._x, y);
+      n.kids.forEach(c => { lines += ln(n._x, y, c._x, yAt(c.e)); walk(c, yAt(c.e)); });
+      if (!n.kids.length) {                                 // branch end: drop to its deepest paper's own energy
+        const yb = yAt(fe(n.low)), id = "v" + (uid++);
+        lines += `<line x1="${n._x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${n._x.toFixed(1)}" y2="${yb.toFixed(1)}" stroke="#1e2a31" stroke-width="1.3" stroke-linecap="round"/>`;
+        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${yb.toFixed(1)}" r="${n.size > 1 ? 4 : 3}" fill="${n.size > 1 ? "#6e7a82" : "#2e9e5b"}" stroke="#fff" stroke-width="1"/>`;
+        meta[id] = levelMeta(model, n);
+      } else if (n.kids.length > 1) {                       // a split: the barrier between these sub-basins
+        const id = "v" + (uid++);
+        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="transparent"/>`;
+        meta[id] = { type: "gap", title: "Barrier", barrier: n.e, papers: n.papers, split: n.kids.length === 2 ? [n.kids[0].size, n.kids[1].size] : null };
+      }
+    })(lt.top, yAt(lt.top.e));
+    lines += `<line x1="${lt.top._x.toFixed(1)}" y1="${yAt(lt.top.e).toFixed(1)}" x2="${lt.top._x.toFixed(1)}" y2="${(yAt(lt.top.e) - 14).toFixed(1)}" stroke="#1e2a31" stroke-width="1.3"/>`;
+    const ax = left - 16, bottomY = top + energyH;
+    const axis = `<line x1="${ax}" y1="${top}" x2="${ax}" y2="${bottomY}" stroke="#bbb"/>` +
+      `<text x="${ax - 6}" y="${bottomY + 3}" text-anchor="end" font-size="10" fill="#888">${lt.emin.toFixed(2)}</text>` +
+      `<text x="${ax - 6}" y="${top + 3}" text-anchor="end" font-size="10" fill="#888">${lt.emax.toFixed(2)}</text>` +
+      `<text transform="translate(14 ${(top + energyH / 2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="10" fill="#888">free energy −ln p ↑ (in ${NLEV} levels)</text>`;
+    const hint = `<text x="${left}" y="${H - 12}" font-size="10.5" fill="#999">Textbook style: energy in ${NLEV} steps, branches under ${MINB} papers hidden · grey ends = several papers lumped · exact view: untick “Levelled”</text>`;
+    return { inner: `<g class="dg-base">` + axis + lines + dots + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W: DW };
+  }
+
   /* ---- View C: the same tree in 3D, standing on the knowledge map ----
      X, Y = each paper's position on the Topic Map; Z = free energy. Every connection and height is the
      disconnectivity tree's own. A junction (transition state) stands where its col lies: on the map
@@ -527,8 +618,35 @@
                `<circle cx="${sh.x.toFixed(1)}" cy="${sh.y.toFixed(1)}" r="2.2" fill="#8e989e"/>`;
     });
 
+    // METRIC style (optional): the levelled tree, each superbasin a vertical post standing at its deepest
+    // paper's map position (Smeeton, Oakley & Wales' metric disconnectivity graph). Same barriers, drawn
+    // in NLEV steps; the exact tree below stays the default.
+    if (METRIC) {
+      const lt = levelTree(model), z = e => (e || 0) / fmax * ZH;
+      const seg = (u, v, wdt) => lines.push({ d: (u.d + v.d) / 2, svg: `<line x1="${u.x.toFixed(1)}" y1="${u.y.toFixed(1)}" x2="${v.x.toFixed(1)}" y2="${v.y.toFixed(1)}" stroke="#1e2a31" stroke-width="${wdt}" stroke-linecap="round"/>` });
+      const place3 = n => { const q0 = pos.get(n.low.paper || n.low) || { x: 0.5, y: 0.5 }; n._w3 = [q0.x - 0.5, 0.5 - q0.y, z(n.e)]; return P(n._w3); };
+      (function walk(n, runTop) {                           // runTop: top of the current vertical post run
+        const q = place3(n);
+        if (n.kids.length === 1 && n.kids[0].low === n.low) { walk(n.kids[0], runTop || q); return; }
+        if (runTop && (runTop.x !== q.x || runTop.y !== q.y)) seg(runTop, q, 1.3 + Math.min(1.7, n.size / 25));
+        n.kids.forEach(c => { const cq = place3(c); seg(q, cq, 1.3 + Math.min(1.7, c.size / 25)); walk(c, cq); });
+        const id = "t" + (uid++);
+        if (!n.kids.length) {                               // branch end: drop to the deepest paper's own energy
+          const b = P([n._w3[0], n._w3[1], z(n.low.fe)]);
+          seg(q, b, 1.3);
+          dots.push({ d: b.d, svg: `<circle class="dg-node" data-id="${id}" cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${n.size > 1 ? 4.5 : 3.5}" fill="${n.size > 1 ? "#6e7a82" : "#2e9e5b"}" stroke="#fff" stroke-width="1"/>` });
+          meta[id] = levelMeta(model, n);
+        } else if (n.kids.length > 1) {
+          dots.push({ d: q.d, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="4" fill="#d64545" stroke="#fff" stroke-width="1"/>` });
+          meta[id] = { type: "gap", title: "Barrier", barrier: n.e, papers: n.papers, split: n.kids.length === 2 ? [n.kids[0].size, n.kids[1].size] : null };
+        }
+      })(lt.top, null);
+      const t0 = P(lt.top._w3), t1 = P([lt.top._w3[0], lt.top._w3[1], lt.top._w3[2] + 0.05]);
+      seg(t0, t1, 1.3);
+    }
+
     // Branches (each child to its junction) and nodes, painted far to near.
-    (function walk(n) {
+    if (!METRIC) (function walk(n) {
       const id = "t" + (uid++), q = P(n._w);
       if (isLeaf(n)) {
         const p = n.paper || n, st = paperStyle(p, scores);
@@ -548,7 +666,7 @@
       }
     })(tree);
     const rootTop = P([tree._w[0], tree._w[1], tree._w[2] + 0.05]), rootQ = P(tree._w);
-    lines.push({ d: rootQ.d, svg: `<line x1="${rootQ.x.toFixed(1)}" y1="${rootQ.y.toFixed(1)}" x2="${rootTop.x.toFixed(1)}" y2="${rootTop.y.toFixed(1)}" stroke="#1e2a31" stroke-width="1.4"/>` });
+    if (!METRIC) lines.push({ d: rootQ.d, svg: `<line x1="${rootQ.x.toFixed(1)}" y1="${rootQ.y.toFixed(1)}" x2="${rootTop.x.toFixed(1)}" y2="${rootTop.y.toFixed(1)}" stroke="#1e2a31" stroke-width="1.4"/>` });
     const paint = arr => arr.sort((u, v) => v.d - u.d).map(o => o.svg).join("");
 
     // Energy axis on one corner of the floor (hidden from straight above, where it collapses to a point).
@@ -557,7 +675,7 @@
       `<text x="${(a0.x - 6).toFixed(1)}" y="${(a0.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">0</text>` +
       `<text x="${(a1.x - 6).toFixed(1)}" y="${(a1.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">${fmax.toFixed(2)}</text>` +
       `<text x="${(a1.x + 6).toFixed(1)}" y="${(a1.y - 6).toFixed(1)}" font-size="10" fill="#888">free energy −ln p ↑</text>`;
-    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = Topic Map density · heights exact; map distances between far regions are approximate</text>`;
+    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = Topic Map density · ${METRIC ? `metric style: ${NLEV} energy steps, posts at each basin's deepest paper` : "heights exact; map distances between far regions are approximate"}</text>`;
 
     // Hover story for each gap-closer, as in the flat view: its bridged pair traced up to their junction.
     const leafOf = new Map();
@@ -568,7 +686,7 @@
       return d;
     };
     Object.values(meta).forEach(m => {
-      if (m.type !== "paper" || !m.pair) return;
+      if (m.type !== "paper" || !m.pair || !m.node) return;   // (the metric style has no exact path to trace)
       const la = leafOf.get(m.pair.a), lb = leafOf.get(m.pair.b), j = la && lb && lcaNode(tree, m.pair.a, m.pair.b);
       if (!j) return;
       const lab = l => { const q = P(l._w); return { x: q.x, y: q.y, title: (l.paper || l).title }; };
@@ -759,7 +877,8 @@
                  : (model.loo && model.loo.size) ? looScores(model.loo)
                  : bridgeScore(model);
     const need3dMap = MODE === "3d" && !(model.pos && model.pos.size);
-    const built = need3dMap ? null : MODE === "mst" ? buildMST(model, W, scores) : MODE === "3d" ? buildDG3(model, W, scores) : buildDG(model, W, scores);
+    const built = need3dMap ? null : MODE === "mst" ? buildMST(model, W, scores) : MODE === "3d" ? buildDG3(model, W, scores)
+                : (LEVELLED && model.hasFE) ? buildLevels(model, W) : buildDG(model, W, scores);
 
     const radio = (v, lbl) =>
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">` +
@@ -776,6 +895,7 @@
       `<input type="checkbox" class="dg-log"${LOG ? " checked" : ""}${FEV ? " disabled" : ""}/> ${FEV ? "Log scale (n/a — energy axis)" : "Log scale (compress large gaps)"}</label>` +
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">` +
       `<input type="checkbox" class="dg-overlay"${OVERLAY ? " checked" : ""}/> Highlight gap-closers</label>` +
+      (model.hasFE && MODE !== "mst" ? styleControls() : "") +
       `</div>`;
 
     // 3D needs each paper's knowledge-map position. Without a Topic Map yet, ask the page to build it
@@ -813,7 +933,28 @@
     if (built.is3d) wire3D(mountEl, model, scores, W);
   }
 
+  // Optional textbook styles: "Levelled" (flat view) and "Metric posts" (3D), with level count and pruning.
+  function styleControls() {
+    const box = (cls, on, label, title) =>
+      `<label title="${title}" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">` +
+      `<input type="checkbox" class="${cls}"${on ? " checked" : ""}/> ${label}</label>`;
+    const sel = (cls, cur, opts, label) =>
+      `<label style="display:inline-flex;align-items:center;gap:5px">${label}<select class="${cls}" style="font:inherit">` +
+      opts.map(([v, t]) => `<option value="${v}"${+v === cur ? " selected" : ""}>${t}</option>`).join("") + `</select></label>`;
+    const on = MODE === "3d" ? METRIC : LEVELLED;
+    return (MODE === "3d"
+        ? box("dg-metric", METRIC, "Metric posts", "Metric disconnectivity graph: energy in steps, each basin a vertical post at its deepest paper")
+        : box("dg-levels", LEVELLED, "Levelled (textbook)", "disconnectionDPS style: energy in steps, basins lumped per step")) +
+      (on ? sel("dg-nlev", NLEV, [[20, "20"], [40, "40"], [60, "60"], [100, "100"]], "levels") +
+            sel("dg-minb", MINB, [[1, "all"], [2, "≥ 2"], [3, "≥ 3"], [5, "≥ 5"]], "branches with papers") : "");
+  }
+
   function wireToolbar(session, mountEl) {
+    const hook = (cls, fn) => { const el = mountEl.querySelector("." + cls); if (el) el.addEventListener("change", () => { fn(el); draw(session, mountEl); }); };
+    hook("dg-levels", el => { LEVELLED = el.checked; });
+    hook("dg-metric", el => { METRIC = el.checked; });
+    hook("dg-nlev", el => { NLEV = +el.value; });
+    hook("dg-minb", el => { MINB = +el.value; });
     mountEl.querySelectorAll(".dg-mode").forEach(r =>
       r.addEventListener("change", () => { if (r.checked) { MODE = r.value; draw(session, mountEl); } }));
     const chk = mountEl.querySelector(".dg-log");
