@@ -101,6 +101,7 @@
   let MINB = 1;          // hide branches holding fewer papers than this (both styles); 1 = show all
   let GC_ALT = false;    // gap-closer scoring: false = route + time (default), true = original + time
   let ADMIN = false;     // admins/developers get every view and control; everyone else a fixed setup
+  let RES = 1;           // admin: density resolution (bandwidth multiplier); 1 = the standard landscape
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
                          // the bottom are not squashed under one tall barrier. Tick labels stay true.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
@@ -154,6 +155,9 @@
 
   function getModel(session) {
     let d = session.disconnectivity;
+    // Admin resolution variant: same papers, its own landscape (tree, energies, scores, gaps).
+    const variants = session.disconnectivity_res || {};
+    if (RES !== 1 && d && variants[String(RES)]) d = Object.assign({}, d, variants[String(RES)]);
     const hasAlt = !!(d && d.alt && d.alt.tree);
     // "Original + time" scoring (selectable): its own tree and gap-closers, same papers and energies.
     if (GC_ALT && hasAlt) d = Object.assign({}, d, d.alt);
@@ -216,7 +220,30 @@
           if (q) pos.set(p, { x: +q.x, y: +q.y });
         });
       }
-      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid, hasAlt };
+      // RESEARCH GAPS: real barriers in the landscape, with what a paper placed at each col would close.
+      // Named after the Topic Map's nearest named gap when one lies close on the map.
+      const tmGaps = (tm && Array.isArray(tm.gaps)) ? tm.gaps : [];
+      const rgaps = (Array.isArray(d.gaps) ? d.gaps : []).map((g, i) => {
+        const A = papers[g.reps && g.reps[0]], B = papers[g.reps && g.reps[1]];
+        if (!A || !B) return null;
+        let at = null;                                     // the gap's place on the map (its col)
+        if (pos && g.col) {
+          const qa = pos.get(papers[g.col[0]]), qb = pos.get(papers[g.col[1]]), t = +g.col[2] || 0;
+          if (qa && qb) at = { x: qa.x + (qb.x - qa.x) * t, y: qa.y + (qb.y - qa.y) * t };
+        }
+        const cp = g.close_pair && papers[g.close_pair[0]] && papers[g.close_pair[1]] ? { a: papers[g.close_pair[0]], b: papers[g.close_pair[1]] } : null;
+        return { type: "rgap", id: "rg" + i, pair: { a: A, b: B }, close: cp, name: null, at, barrier: +g.barrier || 0,
+                 closeMax: +g.close_max || 0, closeTotal: +g.close_total || 0, sizes: g.sizes || [0, 0] };
+      }).filter(Boolean).sort((u, v) => v.closeTotal - u.closeTotal);
+      rgaps.forEach((r, i) => { r.num = i + 1; });
+      // Each named Topic Map gap names only its NEAREST research gap (closest pairs first, within 0.15).
+      const cand = [];
+      rgaps.forEach(r => { if (r.at) tmGaps.forEach(tg => { if (tg.label) cand.push([Math.hypot((+tg.x) - r.at.x, (+tg.y) - r.at.y), r, tg]); }); });
+      const usedR = new Set(), usedT = new Set();
+      cand.sort((u, v) => u[0] - v[0]).forEach(([dd, r, tg]) => {
+        if (dd < 0.15 && !usedR.has(r) && !usedT.has(tg)) { r.name = tg.label; usedR.add(r); usedT.add(tg); }
+      });
+      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid, hasAlt, rgaps };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -316,6 +343,11 @@
         (bridge ? `<div class="dg-sub">${esc(bridge)}</div>` : "") +
         (gapPair ? `<div class="dg-sub">${gapPair}</div>` : "");
     }
+    if (m.type === "rgap")
+      return `<b>Research gap G${m.num}${m.name ? ": " + esc(m.name) : ""}</b>` +
+        `<div class="dg-sub">barrier ${(+m.barrier).toFixed(2)} between basins of ${m.sizes[0]} and ${m.sizes[1]} papers (highlighted)</div>` +
+        (m.close ? `<div class="dg-sub">if targeted: a paper here would lower the barrier between “${esc(trunc(m.close.a.title, 40))}” and “${esc(trunc(m.close.b.title, 40))}” by ${(+m.closeMax).toFixed(2)}</div>` : "") +
+        `<div class="dg-sub">total lowering across the field: ${(+m.closeTotal).toFixed(1)}</div>`;
     const reps = m.papers.slice().sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0));
     const list = reps.slice(0, 4).map(p => `<li>${esc(trunc(p.title, 42))}</li>`).join("");
     if (m.type === "basin")                                 // a lumped branch end in the levelled styles
@@ -446,14 +478,15 @@
       }
       return d;
     };
+    (model.rgaps || []).forEach(r => { meta[r.id] = r; });   // research gaps trace their two basins
     Object.values(meta).forEach(m => {
-      if (m.type !== "paper" || !m.pair) return;
+      if ((m.type !== "paper" && m.type !== "rgap") || !m.pair) return;
       const la = leafOf.get(m.pair.a), lb = leafOf.get(m.pair.b);
       if (!la || !lb) return;
       const j = lcaNode(tree, m.pair.a, m.pair.b);
       if (!j) return;
       const lab = l => ({ x: l._x, y: l._y, title: (l.paper || l).title });
-      m.hl = { path: climb(la, j) + climb(lb, j), a: lab(la), b: lab(lb), self: lab(m.node), j: { x: j._x, y: j._y }, bottomY };
+      m.hl = { path: climb(la, j) + climb(lb, j), a: lab(la), b: lab(lb), self: m.node ? lab(m.node) : null, j: { x: j._x, y: j._y }, bottomY };
     });
 
     // Vertical energy axis (0 = deepest well at the bottom, root at the top).
@@ -518,7 +551,8 @@
   // Gap-closer hover story for the levelled styles: each bridged paper's branch end, traced up the
   // levelled tree to the level where their branches meet. pt(n) = a node's drawn point; dotPt(n) = its
   // branch end. Skipped when both papers sit in the same lumped end (no barrier separates them there).
-  function levelHL(lt, meta, pt, dotPt) {
+  function levelHL(lt, meta, pt, dotPt, rgaps) {
+    (rgaps || []).forEach(r => { meta[r.id] = r; });
     const endOf = new Map();
     (function par(n, p) {
       n._par = p;
@@ -527,7 +561,7 @@
     })(lt.top, null);
     const seg = (u, v) => `M${u.x.toFixed(1)} ${u.y.toFixed(1)} L${v.x.toFixed(1)} ${v.y.toFixed(1)} `;
     Object.values(meta).forEach(m => {
-      if (m.type !== "paper" || !m.pair) return;
+      if ((m.type !== "paper" && m.type !== "rgap") || !m.pair) return;
       const na = endOf.get(m.pair.a), nb = endOf.get(m.pair.b), ns = endOf.get(m.paper);
       if (!na || !nb || na === nb) return;
       const anc = new Set();
@@ -583,7 +617,7 @@
       }
     })(lt.top, yAt(lt.top.e));
     lines += `<line x1="${lt.top._x.toFixed(1)}" y1="${yAt(lt.top.e).toFixed(1)}" x2="${lt.top._x.toFixed(1)}" y2="${(yAt(lt.top.e) - 14).toFixed(1)}" stroke="#1e2a31" stroke-width="1.3"/>`;
-    levelHL(lt, meta, n => ({ x: n._x, y: yAt(n.e) }), n => ({ x: n._x, y: yAt(n.low.fe || 0) }));
+    levelHL(lt, meta, n => ({ x: n._x, y: yAt(n.e) }), n => ({ x: n._x, y: yAt(n.low.fe || 0) }), model.rgaps);
     const ax = left - 16, bottomY = top + energyH;
     const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => {
       const y = top + (1 - f) * energyH;
@@ -697,7 +731,7 @@
       })(lt.top, null);
       const t0 = P(lt.top._w3), t1 = P([lt.top._w3[0], lt.top._w3[1], lt.top._w3[2] + 0.05]);
       seg(t0, t1, 1.3);
-      levelHL(lt, meta, n => P(n._w3), n => P([n._w3[0], n._w3[1], z(n.low.fe)]));
+      levelHL(lt, meta, n => P(n._w3), n => P([n._w3[0], n._w3[1], z(n.low.fe)]), model.rgaps);
     }
 
     // Branches (each child to its junction) and nodes, painted far to near.
@@ -740,13 +774,15 @@
       while (c && c !== stop && c._parent) { d += `M${xy(P(c._w))} L${xy(P(c._parent._w))} `; c = c._parent; }
       return d;
     };
+    if (!METRIC) (model.rgaps || []).forEach(r => { meta[r.id] = r; });
     Object.values(meta).forEach(m => {
-      if (m.type !== "paper" || !m.pair || !m.node) return;   // (the metric style has no exact path to trace)
+      if (METRIC) return;                                     // the metric style traced its own paths above
+      if (!((m.type === "paper" && m.node) || m.type === "rgap") || !m.pair) return;
       const la = leafOf.get(m.pair.a), lb = leafOf.get(m.pair.b), j = la && lb && lcaNode(tree, m.pair.a, m.pair.b);
       if (!j) return;
       const lab = l => { const q = P(l._w); return { x: q.x, y: q.y, title: (l.paper || l).title }; };
       const jq = P(j._w);
-      m.hl = { path: climb(la, j) + climb(lb, j), a: lab(la), b: lab(lb), self: lab(m.node), j: { x: jq.x, y: jq.y }, near: true };
+      m.hl = { path: climb(la, j) + climb(lb, j), a: lab(la), b: lab(lb), self: m.node ? lab(m.node) : null, j: { x: jq.x, y: jq.y }, near: true };
     });
 
     return { inner: `<g class="dg-base">` + floor + axis + paint(lines) + paint(dots) + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W, is3d: true };
@@ -848,6 +884,37 @@
     return { inner: lines + gapdots + ndots + labels + hint, H, meta, W };
   }
 
+  /* ---- Research-gap markers: a gold "G#" on each gap's junction, wherever the view drew it ---- */
+  function addGapMarkers(built) {
+    if (!built) return built;
+    const gm = Object.values(built.meta).filter(m => m.type === "rgap" && m.hl && m.hl.j);
+    if (!gm.length) return built;
+    const svg = gm.map(m => {
+      const x = m.hl.j.x.toFixed(1), y = m.hl.j.y.toFixed(1);
+      return `<circle class="dg-node" data-id="${m.id}" cx="${x}" cy="${y}" r="9" fill="#f2c94c" stroke="#9c6b00" stroke-width="1.5"/>` +
+        `<text x="${x}" y="${(m.hl.j.y + 3.3).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#5a3d00" pointer-events="none">G${m.num}</text>`;
+    }).join("");
+    built.inner = built.inner.replace('</g><g class="dg-hl"', svg + '</g><g class="dg-hl"');
+    return built;
+  }
+
+  // The list of research gaps under the graph, ranked by how much targeting each would connect.
+  function gapPanel(model) {
+    const rg = model.rgaps || [];
+    if (!rg.length) return "";
+    const row = r =>
+      `<div class="dg-gap-row" data-id="${r.id}" style="display:flex;gap:9px;align-items:flex-start;padding:6px 8px;border-top:1px solid #eee;cursor:default">` +
+      `<span style="flex:0 0 auto;background:#f2c94c;color:#5a3d00;border:1px solid #9c6b00;border-radius:999px;font-weight:700;font-size:10px;padding:1px 6px">G${r.num}</span>` +
+      `<span style="flex:1;min-width:0"><b>${esc(r.name || `Between “${trunc(r.pair.a.title, 34)}” and “${trunc(r.pair.b.title, 34)}”`)}</b>` +
+      `<span style="display:block;color:#666;margin-top:2px">barrier ${r.barrier.toFixed(2)} · basins of ${r.sizes[0]} and ${r.sizes[1]} papers` +
+      (r.close ? ` · if targeted, closes “${esc(trunc(r.close.a.title, 30))}” ↔ “${esc(trunc(r.close.b.title, 30))}” by ${r.closeMax.toFixed(2)}` : "") +
+      ` · total ${r.closeTotal.toFixed(1)}</span></span></div>`;
+    return `<div class="dg-gaps" style="margin-top:12px;font:12px/1.45 system-ui,sans-serif;color:#333">` +
+      `<div style="font-weight:700;margin-bottom:2px">Research gaps <span style="font-weight:400;color:#888">· ranked by impact if targeted · hover to highlight</span></div>` +
+      `<div style="color:#888;margin-bottom:4px">Targeting a gap = a new paper at its location. Impact = how much it would lower the barriers between existing papers (same energy units as the graph).</div>` +
+      rg.map(row).join("") + `</div>`;
+  }
+
   /* ---- Gap-closer story on hover: dim the graph, trace the bridged pair up to their junction ---- */
   function showGap(mountEl, m) {
     const base = mountEl.querySelector(".dg-base"), layer = mountEl.querySelector(".dg-hl");
@@ -900,7 +967,7 @@
   // the metric 3D view, and no MST.
   function userSetup() {
     if (ADMIN) return;
-    GC_ALT = true; LEVELLED = true; METRIC = true; NLEV = 100; MINB = 1; LOGLV = true;
+    GC_ALT = true; LEVELLED = true; METRIC = true; NLEV = 100; MINB = 1; LOGLV = true; RES = 1;
     if (MODE === "mst") MODE = "dg";
   }
 
@@ -941,8 +1008,9 @@
                  : (model.loo && model.loo.size) ? looScores(model.loo)
                  : bridgeScore(model);
     const need3dMap = MODE === "3d" && !(model.pos && model.pos.size);
-    const built = need3dMap ? null : MODE === "mst" ? buildMST(model, W, scores) : MODE === "3d" ? buildDG3(model, W, scores)
-                : (LEVELLED && model.hasFE) ? buildLevels(model, W, scores) : buildDG(model, W, scores);
+    const needRes = ADMIN && RES !== 1 && !((session.disconnectivity_res || {})[String(RES)]);
+    const built = (need3dMap || needRes) ? null : addGapMarkers(MODE === "mst" ? buildMST(model, W, scores) : MODE === "3d" ? buildDG3(model, W, scores)
+                : (LEVELLED && model.hasFE) ? buildLevels(model, W, scores) : buildDG(model, W, scores));
 
     const radio = (v, lbl) =>
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">` +
@@ -960,9 +1028,30 @@
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">` +
       `<input type="checkbox" class="dg-overlay"${OVERLAY ? " checked" : ""}/> Highlight gap-closers</label>` +
       (ADMIN && model.hasFE && MODE !== "mst" ? styleControls() : "") +
+      (ADMIN && model.hasFE ? `<label title="Density resolution: the KDE bandwidth as a multiple of the standard one. Narrower resolves sub-groups inside clusters (more barriers); each setting is built once and cached." style="display:inline-flex;align-items:center;gap:5px">resolution` +
+        `<select class="dg-res" style="font:inherit">` + [[1, "1× (standard)"], [0.75, "0.75×"], [0.5, "0.5×"]].map(([v, t]) => `<option value="${v}"${v === RES ? " selected" : ""}>${t}</option>`).join("") + `</select></label>` : "") +
       (ADMIN && model.hasAlt ? `<label title="Route + time: a paper only closes gaps whose route runs through it, between works published by its year. Original + time: the earlier scoring (its own tree) with the same time rule." style="display:inline-flex;align-items:center;gap:5px">gap-closers` +
         `<select class="dg-gcalt" style="font:inherit"><option value="0"${GC_ALT ? "" : " selected"}>route + time</option><option value="1"${GC_ALT ? " selected" : ""}>original + time</option></select></label>` : "") +
       `</div>`;
+
+    // Admin resolution not built yet: build it (cached on the session), show the loader, then redraw.
+    if (needRes) {
+      const wait = window.EratostLoader ? EratostLoader.block(`Building the landscape at ${RES}× resolution…`, { gradient: true }) : "Building…";
+      mountEl.innerHTML = tools + `<div class="dg-3d-wait">${wait}</div>`;
+      wireToolbar(session, mountEl);
+      if (typeof window.dgEnsureRes === "function" && !ENSURING) {
+        ENSURING = true;
+        window.dgEnsureRes(RES).then(s2 => {
+          ENSURING = false;
+          if (s2 && _last && _last.mountEl === mountEl) { _last.session = s2; draw(s2, mountEl); }
+        }).catch(e => {
+          ENSURING = false; RES = 1;
+          const w = mountEl.querySelector(".dg-3d-wait");
+          if (w) w.textContent = "Could not build that resolution (" + ((e && (e.message || e.code)) || "error") + ").";
+        });
+      }
+      return;
+    }
 
     // 3D needs each paper's knowledge-map position. Without a Topic Map yet, ask the page to build it
     // (free), show the loader meanwhile, and redraw when it arrives.
@@ -992,11 +1081,17 @@
     mountEl.innerHTML = tools +
       `<div style="overflow-x:auto;overflow-y:hidden;max-width:100%">` +
       `<svg class="dg-svg" viewBox="0 0 ${DW} ${built.H}" width="${DW}" height="${built.H}" preserveAspectRatio="xMinYMin meet" ` +
-      `style="font-family:system-ui,sans-serif;display:block${built.is3d ? ";cursor:grab;touch-action:none;user-select:none" : ""}">` + built.inner + `</svg></div>`;
+      `style="font-family:system-ui,sans-serif;display:block${built.is3d ? ";cursor:grab;touch-action:none;user-select:none" : ""}">` + built.inner + `</svg></div>` +
+      (MODE !== "mst" ? gapPanel(model) : "");
 
     wireToolbar(session, mountEl);
     wireTooltip(mountEl, built.meta);
     if (built.is3d) wire3D(mountEl, model, scores, W);
+    mountEl.querySelectorAll(".dg-gap-row").forEach(row => {
+      const r = (model.rgaps || []).find(x => x.id === row.dataset.id);
+      row.addEventListener("mouseenter", () => { row.style.background = "#fbf4dc"; showGap(mountEl, r); });
+      row.addEventListener("mouseleave", () => { row.style.background = ""; showGap(mountEl, null); });
+    });
   }
 
   // Optional textbook styles: "Levelled" (flat view) and "Metric posts" (3D), with level count and pruning.
@@ -1024,6 +1119,7 @@
     hook("dg-minb", el => { MINB = +el.value; });
     hook("dg-axis", el => { LOGLV = el.value === "1"; });
     hook("dg-gcalt", el => { GC_ALT = el.value === "1"; });
+    hook("dg-res", el => { RES = +el.value; });
     mountEl.querySelectorAll(".dg-mode").forEach(r =>
       r.addEventListener("change", () => { if (r.checked) { MODE = r.value; draw(session, mountEl); } }));
     const chk = mountEl.querySelector(".dg-log");
@@ -1043,7 +1139,7 @@
       queued = true;
       requestAnimationFrame(() => {
         queued = false;
-        const b = buildDG3(model, W, scores);
+        const b = addGapMarkers(buildDG3(model, W, scores));
         svg.innerHTML = b.inner;
         wireTooltip(mountEl, b.meta);
       });

@@ -54,7 +54,8 @@
     deleteSession(id) { return req("DELETE", "/sessions/" + encodeURIComponent(id)); },
     profileAuthors(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/authors"); },
     topicMap(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/topicmap"); },
-    disconnectivity(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/disconnectivity"); },
+    // res: density resolution for admins (bandwidth multiplier); omitted = the standard graph.
+    disconnectivity(id, res) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/disconnectivity" + (res && res !== 1 ? "?res=" + res : "")); },
     expand(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/expand"); },
 
     /* Stream a job's SSE events. handlers: {onEvent(type,data), onError(err)} */

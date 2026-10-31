@@ -259,12 +259,12 @@
 <script src="js/config.js?v=20261030a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabaseClient.js?v=20260829m"></script>
-<script src="js/api.js?v=20261031b"></script>
+<script src="js/api.js?v=20261102a"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261031a"></script>
 <script src="js/shell.js?v=20261031b"></script>
-<script src="js/disconnectivity.js?v=20261101f"></script>
+<script src="js/disconnectivity.js?v=20261102a"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -651,14 +651,20 @@
     TOPIC=data.topic_map||TOPIC;
     return data;
   };
+  // Admin: build the Gap Graph at another density resolution (cached on the session, no quota).
+  window.dgEnsureRes = async function(res){
+    const { job_id }=await window.SciCoAPI.disconnectivity(SID, res);
+    await window.SciCoAPI.streamJob(job_id,{});
+    return await window.SciCoAPI.getSession(SID);
+  };
   async function startDisc(){
     if(!SID){ $('discStatus').textContent='No session specified.'; return; }
     try{
       $('discStatus').innerHTML=loadHTML('Loading the Gap Graph…');
       let data=await window.SciCoAPI.getSession(SID);
-      // Cached on the session: show it. Graphs saved before the current version (6: route + time gap-closers,
-      // plus the original + time scoring to compare) are rebuilt once; rebuilding a saved graph is free.
-      if(data.disconnectivity && data.disconnectivity.tree && (data.disconnectivity.dg_version||1)>=6){ renderDisc(data); return; }
+      // Cached on the session: show it. Graphs saved before the current version (7: research gaps with their
+      // targeting impact, log-space densities) are rebuilt once; rebuilding a saved graph is free.
+      if(data.disconnectivity && data.disconnectivity.tree && (data.disconnectivity.dg_version||1)>=7){ renderDisc(data); return; }
       $('discStatus').innerHTML=loadHTML('Building the research-gap landscape…');
       const { job_id }=await window.SciCoAPI.disconnectivity(SID);
       await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('discStatus').innerHTML=loadHTML(d.message); } });
