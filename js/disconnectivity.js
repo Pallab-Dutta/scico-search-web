@@ -99,6 +99,7 @@
   let METRIC = false;    // 3D view drawn as a metric disconnectivity graph: vertical posts per basin
   let NLEV = 40;         // number of energy levels for both styles
   let MINB = 1;          // hide branches holding fewer papers than this (both styles); 1 = show all
+  let GC_ALT = false;    // gap-closer scoring: false = route + time (default), true = original + time
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
                          // the bottom are not squashed under one tall barrier. Tick labels stay true.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
@@ -151,7 +152,10 @@
   }
 
   function getModel(session) {
-    const d = session.disconnectivity;
+    let d = session.disconnectivity;
+    const hasAlt = !!(d && d.alt && d.alt.tree);
+    // "Original + time" scoring (selectable): its own tree and gap-closers, same papers and energies.
+    if (GC_ALT && hasAlt) d = Object.assign({}, d, d.alt);
     // Server contract (live path): {tree, papers, edges (index pairs), loo, betweenness}. JSON can't
     // carry object refs, so hydrate index-based nodes/edges back into paper-object form and key the
     // faithful leave-one-out scores by paper object.
@@ -211,7 +215,7 @@
           if (q) pos.set(p, { x: +q.x, y: +q.y });
         });
       }
-      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid };
+      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid, hasAlt };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -946,6 +950,8 @@
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">` +
       `<input type="checkbox" class="dg-overlay"${OVERLAY ? " checked" : ""}/> Highlight gap-closers</label>` +
       (model.hasFE && MODE !== "mst" ? styleControls() : "") +
+      (model.hasAlt ? `<label title="Route + time: a paper only closes gaps whose route runs through it, between works published by its year. Original + time: the earlier scoring (its own tree) with the same time rule." style="display:inline-flex;align-items:center;gap:5px">gap-closers` +
+        `<select class="dg-gcalt" style="font:inherit"><option value="0"${GC_ALT ? "" : " selected"}>route + time</option><option value="1"${GC_ALT ? " selected" : ""}>original + time</option></select></label>` : "") +
       `</div>`;
 
     // 3D needs each paper's knowledge-map position. Without a Topic Map yet, ask the page to build it
@@ -1007,6 +1013,7 @@
     hook("dg-nlev", el => { NLEV = +el.value; });
     hook("dg-minb", el => { MINB = +el.value; });
     hook("dg-axis", el => { LOGLV = el.value === "1"; });
+    hook("dg-gcalt", el => { GC_ALT = el.value === "1"; });
     mountEl.querySelectorAll(".dg-mode").forEach(r =>
       r.addEventListener("change", () => { if (r.checked) { MODE = r.value; draw(session, mountEl); } }));
     const chk = mountEl.querySelector(".dg-log");
