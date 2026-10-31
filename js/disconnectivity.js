@@ -104,6 +104,8 @@
   let RES = 1;           // admin density: 1 / 0.75 / 0.5 = KDE bandwidth multiplier; "knn3" / "knn5" / "knn8" =
                          // kNN field in the intrinsic dimension with k neighbours. 1 = the standard landscape.
   let SIG = false;       // admin, kNN field: keep only barriers larger than 1.65x their combined error
+  let FLOOR_HD = false;  // admin, 3D: colour the floor by the SAME high-dimensional free energy as the heights
+                         // (interpolated between papers) instead of the Topic Map's own 2D density
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
                          // the bottom are not squashed under one tall barrier. Tick labels stay true.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
@@ -658,6 +660,35 @@
     const [a, b, f] = t < 0.5 ? [A, B, t / 0.5] : [B, C, (t - 0.5) / 0.5];
     return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * f)).join(",") + ")";
   }
+  // Floor from the SAME free energy as the heights: on a G x G grid over the map, a Gaussian-weighted
+  // average of nearby papers' well depths (bandwidth = median nearest-neighbour distance on the map),
+  // turned into the floor's 0..1 "dense" scale (deepest well = 1). Where no paper is near, the
+  // coverage weight fades the value to 0: the high-dimensional surface is empty there too.
+  function hdFloor(model) {
+    const pts = [];
+    (model.papers || []).forEach(p => {
+      const q = model.pos && model.pos.get(p), f = model.energy && model.energy.get(p);
+      if (q && typeof f === "number") pts.push([q.x, q.y, f]);
+    });
+    if (pts.length < 2) return model.grid;
+    const nn = pts.map((a, i) => Math.min(...pts.map((b, j) => i === j ? Infinity : Math.hypot(a[0] - b[0], a[1] - b[1]))));
+    const sorted = nn.slice().sort((a, b) => a - b), bw = Math.max(0.03, sorted[Math.floor(sorted.length / 2)]);
+    const fs = pts.map(p => p[2]), fmin = Math.min(...fs), fmax = Math.max(...fs), span = (fmax - fmin) || 1;
+    const G = 40, out = [];
+    for (let r = 0; r < G; r++) {
+      const y = r / (G - 1), row = [];
+      for (let c = 0; c < G; c++) {
+        const x = c / (G - 1);
+        let ws = 0, wf = 0;
+        pts.forEach(([px, py, f]) => { const w = Math.exp(-((x - px) ** 2 + (y - py) ** 2) / (2 * bw * bw)); ws += w; wf += w * f; });
+        const t = ws > 1e-9 ? 1 - (wf / ws - fmin) / span : 0;          // deep well -> 1, shallow -> 0
+        row.push(Math.max(0, Math.min(1, t * Math.min(1, ws))));        // fade out away from every paper
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
   function buildDG3(model, W, scores) {
     const tree = model.root, papers = model.papers || [], pos = model.pos;
     const H = 600, ZH = 0.8;
@@ -696,7 +727,7 @@
 
     // Floor: the Topic Map's density field, the map border, and each paper's shadow on it.
     let floor = "";
-    const grid = model.grid;
+    const grid = FLOOR_HD ? hdFloor(model) : model.grid;
     if (grid && grid.length > 1) {
       const G = grid.length, step = Math.max(1, Math.ceil(G / 28));
       for (let r = 0; r < G - 1; r += step) for (let c = 0; c < G - 1; c += step) {
@@ -780,7 +811,7 @@
       `<text x="${(a0.x - 6).toFixed(1)}" y="${(a0.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">0</text>` +
       `<text x="${(a1.x - 6).toFixed(1)}" y="${(a1.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">${fmax.toFixed(2)}</text>` +
       `<text x="${(a1.x + 6).toFixed(1)}" y="${(a1.y - 6).toFixed(1)}" font-size="10" fill="#888">free energy −ln p ↑</text>`;
-    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = Topic Map density · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : "heights exact; map distances between far regions are approximate"}</text>`;
+    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = ${FLOOR_HD ? "free energy of the heights, interpolated between papers" : "Topic Map density"} · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : "heights exact; map distances between far regions are approximate"}</text>`;
 
     // Hover story for each gap-closer, as in the flat view: its bridged pair traced up to their junction.
     const leafOf = new Map();
@@ -1035,6 +1066,7 @@
       `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:8px;` +
       `font:12px system-ui,sans-serif;color:#555">` +
       `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")}${ADMIN ? " " + radio("mst", "MST") : ""}${model.hasFE ? " " + radio("3d", "3D on the map") : ""}</span>` +
+      (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Colour the floor by the same high-dimensional free energy as the heights (interpolated between the papers' map positions) instead of the Topic Map's 2D density."><input type="checkbox" class="dg-floorhd"${FLOOR_HD ? " checked" : ""}/> floor: same free energy as heights</label>` : "") +
       (MODE === "3d" ? `<span style="display:inline-flex;gap:6px">` +
         [["side", "Side"], ["top", "Top"], ["reset", "Reset"]].map(([k, l]) =>
           `<button type="button" class="dg-cam" data-cam="${k}" style="font:inherit;border:1px solid #ddd;background:#fff;border-radius:6px;padding:2px 9px;cursor:pointer">${l}</button>`).join("") +
@@ -1140,6 +1172,7 @@
     hook("dg-gcalt", el => { GC_ALT = el.value === "1"; });
     hook("dg-res", el => { RES = el.value.startsWith("knn") ? el.value : +el.value; });
     hook("dg-sig", el => { SIG = el.checked; });
+    hook("dg-floorhd", el => { FLOOR_HD = el.checked; });
     mountEl.querySelectorAll(".dg-mode").forEach(r =>
       r.addEventListener("change", () => { if (r.checked) { MODE = r.value; draw(session, mountEl); } }));
     const chk = mountEl.querySelector(".dg-log");
