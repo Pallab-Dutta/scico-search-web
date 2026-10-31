@@ -235,34 +235,22 @@
           if (q) pos.set(p, { x: +q.x, y: +q.y });
         });
       }
-      // RESEARCH GAPS: real barriers in the landscape, with what a paper placed at each col would close.
-      // Named after the Topic Map's nearest named gap when one lies close on the map.
-      const tmGaps = (tm && Array.isArray(tm.gaps)) ? tm.gaps : [];
-      const rgaps = (Array.isArray(d.gaps) ? d.gaps : []).map((g, i) => {
-        const A = papers[g.reps && g.reps[0]], B = papers[g.reps && g.reps[1]];
+      // RESEARCH GAPS = the gaps the Topic Map detected (its density valleys), as the backend placed them in
+      // this landscape: the two papers each lies between (flank), the barrier there, and what a paper
+      // placed at the gap would close. In 3D each stands at its exact Topic Map position.
+      const rgaps = (Array.isArray(d.tm_gaps) ? d.tm_gaps : []).map((g, i) => {
+        const A = papers[g.flank && g.flank[0]], B = papers[g.flank && g.flank[1]];
         if (!A || !B) return null;
-        let at = null;                                     // the gap's place on the map (its col)
-        if (pos && g.col) {
-          const qa = pos.get(papers[g.col[0]]), qb = pos.get(papers[g.col[1]]), t = +g.col[2] || 0;
-          if (qa && qb) at = { x: qa.x + (qb.x - qa.x) * t, y: qa.y + (qb.y - qa.y) * t };
-        }
         const cp = g.close_pair && papers[g.close_pair[0]] && papers[g.close_pair[1]] ? { a: papers[g.close_pair[0]], b: papers[g.close_pair[1]] } : null;
-        // With the significance test on, gaps whose barrier is within the error are not shown.
-        if (sigOn && (+g.barrier || 0) < 1.65 * Math.SQRT2 * d.chord_sigma) return null;
-        return { type: "rgap", id: "rg" + i, pair: { a: A, b: B }, close: cp, name: null, at, level: +g.level || 1, barrier: +g.barrier || 0,
-                 closeMax: +g.close_max || 0, closeTotal: +g.close_total || 0, sizes: g.sizes || [0, 0] };
+        return { type: "rgap", id: "rg" + i, pair: { a: A, b: B }, close: cp, name: g.label || null,
+                 at: { x: +g.x, y: +g.y }, fe: +g.fe || 0, barrier: +g.barrier || 0,
+                 closeMax: +g.close_max || 0, closeTotal: +g.close_total || 0 };
       }).filter(Boolean).sort((u, v) => v.closeTotal - u.closeTotal);
       rgaps.forEach((r, i) => { r.num = i + 1; });
-      // Each named Topic Map gap names only its NEAREST research gap (closest pairs first, within 0.15).
-      const cand = [];
-      rgaps.forEach(r => { if (r.at) tmGaps.forEach(tg => { if (tg.label) cand.push([Math.hypot((+tg.x) - r.at.x, (+tg.y) - r.at.y), r, tg]); }); });
-      const usedR = new Set(), usedT = new Set();
-      cand.sort((u, v) => u[0] - v[0]).forEach(([dd, r, tg]) => {
-        if (dd < 0.15 && !usedR.has(r) && !usedT.has(tg)) { r.name = tg.label; usedR.add(r); usedT.add(tg); }
-      });
+      const tmKnown = typeof d.tm_sig === "string" && d.tm_sig !== "0|";   // the Topic Map had gaps
       const estInfo = d.estimator === "knn" ? { d: d.intrinsic_dim, k: d.knn_k, kstar: d.kstar_median, sigma: d.chord_sigma } : null;
       return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid, hasAlt, rgaps, estInfo,
-               estKind: d.estimator || "kde" };
+               estKind: d.estimator || "kde", tmKnown, hasTopic: !!(tm && Array.isArray(tm.points)) };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
     if (d && (d.children || d.leaf)) return { root: d, edges: d.edges || deriveEdges(d) };
@@ -364,9 +352,9 @@
     }
     if (m.type === "rgap")
       return `<b>Research gap G${m.num}${m.name ? ": " + esc(m.name) : ""}</b>` +
-        `<div class="dg-sub">barrier ${(+m.barrier).toFixed(2)} between basins of ${m.sizes[0]} and ${m.sizes[1]} papers (highlighted)</div>` +
-        (m.close ? `<div class="dg-sub">if targeted: a paper here would lower the barrier between “${esc(trunc(m.close.a.title, 40))}” and “${esc(trunc(m.close.b.title, 40))}” by ${(+m.closeMax).toFixed(2)}</div>` : "") +
-        `<div class="dg-sub">total lowering across the field: ${(+m.closeTotal).toFixed(1)}</div>`;
+        `<div class="dg-sub">found on the Topic Map · lies between “${esc(trunc(m.pair.a.title, 40))}” and “${esc(trunc(m.pair.b.title, 40))}” (highlighted) · barrier ${(+m.barrier).toFixed(2)}</div>` +
+        (m.close ? `<div class="dg-sub">if targeted: a paper here would lower the barrier between “${esc(trunc(m.close.a.title, 40))}” and “${esc(trunc(m.close.b.title, 40))}” by ${(+m.closeMax).toFixed(2)} · total across the field ${(+m.closeTotal).toFixed(1)}</div>`
+                 : `<div class="dg-sub">if targeted: no barrier would fall, since these areas are already better connected elsewhere</div>`);
     const reps = m.papers.slice().sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0));
     const list = reps.slice(0, 4).map(p => `<li>${esc(trunc(p.title, 42))}</li>`).join("");
     if (m.type === "basin")                                 // a lumped branch end in the levelled styles
@@ -756,8 +744,10 @@
     // METRIC style (optional): the levelled tree, each superbasin a vertical post standing at its deepest
     // paper's map position (Smeeton, Oakley & Wales' metric disconnectivity graph). Same barriers, drawn
     // in NLEV steps; the exact tree below stays the default.
+    let zOfFe = e => (e || 0) / fmax * ZH;                // height of an energy on this view's axis
     if (METRIC) {
       const lt = levelTree(model), z = e => lt.frac(e || 0) * ZH;
+      zOfFe = z;
       const seg = (u, v, wdt) => lines.push({ d: (u.d + v.d) / 2, svg: `<line x1="${u.x.toFixed(1)}" y1="${u.y.toFixed(1)}" x2="${v.x.toFixed(1)}" y2="${v.y.toFixed(1)}" stroke="#1e2a31" stroke-width="${wdt}" stroke-linecap="round"/>` });
       const place3 = n => { const q0 = pos.get(n.low.paper || n.low) || { x: 0.5, y: 0.5 }; n._w3 = [q0.x - 0.5, 0.5 - q0.y, z(n.e)]; return P(n._w3); };
       (function walk(n, runTop) {                           // runTop: top of the current vertical post run
@@ -831,6 +821,14 @@
       const lab = l => { const q = P(l._w); return { x: q.x, y: q.y, title: (l.paper || l).title }; };
       const jq = P(j._w);
       m.hl = { path: climb(la, j) + climb(lb, j), a: lab(la), b: lab(lb), self: m.node ? lab(m.node) : null, j: { x: jq.x, y: jq.y }, near: true };
+    });
+    // Research gaps stand at their exact Topic Map position, at the height of the barrier they sit in,
+    // with a dashed link to the tree junction where their two papers meet.
+    Object.values(meta).forEach(m => {
+      if (m.type !== "rgap" || !m.hl || !m.at) return;
+      const q = P([m.at.x - 0.5, 0.5 - m.at.y, zOfFe(m.fe)]);
+      m.hl.link = { x1: m.hl.j.x, y1: m.hl.j.y, x2: q.x, y2: q.y };
+      m.hl.j = { x: q.x, y: q.y };
     });
 
     return { inner: `<g class="dg-base">` + floor + axis + paint(lines) + paint(dots) + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W, is3d: true };
@@ -946,29 +944,23 @@
     return built;
   }
 
-  // The list of research gaps under the graph, ranked by how much targeting each would connect.
+  // The list of research gaps under the graph: the Topic Map's gaps, ranked by what targeting each would do.
   function gapPanel(model) {
     const rg = model.rgaps || [];
-    if (!rg.length) return "";
+    const box = inner => `<div class="dg-gaps" style="margin-top:12px;font:12px/1.45 system-ui,sans-serif;color:#333">` +
+      `<div style="font-weight:700;margin-bottom:2px">Research gaps <span style="font-weight:400;color:#888">· found on the Topic Map · ranked by impact if targeted · hover to highlight</span></div>` + inner + `</div>`;
+    if (!rg.length)
+      return model.hasTopic ? box(`<div style="color:#888">The Topic Map found no research gaps for this search.</div>`) : "";
     const row = r =>
       `<div class="dg-gap-row" data-id="${r.id}" style="display:flex;gap:9px;align-items:flex-start;padding:6px 8px;border-top:1px solid #eee;cursor:default">` +
       `<span style="flex:0 0 auto;background:#f2c94c;color:#5a3d00;border:1px solid #9c6b00;border-radius:999px;font-weight:700;font-size:10px;padding:1px 6px">G${r.num}</span>` +
-      `<span style="flex:1;min-width:0"><b>${esc(r.name || `Between “${trunc(r.pair.a.title, 34)}” and “${trunc(r.pair.b.title, 34)}”`)}</b>` +
-      `<span style="display:block;color:#666;margin-top:2px">barrier ${r.barrier.toFixed(2)} · basins of ${r.sizes[0]} and ${r.sizes[1]} papers` +
-      (r.close ? ` · if targeted, closes “${esc(trunc(r.close.a.title, 30))}” ↔ “${esc(trunc(r.close.b.title, 30))}” by ${r.closeMax.toFixed(2)}` : "") +
-      ` · total ${r.closeTotal.toFixed(1)}</span></span></div>`;
-    const head = (sub, note) => `<div class="dg-gaps" style="margin-top:12px;font:12px/1.45 system-ui,sans-serif;color:#333">` +
-      `<div style="font-weight:700;margin-bottom:2px">Research gaps <span style="font-weight:400;color:#888">· ${sub} · hover to highlight</span></div>` +
-      `<div style="color:#888;margin-bottom:4px">${note}Targeting a gap = a new paper at its location. Impact = how much it would lower the barriers between existing papers (same energy units as the graph).</div>`;
-    if (model.estKind === "map2d") {
-      // 2D-map landscape: EVERY saddle is a gap, listed by its level in the tree (1 = top split).
-      const levels = [...new Set(rg.map(r => r.level))].sort((a, b) => a - b);
-      return head("every saddle, by level in the tree",
-          "Landscape of the 2D Topic Map (a projection, same density as the map): it describes the map, not the full embedding space. ") +
-        levels.map(l => `<div style="font-weight:700;color:#555;margin:8px 0 2px">Level ${l}${l === 1 ? " · top split" : ""}</div>` +
-          rg.filter(r => r.level === l).sort((u, v) => v.barrier - u.barrier).map(row).join("")).join("") + `</div>`;
-    }
-    return head("ranked by impact if targeted", "") + rg.map(row).join("") + `</div>`;
+      `<span style="flex:1;min-width:0"><b>${esc(r.name || "Research gap")}</b>` +
+      `<span style="display:block;color:#666;margin-top:2px">between “${esc(trunc(r.pair.a.title, 34))}” and “${esc(trunc(r.pair.b.title, 34))}” · barrier ${r.barrier.toFixed(2)}` +
+      (r.close ? ` · if targeted, closes “${esc(trunc(r.close.a.title, 30))}” ↔ “${esc(trunc(r.close.b.title, 30))}” by ${r.closeMax.toFixed(2)} · total ${r.closeTotal.toFixed(1)}`
+               : ` · if targeted, no barrier would fall (already better connected elsewhere)`) +
+      `</span></span></div>`;
+    return box(`<div style="color:#888;margin-bottom:4px">Targeting a gap = a new paper at its location. Impact = how much it would lower the barriers between existing papers (same energy units as the graph).</div>` +
+      rg.map(row).join(""));
   }
 
   /* ---- Gap-closer story on hover: dim the graph, trace the bridged pair up to their junction ---- */
@@ -985,6 +977,7 @@
     base.style.opacity = ".22";
     layer.innerHTML =
       `<path d="${h.path}" stroke="${RED}" stroke-width="3" fill="none" stroke-linejoin="round"/>` +
+      (h.link ? `<line x1="${h.link.x1.toFixed(1)}" y1="${h.link.y1.toFixed(1)}" x2="${h.link.x2.toFixed(1)}" y2="${h.link.y2.toFixed(1)}" stroke="${RED}" stroke-width="2" stroke-dasharray="5 4"/>` : "") +
       `<circle cx="${h.j.x.toFixed(1)}" cy="${h.j.y.toFixed(1)}" r="7" fill="${RED}" stroke="#fff" stroke-width="1.5"/>` +
       ring(h.a, RED) + ring(h.b, RED) + (h.self ? ring(h.self, INK) : "") +
       title(h.a, RED) + title(h.b, RED) + (h.self ? title(h.self, INK) : "");

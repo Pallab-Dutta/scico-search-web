@@ -264,7 +264,7 @@
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261031a"></script>
 <script src="js/shell.js?v=20261031b"></script>
-<script src="js/disconnectivity.js?v=20261102d"></script>
+<script src="js/disconnectivity.js?v=20261103a"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -642,35 +642,39 @@
   }
   // The Gap Graph's 3D view stands the tree on the Topic Map. If the map hasn't been built yet, build it
   // (free) and hand back the refreshed session; the Topic Map tab then reuses it.
-  window.dgEnsureMap = async function(){
-    if(!TOPIC){
-      const { job_id }=await window.SciCoAPI.topicMap(SID);
-      await window.SciCoAPI.streamJob(job_id,{});
-    }
+  // The Gap Graph's research gaps are the Topic Map's gaps, so it needs the Topic Map (free to build).
+  // tmSig identifies the Topic Map's gap set; a graph built against another set is rebuilt (free).
+  const tmSig = tm => { const g=(tm&&tm.gaps)||[]; return g.length+'|'+g.map(x=>String(x.label||'')).join('|'); };
+  async function ensureTopic(){
+    if(TOPIC) return;
+    const cur=await window.SciCoAPI.getSession(SID);        // the page may not have loaded it yet
+    if(cur.topic_map && cur.topic_map.points){ TOPIC=cur.topic_map; return; }
+    $('discStatus').innerHTML=loadHTML('Finding the research gaps on the Topic Map…');
+    const { job_id }=await window.SciCoAPI.topicMap(SID);
+    await window.SciCoAPI.streamJob(job_id,{});
     const data=await window.SciCoAPI.getSession(SID);
     TOPIC=data.topic_map||TOPIC;
-    return data;
-  };
-  // Admin: build the Gap Graph at another density resolution (cached on the session, no quota).
-  window.dgEnsureRes = async function(res){
-    if(res==='map2d' && !TOPIC) await window.dgEnsureMap();   // the 2D-map landscape needs the Topic Map
+  }
+  async function buildDisc(res){
     const { job_id }=await window.SciCoAPI.disconnectivity(SID, res);
-    await window.SciCoAPI.streamJob(job_id,{});
+    await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat' && !res) $('discStatus').innerHTML=loadHTML(d.message); } });
     return await window.SciCoAPI.getSession(SID);
-  };
+  }
+  window.dgEnsureMap = async function(){ await ensureTopic(); return await window.SciCoAPI.getSession(SID); };
+  // Admin: build the Gap Graph with another density setting (cached on the session, no quota).
+  window.dgEnsureRes = async function(res){ await ensureTopic(); return await buildDisc(res); };
   async function startDisc(){
     if(!SID){ $('discStatus').textContent='No session specified.'; return; }
     try{
       $('discStatus').innerHTML=loadHTML('Loading the Gap Graph…');
+      await ensureTopic();
       let data=await window.SciCoAPI.getSession(SID);
-      // Cached on the session: show it. Graphs saved before the current version (7: research gaps with their
-      // targeting impact, log-space densities) are rebuilt once; rebuilding a saved graph is free.
-      if(data.disconnectivity && data.disconnectivity.tree && (data.disconnectivity.dg_version||1)>=7){ renderDisc(data); return; }
+      const dg=data.disconnectivity;
+      // Cached on the session and current (version 8: research gaps = the Topic Map's gaps, built against
+      // this Topic Map): show it. Otherwise rebuild once; rebuilding a saved graph is free.
+      if(dg && dg.tree && (dg.dg_version||1)>=8 && dg.tm_sig===tmSig(data.topic_map)){ renderDisc(data); return; }
       $('discStatus').innerHTML=loadHTML('Building the research-gap landscape…');
-      const { job_id }=await window.SciCoAPI.disconnectivity(SID);
-      await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('discStatus').innerHTML=loadHTML(d.message); } });
-      data=await window.SciCoAPI.getSession(SID);
-      renderDisc(data);
+      renderDisc(await buildDisc());
     }catch(err){
       if(err.code===429||err.code===402){ $('discStatus').innerHTML='You have used this month\'s Research-Gap Graphs. <a href="pricing.html">See plans &amp; pricing</a> for more; graphs you already built stay available.'; return; }
       $('discStatus').textContent = err.code===401 ? 'Please sign in again.' : ('Could not build the graph ('+(err.message||'error')+').');
