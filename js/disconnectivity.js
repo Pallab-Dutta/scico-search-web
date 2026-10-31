@@ -510,10 +510,36 @@
     return { type: "basin", papers: nd.papers, depth: nd.low.fe || 0, level: nd.e };
   }
 
+  // Gap-closer hover story for the levelled styles: each bridged paper's branch end, traced up the
+  // levelled tree to the level where their branches meet. pt(n) = a node's drawn point; dotPt(n) = its
+  // branch end. Skipped when both papers sit in the same lumped end (no barrier separates them there).
+  function levelHL(lt, meta, pt, dotPt) {
+    const endOf = new Map();
+    (function par(n, p) {
+      n._par = p;
+      if (!n.kids.length) n.papers.forEach(q => endOf.set(q, n));
+      n.kids.forEach(c => par(c, n));
+    })(lt.top, null);
+    const seg = (u, v) => `M${u.x.toFixed(1)} ${u.y.toFixed(1)} L${v.x.toFixed(1)} ${v.y.toFixed(1)} `;
+    Object.values(meta).forEach(m => {
+      if (m.type !== "paper" || !m.pair) return;
+      const na = endOf.get(m.pair.a), nb = endOf.get(m.pair.b), ns = endOf.get(m.paper);
+      if (!na || !nb || na === nb) return;
+      const anc = new Set();
+      for (let c = na; c; c = c._par) anc.add(c);
+      let j = nb;
+      while (j && !anc.has(j)) j = j._par;
+      if (!j) return;
+      const climb = n => { let d = seg(dotPt(n), pt(n)), c = n; while (c !== j && c._par) { d += seg(pt(c), pt(c._par)); c = c._par; } return d; };
+      const lab = (n, p) => { const q = dotPt(n); return { x: q.x, y: q.y, title: p.title }; };
+      m.hl = { path: climb(na) + climb(nb), a: lab(na, m.pair.a), b: lab(nb, m.pair.b), self: ns ? lab(ns, m.paper) : null, j: pt(j), near: true };
+    });
+  }
+
   /* Textbook flat view: disconnectionDPS layout. A branch is as wide as the number of branch ends under
      it; at every split the deepest sub-basin goes in the centre and the others alternate right and left,
      so the global minimum runs down the middle. Straight lines join consecutive levels. */
-  function buildLevels(model, W) {
+  function buildLevels(model, W, scores) {
     const lt = levelTree(model), fe = n => n.fe || 0;
     const width = n => n._w || (n._w = n.kids.length ? n.kids.reduce((a, c) => a + width(c), 0) : 1);
     const slots = width(lt.top);
@@ -542,7 +568,8 @@
       if (!n.kids.length) {                                 // branch end: drop to its deepest paper's own energy
         const yb = yAt(fe(n.low)), id = "v" + (uid++);
         lines += `<line x1="${n._x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${n._x.toFixed(1)}" y2="${yb.toFixed(1)}" stroke="#1e2a31" stroke-width="1.3" stroke-linecap="round"/>`;
-        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${yb.toFixed(1)}" r="${n.size > 1 ? 4 : 3}" fill="${n.size > 1 ? "#6e7a82" : "#2e9e5b"}" stroke="#fff" stroke-width="1"/>`;
+        const st = n.size === 1 ? paperStyle(n.papers[0], scores) : null;     // gap-closer tint when highlighted
+        dots += `<circle class="dg-node" data-id="${id}" cx="${n._x.toFixed(1)}" cy="${yb.toFixed(1)}" r="${st ? Math.max(3, st.r - 1.5).toFixed(1) : 4}" fill="${st ? st.fill : "#6e7a82"}" stroke="#fff" stroke-width="1"/>`;
         meta[id] = levelMeta(model, n);
       } else if (n.kids.length > 1) {                       // a split: the barrier between these sub-basins
         const id = "v" + (uid++);
@@ -551,6 +578,7 @@
       }
     })(lt.top, yAt(lt.top.e));
     lines += `<line x1="${lt.top._x.toFixed(1)}" y1="${yAt(lt.top.e).toFixed(1)}" x2="${lt.top._x.toFixed(1)}" y2="${(yAt(lt.top.e) - 14).toFixed(1)}" stroke="#1e2a31" stroke-width="1.3"/>`;
+    levelHL(lt, meta, n => ({ x: n._x, y: yAt(n.e) }), n => ({ x: n._x, y: yAt(n.low.fe || 0) }));
     const ax = left - 16, bottomY = top + energyH;
     const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => {
       const y = top + (1 - f) * energyH;
@@ -654,7 +682,8 @@
         if (!n.kids.length) {                               // branch end: drop to the deepest paper's own energy
           const b = P([n._w3[0], n._w3[1], z(n.low.fe)]);
           seg(q, b, 1.3);
-          dots.push({ d: b.d, svg: `<circle class="dg-node" data-id="${id}" cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${n.size > 1 ? 4.5 : 3.5}" fill="${n.size > 1 ? "#6e7a82" : "#2e9e5b"}" stroke="#fff" stroke-width="1"/>` });
+          const st = n.size === 1 ? paperStyle(n.papers[0], scores) : null;
+          dots.push({ d: b.d, svg: `<circle class="dg-node" data-id="${id}" cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${st ? Math.max(3.5, st.r - 1).toFixed(1) : 4.5}" fill="${st ? st.fill : "#6e7a82"}" stroke="#fff" stroke-width="1"/>` });
           meta[id] = levelMeta(model, n);
         } else if (n.kids.length > 1) {
           dots.push({ d: q.d, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="4" fill="#d64545" stroke="#fff" stroke-width="1"/>` });
@@ -663,6 +692,7 @@
       })(lt.top, null);
       const t0 = P(lt.top._w3), t1 = P([lt.top._w3[0], lt.top._w3[1], lt.top._w3[2] + 0.05]);
       seg(t0, t1, 1.3);
+      levelHL(lt, meta, n => P(n._w3), n => P([n._w3[0], n._w3[1], z(n.low.fe)]));
     }
 
     // Branches (each child to its junction) and nodes, painted far to near.
@@ -828,8 +858,8 @@
     layer.innerHTML =
       `<path d="${h.path}" stroke="${RED}" stroke-width="3" fill="none" stroke-linejoin="round"/>` +
       `<circle cx="${h.j.x.toFixed(1)}" cy="${h.j.y.toFixed(1)}" r="7" fill="${RED}" stroke="#fff" stroke-width="1.5"/>` +
-      ring(h.a, RED) + ring(h.b, RED) + ring(h.self, INK) +
-      title(h.a, RED) + title(h.b, RED) + title(h.self, INK);
+      ring(h.a, RED) + ring(h.b, RED) + (h.self ? ring(h.self, INK) : "") +
+      title(h.a, RED) + title(h.b, RED) + (h.self ? title(h.self, INK) : "");
   }
 
   /* ---- Shared shell: toolbar, svg wrapper, tooltip ---- */
@@ -898,7 +928,7 @@
                  : bridgeScore(model);
     const need3dMap = MODE === "3d" && !(model.pos && model.pos.size);
     const built = need3dMap ? null : MODE === "mst" ? buildMST(model, W, scores) : MODE === "3d" ? buildDG3(model, W, scores)
-                : (LEVELLED && model.hasFE) ? buildLevels(model, W) : buildDG(model, W, scores);
+                : (LEVELLED && model.hasFE) ? buildLevels(model, W, scores) : buildDG(model, W, scores);
 
     const radio = (v, lbl) =>
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">` +
