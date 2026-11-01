@@ -168,6 +168,36 @@
   }
 
   let n = 0;
+  // CAST SHADOW (large loaders), as on the homepage: sunlight from SUN, the Earth blocks a band as wide as
+  // itself and each stick a strip (the stick swept along the rays, away from the sun). One solid shape faded
+  // once through a mask (so overlaps never darken twice), from the still arrow's tip level outwards, drawn
+  // under the Earth so the Earth's face stays clear. The rotating stick's strip turns with it.
+  const CAST_FAR = 900, CAST_LEN = 430;
+  const castDir = () => [-Math.cos(rad(SUN)), Math.sin(rad(SUN))];          // screen axes (y down)
+  const poly = pts => "M" + pts.map(q => f(q[0]) + " " + f(q[1])).join("L") + "Z";
+  function castBand() {
+    const [dx, dy] = castDir(), px = -dy * R_SURF, py = dx * R_SURF, F = CAST_FAR;
+    return poly([[CX + px, CY + py], [CX + px + F * dx, CY + py + F * dy], [CX - px + F * dx, CY - py + F * dy], [CX - px, CY - py]]);
+  }
+  function castStrip(th) {
+    const [dx, dy] = castDir(), ux = Math.cos(rad(th)), uy = -Math.sin(rad(th)), F = CAST_FAR;
+    if (Math.abs(ux * dy - uy * dx) < 1e-3) return "";                       // along the rays: no shadow
+    const b = [CX + ux * R_SURF, CY + uy * R_SURF], t = [CX + ux * R_TIP, CY + uy * R_TIP];
+    return poly([b, t, [t[0] + F * dx, t[1] + F * dy], [b[0] + F * dx, b[1] + F * dy]]);
+  }
+  function castLayer(id, th) {
+    const [dx, dy] = castDir(), s0 = -R_TIP, s1 = CAST_LEN;
+    let stops = "";
+    for (let i = 0; i <= 8; i++) stops += '<stop offset="' + (i / 8) + '" stop-color="#fff" stop-opacity="' + Math.pow(1 - i / 8, 2).toFixed(3) + '"/>';
+    return '<defs><linearGradient id="' + id + 'g" gradientUnits="userSpaceOnUse" x1="' + f(CX + dx * s0) + '" y1="' + f(CY + dy * s0) +
+        '" x2="' + f(CX + dx * s1) + '" y2="' + f(CY + dy * s1) + '">' + stops + '</linearGradient>' +
+      '<mask id="' + id + 'm" maskUnits="userSpaceOnUse" x="6" y="96" width="600" height="600"><rect x="6" y="96" width="600" height="600" fill="url(#' + id + 'g)"/></mask></defs>' +
+      '<g class="era-cast" mask="url(#' + id + 'm)" opacity=".34">' +
+        '<path d="' + castBand() + '" fill="' + SHADE + '"/>' +
+        '<path d="' + castStrip(STILL) + '" fill="' + SHADE + '"/>' +
+        '<path class="era-cast-o" d="' + castStrip(th) + '" fill="' + SHADE + '"/></g>';
+  }
+
   function svg(cls, opts) {
     const still = !!(opts && opts.still);   // a static mark (logo): drawn once, never animated
     if (!still) start();
@@ -184,7 +214,7 @@
       '<path class="era-ar-o" d="' + area(th) + '" fill="url(#' + g + ')"/>';
     return '<svg class="' + (still ? "era-mark " : "era-ld ") + (cls || "") + '" viewBox="6 96 600 600" role="img" aria-label="' +
       (still ? "Eratosthenes" : "Loading") + '">' +
-      shade + areas +
+      shade + areas + ((opts && opts.cast) ? castLayer("era-cast-" + n, th) : "") +
       '<circle cx="306" cy="396" r="181.6" fill="#fff" stroke="' + RING + '" stroke-width="20"/>' +
       (withArea ? '<path d="' + nightDisc() + '" fill="' + SHADE + '" fill-opacity=".09"/>' : "") +
       '<path d="' + nightPath() + '" fill="none" stroke="' + NIGHT + '" stroke-width="20"/>' +
@@ -210,9 +240,11 @@
     } else {
       idleSince = 0;
       const th = angleAt(now), tr = "rotate(" + f(POSE - th) + " 306 396)", d = shadowPath(th);
-      let ar = null, col = null;
+      let ar = null, col = null, cs = null;
       for (const el of live) {
         const o = el.querySelector(".era-orange"), s = el.querySelector(".era-sh-o"), a = el.querySelector(".era-ar-o");
+        const c = el.querySelector(".era-cast-o");
+        if (c) c.setAttribute("d", cs !== null ? cs : (cs = castStrip(th)));
         if (o) o.setAttribute("transform", tr);
         if (s) { s.setAttribute("d", d); if (s.classList.contains("era-fade")) s.style.stroke = col || (col = shadeAt(th)); }
         if (a) a.setAttribute("d", ar || (ar = area(th)));
@@ -256,7 +288,8 @@
     sun: () => SUN,       // sunlight direction, degrees
     still: () => STILL,   // still arrow angle
     angle: () => cur,     // rotating arrow angle right now
-    block: (label, opts) => '<div class="era-ld-block" role="status">' + svg("", opts) +
+    // Large loader: with the cast shadow by default (pass { cast: false } for none).
+    block: (label, opts) => '<div class="era-ld-block" role="status">' + svg("", Object.assign({ cast: true }, opts)) +
       (label ? '<div class="era-ld-label">' + esc(label) + '</div>' : "") + '</div>',
     inline: opts => '<span class="era-ld-inline">' + svg("", opts) + '</span>',
     // The logo, standing still. The rotating arrow sits where a 0.75 score puts it, which is the
