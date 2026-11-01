@@ -43,7 +43,8 @@
     const B1 = L(A1, A2, t0, t2), B2 = L(A2, A3, t1, t3);
     return L(B1, B2, t1, t2);
   }
-  function curve(pts, i, u) {                              // point on the leg from key i to key i + 1
+  function curve(pts, i, u, straight) {                    // point on the leg from key i to key i + 1
+    if (straight) return add(mul(pts[i], 1 - u), mul(pts[i + 1], u));   // a straight line between the two keys
     const n = pts.length, P = k => pts[clamp(k, 0, n - 1)];
     const p0 = i - 1 < 0 ? sub(mul(P(0), 2), P(1)) : P(i - 1);          // mirrored end points
     const p3 = i + 2 > n - 1 ? sub(mul(P(n - 1), 2), P(n - 2)) : P(i + 2);
@@ -62,9 +63,10 @@
       if (i < ks.length - 1) {
         const dur = Math.max(0.05, +ks[i].dur || 0);
         const M = 48, acc = [0];
-        let prev = curve(pos, i, 0);
-        for (let m = 1; m <= M; m++) { const q = curve(pos, i, m / M); acc.push(acc[m - 1] + len(sub(q, prev))); prev = q; }
-        legs.push({ kind: "fly", i, t0: T, t1: T + dur, ease: EASE[ks[i].ease] || EASE.smooth, acc, total: acc[M] });
+        const straight = ks[i].shape !== "curve";
+        let prev = curve(pos, i, 0, straight);
+        for (let m = 1; m <= M; m++) { const q = curve(pos, i, m / M, straight); acc.push(acc[m - 1] + len(sub(q, prev))); prev = q; }
+        legs.push({ kind: "fly", i, t0: T, t1: T + dur, ease: EASE[ks[i].ease] || EASE.smooth, acc, total: acc[M], straight });
         T += dur;
       }
     }
@@ -86,7 +88,7 @@
       while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (a[mid] < want) lo = mid; else hi = mid; }
       u = (lo + (want - a[lo]) / ((a[hi] - a[lo]) || 1)) / M;
     }
-    return { pos: curve(path.pos, leg.i, u), tgt: curve(path.tgt, leg.i, e) };
+    return { pos: curve(path.pos, leg.i, u, leg.straight), tgt: curve(path.tgt, leg.i, e, leg.straight) };
   };
 
   // Height of the drawn surface under (x, y), or 0 off the map / where the surface is not drawn.
@@ -455,68 +457,17 @@
   }
 
   // The camera at time t, kept above the surface when asked (so a path never dives into a ridge).
-  // Ground for "keep the drone above the surface": the landscape as a SOLID, continuous height -- each
-  // well's walls carried on up to the rim height (no sudden drop where the drawn surface is cut away),
-  // easing down to the floor over 0.3 map widths beyond the grid. A hard step here made the drone leap
-  // up and back down in one frame whenever its path crossed a rim.
-  D.groundZ = function (scene, x, y) {
-    const S = scene.surface;
-    if (!S || !S.xs) return 0;
-    const X = x + 0.5, Y = 0.5 - y, xs = S.xs, ys = S.ys, top = scene.top || 0.8;
-    const [c, fc] = seek(xs, X), [r, fr] = seek(ys, Y), Z = S.z;
-    const h = Math.min(top, (Z[r][c] * (1 - fc) + Z[r][c + 1] * fc) * (1 - fr) + (Z[r + 1][c] * (1 - fc) + Z[r + 1][c + 1] * fc) * fr);
-    const out = Math.max(0, xs[0] - X, X - xs[xs.length - 1], ys[0] - Y, Y - ys[ys.length - 1]);
-    if (out <= 0) return h;
-    const f = clamp(out / 0.3, 0, 1);
-    return h * (1 - f * f * (3 - 2 * f));
-  };
-  // Where t falls within a flight leg (0..1), or -1 while hovering at a keyframe.
-  function legFrac(path, t) {
-    for (const l of path.legs) if (t <= l.t1) return l.kind === "fly" ? clamp((t - l.t0) / ((l.t1 - l.t0) || 1), 0, 1) : -1;
-    return -1;
-  }
-  // The drone at time t. With keepAbove, it is lifted just enough to clear the ground, but only BETWEEN
-  // keyframes (the lift grows and shrinks smoothly along each leg), so every keyframe view is exactly the
-  // one that was set, and the motion stays continuous.
-  // The lift over the whole flight, worked out once: how far below the ground the path would go, taken as
-  // a running maximum over +-0.7 s (so the drone starts climbing BEFORE a rim, not at it) and smoothed
-  // over time, then faded to zero at every keyframe. Cached on the path.
-  function liftProfile(scene, path, k) {
-    const key = k;
-    if (path._lift && path._lift.scene === scene && path._lift.key === key) return path._lift;
-    const T = path.duration, rate = 30, n = Math.max(2, Math.ceil(T * rate)), need = new Float64Array(n + 1);
-    for (let i = 0; i <= n; i++) {
-      const t = T * i / n, u = legFrac(path, t), c = D.camAt(path, t);
-      need[i] = u > 0 && c ? Math.max(0, D.groundZ(scene, c.pos[0] / k, c.pos[1] / k) + 0.04 - c.pos[2]) : 0;
-    }
-    const win = Math.round(0.7 * rate), mx = new Float64Array(n + 1);
-    for (let i = 0; i <= n; i++) { let m = 0; for (let j = Math.max(0, i - win); j <= Math.min(n, i + win); j++) if (need[j] > m) m = need[j]; mx[i] = m; }
-    const sg = 0.25 * rate, half = Math.ceil(3 * sg), sm = new Float64Array(n + 1);
-    for (let i = 0; i <= n; i++) {
-      let a = 0, w = 0;
-      for (let j = Math.max(0, i - half); j <= Math.min(n, i + half); j++) { const g = Math.exp(-((j - i) ** 2) / (2 * sg * sg)); a += g * mx[j]; w += g; }
-      const u = legFrac(path, T * i / n);
-      sm[i] = u > 0 ? (a / w) * Math.sin(Math.PI * u) : 0;
-    }
-    path._lift = { scene, key, n, T, v: sm };
-    return path._lift;
-  }
-  // The drone at time t. With keepAbove it is lifted clear of the ground (see liftProfile); every
-  // keyframe view stays exactly as it was set and the motion stays smooth.
-  D.frameCam = function (scene, path, t, keepAbove, spread) {
-    const c = D.camAt(path, t), k = spread || 1;
+  // The drone at time t: exactly the planned path (it flies through the see-through surface).
+  D.frameCam = function (scene, path, t) {
+    const c = D.camAt(path, t);
     if (!c) return null;
     const pos = c.pos.slice();
-    if (keepAbove && scene.surface) {
-      const L = liftProfile(scene, path, k), x = clamp(t / (L.T || 1), 0, 1) * L.n, i = Math.min(L.n - 1, Math.floor(x)), f = x - i;
-      pos[2] += L.v[i] * (1 - f) + L.v[i + 1] * f;
-    }
     pos[2] = Math.max(pos[2], 0.01);
     return { pos, tgt: c.tgt };
   };
 
   /* ---------------- flight file ---------------- */
-  // flight = { scene, keys, settings: { W, H, fps, fov, alpha, surface, keepAbove, bg }, title }
+  // flight = { scene, keys, settings: { W, H, fps, fov, alpha, surface, bg, spread, wire }, title }
   D.flightHTML = function (flight) {
     const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
     const data = JSON.stringify(flight, (k, v) => typeof v === "number" ? Math.round(v * 1e4) / 1e4 : v).replace(/</g, "\\u003c");
@@ -548,7 +499,7 @@ Drone.player(document.getElementById("c"), FLIGHT);<\/script></body></html>`;
     const ctx = canvas.getContext("2d");
     canvas.width = st.W; canvas.height = st.H;
     const opt = lod => ({ W: st.W, H: st.H, fov: st.fov, lod, alpha: st.alpha, surface: st.surface, bg: st.bg, spread: st.spread || 1, wire: !!st.wire });
-    const draw = (t, lod) => { const c = D.frameCam(F.scene, path, t, st.keepAbove, st.spread); if (c) D.render(ctx, F.scene, c, opt(lod)); };
+    const draw = (t, lod) => { const c = D.frameCam(F.scene, path, t); if (c) D.render(ctx, F.scene, c, opt(lod)); };
     const q = new URLSearchParams(location.search), fr = q.get("frame");
     if (fr != null) {                                      // exact frame for the MP4 script
       document.body.classList.add("frame");
@@ -624,7 +575,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const storeKey = "eratost_drone:" + (opts.sessionId || "default");
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(storeKey) || "null"); } catch (_) { saved = null; }
-    const st = Object.assign({ W: 1920, H: 1080, fps: 30, fov: 52, alpha: 0.35, surface: !!scene.surface, keepAbove: false, bg: "#ffffff", spread: 1, wire: true, newDur: 3, newEase: "smooth" },
+    const st = Object.assign({ W: 1920, H: 1080, fps: 30, fov: 52, alpha: 0.35, surface: !!scene.surface, bg: "#ffffff", spread: 1, wire: true, newDur: 3, newEase: "smooth" },
                              (saved && saved.settings) || {});
     let keys = (saved && Array.isArray(saved.keys)) ? saved.keys : [];
     let sel = -1;
@@ -678,14 +629,14 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
 <div class="muted">Fly: drag to look around · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>E</kbd>/<kbd>Q</kbd> up/down · wheel forward/back · hold <kbd>Shift</kbd> to go faster. Click the picture first so it takes the keys.</div></div>
 <div class="dp">
 <div><h4>Keyframes</h4><div class="row"><button class="pri x-add">+ Add keyframe here</button><button class="x-path">Hide path</button></div>
-<div class="muted" style="margin-top:4px">Each keyframe is where the drone is and what it looks at. It flies a smooth curve through them in order. Per keyframe: <b>hover</b> = seconds it stays there, <b>fly</b> = seconds to reach the next one (longer = slower), <b>easing</b> = how it speeds up or slows down on that leg.</div></div>
+<div class="muted" style="margin-top:4px">Each keyframe is where the drone is and what it looks at. It flies a smooth curve through them in order. Per keyframe: <b>hover</b> = seconds it stays there, <b>fly</b> = seconds to reach the next one (longer = slower), <b>easing</b> = how it speeds up or slows down on that leg, <b>straight line / smooth curve</b> = the leg's shape (a curve bends smoothly through the neighbouring keyframes).</div></div>
 <div class="keys"></div>
 <div><h4>New keyframes get</h4><div class="row">fly <input type="number" class="x-ndur" min="0.2" step="0.5" style="width:58px"/> s <select class="x-nease"></select></div></div>
 <div><h4>Look</h4>
 <div class="row">surface <input type="checkbox" class="x-surf"/> opacity <input type="range" class="x-alpha" min="0" max="1" step="0.05" style="width:110px"/> <label><input type="checkbox" class="x-wire"/> wireframe</label></div>
 <div class="row">lens (field of view) <input type="range" class="x-fov" min="25" max="95" step="1" style="width:110px"/> <span class="x-fovv"></span></div>
 <div class="row" title="Stretch the landscape sideways (x, y) without changing its heights. Set it before placing keyframes: they live in the stretched space.">spread X,Y <input type="range" class="x-spread" min="1" max="2.5" step="0.05" style="width:110px"/> <span class="x-spreadv"></span></div>
-<div class="row"><label><input type="checkbox" class="x-above"/> keep the drone above the surface</label></div></div>
+</div>
 <div><h4>Video</h4><div class="row"><select class="x-size"></select> <select class="x-fps"><option value="30">30 fps</option><option value="60">60 fps</option><option value="24">24 fps</option></select></div></div>
 <div><h4>Export</h4><div class="row"><button class="pri x-dl">Download flight file</button></div>
 <div class="muted" style="margin-top:4px">One HTML file with this landscape and path. Open it in any browser to play it or record a WebM. For a full-quality MP4, its "Render a full-quality MP4" box gives the Chrome + ffmpeg commands.</div>
@@ -704,7 +655,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const rebuild = () => {
       path = D.prepare(keys);
       pathPts = [];
-      if (path.keys.length > 1) for (let i = 0; i <= 200; i++) { const c = D.frameCam(scene, path, path.duration * i / 200, st.keepAbove, st.spread); if (c) pathPts.push(c.pos); }
+      if (path.keys.length > 1) for (let i = 0; i <= 200; i++) { const c = D.frameCam(scene, path, path.duration * i / 200); if (c) pathPts.push(c.pos); }
       slider.max = Math.max(0.01, path.duration);
       if (t > path.duration) t = path.duration;
       save(); dirty = true;
@@ -721,7 +672,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     };
     const fmt = x => x.toFixed(1) + " s / " + path.duration.toFixed(1) + " s";
     const draw = lod => {
-      const c = playing || (!showPathNow()) ? D.frameCam(scene, path, t, st.keepAbove, st.spread) : camNow();
+      const c = playing || (!showPathNow()) ? D.frameCam(scene, path, t) : camNow();
       if (!c) return;
       D.render(ctx, scene, c, { W: canvas.width, H: canvas.height, fov: st.fov, lod, alpha: st.alpha, surface: st.surface, bg: st.bg, spread: st.spread, wire: st.wire,
         path: !playing && showPath && !scrubView ? { pts: pathPts, keys: path.keys.map(k => k.pos), sel } : null });
@@ -798,7 +749,8 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
         <div class="row"><span class="kn">${i + 1}</span><span class="muted" title="position">at (${fmtP(k.pos)})</span></div>
         <div class="row">hover <input type="number" min="0" step="0.5" value="${+k.hold || 0}" data-f="hold"/> s
           ${i < keys.length - 1 ? `· fly <input type="number" min="0.2" step="0.5" value="${+k.dur || 3}" data-f="dur"/> s
-          <select data-f="ease">${D.EASES.map(([v, tt]) => `<option value="${v}"${(k.ease || "smooth") === v ? " selected" : ""}>${tt}</option>`).join("")}</select>` : `<span class="muted">· last keyframe</span>`}</div>
+          <select data-f="ease">${D.EASES.map(([v, tt]) => `<option value="${v}"${(k.ease || "smooth") === v ? " selected" : ""}>${tt}</option>`).join("")}</select>
+          <select data-f="shape" title="How the drone travels to the next keyframe"><option value="straight"${k.shape !== "curve" ? " selected" : ""}>straight line</option><option value="curve"${k.shape === "curve" ? " selected" : ""}>smooth curve</option></select>` : `<span class="muted">· last keyframe</span>`}</div>
         <div class="row mini"><button data-a="go">Go to</button><button data-a="set" title="Move this keyframe to where the camera is now">Set to view</button>
           <button data-a="up" title="Earlier">↑</button><button data-a="down" title="Later">↓</button><button data-a="ins" title="Insert a new keyframe after this one, at the current view">+ after</button><button data-a="del">Delete</button></div></div>`).join("")
         : `<div class="muted">No keyframes yet. Fly to where the video should start and click "Add keyframe here".</div>`;
@@ -807,7 +759,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
       const box = e.target.closest(".key"); if (!box) return;
       const k = keys[+box.dataset.i], f = e.target.dataset.f;
       if (!k || !f) return;
-      k[f] = f === "ease" ? e.target.value : Math.max(f === "dur" ? 0.2 : 0, +e.target.value || 0);
+      k[f] = f === "ease" || f === "shape" ? e.target.value : Math.max(f === "dur" ? 0.2 : 0, +e.target.value || 0);
       rebuild();
     });
     keysEl.addEventListener("click", e => {
@@ -851,7 +803,6 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     bind("x-alpha", x => x.value = st.alpha, x => st.alpha = +x.value, "input");
     bind("x-wire", x => x.checked = !!st.wire, x => st.wire = x.checked);
     bind("x-fov", x => { x.value = st.fov; $("x-fovv").textContent = st.fov + "°"; }, x => { st.fov = +x.value; $("x-fovv").textContent = st.fov + "°"; }, "input");
-    bind("x-above", x => x.checked = st.keepAbove, x => { st.keepAbove = x.checked; rebuild(); });
     bind("x-spread", x => { x.value = st.spread; $("x-spreadv").textContent = (+st.spread).toFixed(2) + "×"; }, x => { st.spread = +x.value; $("x-spreadv").textContent = st.spread.toFixed(2) + "×"; }, "input");
     bind("x-size", x => x.value = st.W + "x" + st.H, x => { const [w, h] = x.value.split("x").map(Number); st.W = w; st.H = h; size(); });
     bind("x-fps", x => x.value = String(st.fps), x => st.fps = +x.value);
@@ -866,7 +817,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const base = () => ("eratost_" + (opts.title || "flight")).replace(/[^\w-]+/g, "_").slice(0, 60);
     $("x-dl").onclick = () => {
       if (path.keys.length < 2) { timeEl.textContent = "Add at least two keyframes first."; return; }
-      const settings = { W: st.W, H: st.H, fps: st.fps, fov: st.fov, alpha: st.alpha, surface: st.surface, keepAbove: st.keepAbove, bg: st.bg, spread: st.spread, wire: !!st.wire };
+      const settings = { W: st.W, H: st.H, fps: st.fps, fov: st.fov, alpha: st.alpha, surface: st.surface, bg: st.bg, spread: st.spread, wire: !!st.wire };
       download(base() + "_flight.html", D.flightHTML({ title: "Eratost · " + (opts.title || "flight"), scene, keys, settings }), "text/html");
     };
     $("x-savep").onclick = () => download(base() + "_path.json", JSON.stringify({ keys, settings: st }, null, 1), "application/json");
