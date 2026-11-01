@@ -105,6 +105,7 @@
     st.id = "eratost-loader-style";
     st.textContent =
       ".era-ld,.era-mark{display:block;overflow:hidden}" +
+      ".era-ld.era-ld-cast{overflow:visible}" +                // large loader: its shadow fades past the box, no edge
       ".era-ld .era-sh,.era-mark .era-sh{fill:none;stroke:" + SHADE + ";stroke-width:20}" +
       "@keyframes era-pulse{0%,100%{opacity:1}50%{opacity:.45}}" +
       "@media (prefers-reduced-motion:reduce){.era-ld .era-orange{animation:era-pulse 1.8s ease-in-out infinite}}" +
@@ -172,7 +173,7 @@
   // itself and each stick a strip (the stick swept along the rays, away from the sun). One solid shape faded
   // once through a mask (so overlaps never darken twice), from just behind the Earth's centre outwards, drawn
   // under the Earth so the Earth's face stays clear. The rotating stick's strip turns with it.
-  const CAST_FAR = 900, CAST_FROM = 40, CAST_TO = 300;   // fade span along the rays (from the Earth's centre)
+  const CAST_FAR = 900, CAST_FROM = 40, CAST_TO = 560;   // fade span along the rays (from the Earth's centre)
   const castDir = () => [-Math.cos(rad(SUN)), Math.sin(rad(SUN))];          // screen axes (y down)
   const poly = pts => "M" + pts.map(q => f(q[0]) + " " + f(q[1])).join("L") + "Z";
   function castBand() {
@@ -191,7 +192,7 @@
     for (let i = 0; i <= 8; i++) stops += '<stop offset="' + (i / 8) + '" stop-color="#fff" stop-opacity="' + Math.pow(1 - i / 8, 2).toFixed(3) + '"/>';
     return '<defs><linearGradient id="' + id + 'g" gradientUnits="userSpaceOnUse" x1="' + f(CX + dx * s0) + '" y1="' + f(CY + dy * s0) +
         '" x2="' + f(CX + dx * s1) + '" y2="' + f(CY + dy * s1) + '">' + stops + '</linearGradient>' +
-      '<mask id="' + id + 'm" maskUnits="userSpaceOnUse" x="6" y="96" width="600" height="600"><rect x="6" y="96" width="600" height="600" fill="url(#' + id + 'g)"/></mask></defs>' +
+      '<mask id="' + id + 'm" maskUnits="userSpaceOnUse" x="-900" y="-900" width="2400" height="2400"><rect x="-900" y="-900" width="2400" height="2400" fill="url(#' + id + 'g)"/></mask></defs>' +
       '<g class="era-cast" mask="url(#' + id + 'm)" opacity=".34">' +
         '<path d="' + castBand() + '" fill="' + SHADE + '"/>' +
         '<path d="' + castStrip(STILL) + '" fill="' + SHADE + '"/>' +
@@ -212,7 +213,7 @@
     const areas = !withArea ? "" :
       '<path d="' + area(STILL) + '" fill="url(#' + g + ')"/>' +
       '<path class="era-ar-o" d="' + area(th) + '" fill="url(#' + g + ')"/>';
-    return '<svg class="' + (still ? "era-mark " : "era-ld ") + (cls || "") + '" viewBox="6 96 600 600" role="img" aria-label="' +
+    return '<svg class="' + (still ? "era-mark " : "era-ld ") + ((opts && opts.cast) ? "era-ld-cast " : "") + (cls || "") + '" viewBox="6 96 600 600" role="img" aria-label="' +
       (still ? "Eratosthenes" : "Loading") + '">' +
       shade + areas + ((opts && opts.cast) ? castLayer("era-cast-" + n, th) : "") +
       '<circle cx="306" cy="396" r="181.6" fill="#fff" stroke="' + RING + '" stroke-width="20"/>' +

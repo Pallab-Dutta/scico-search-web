@@ -1097,10 +1097,22 @@
 
   // Everyone except admins: original + time gap-closers, the Levelled textbook graph at 100 levels,
   // the metric 3D view, and no MST.
+  // Everyone except admins (user decision 2026-11-03): density from the 2D Topic Map, original + time
+  // gap-closers, all branches, a linear energy axis, 100 levels; the flat view Levelled (textbook) and
+  // the 3D view in metric posts; "Highlight gap-closers" starts ticked (they may untick it). No MST.
+  let USER_INIT = false;
   function userSetup() {
     if (ADMIN) return;
-    GC_ALT = true; LEVELLED = true; METRIC = true; NLEV = 100; MINB = 1; LOGLV = true; RES = 1; SIG = false;
+    GC_ALT = true; LEVELLED = true; METRIC = true; NLEV = 100; MINB = 1; LOGLV = false; RES = "map2d"; SIG = false;
+    if (!USER_INIT) { OVERLAY = true; USER_INIT = true; }
     if (MODE === "mst") MODE = "dg";
+  }
+  // A density variant must be (re)built when missing, or built before the current version or against
+  // another set of Topic Map gaps.
+  const tmSigOf = tm => { const g = (tm && tm.gaps) || []; return g.length + "|" + g.map(x => String(x.label || "")).join("|"); };
+  function variantStale(session) {
+    const v = (session.disconnectivity_res || {})[String(RES)];
+    return !v || (v.dg_version || 1) < 8 || v.tm_sig !== tmSigOf(session.topic_map);
   }
 
   function draw(session, mountEl) {
@@ -1140,7 +1152,7 @@
                  : (model.loo && model.loo.size) ? looScores(model.loo)
                  : bridgeScore(model);
     const need3dMap = MODE === "3d" && !(model.pos && model.pos.size);
-    const needRes = ADMIN && RES !== 1 && !((session.disconnectivity_res || {})[String(RES)]);
+    const needRes = RES !== 1 && variantStale(session);
     const built = (need3dMap || needRes) ? null : addGapMarkers(MODE === "mst" ? buildMST(model, W, scores) : MODE === "3d" ? buildDG3(model, W, scores)
                 : (LEVELLED && model.hasFE) ? buildLevels(model, W, scores) : buildDG(model, W, scores));
 
@@ -1173,7 +1185,7 @@
 
     // Admin resolution not built yet: build it (cached on the session), show the loader, then redraw.
     if (needRes) {
-      const wait = window.EratostLoader ? EratostLoader.block(RES === "map2d" ? "Building the landscape of the 2D map…" : String(RES).startsWith("knn") ? `Building the kNN density field (k = ${String(RES).slice(3)})…` : `Building the landscape at ${RES}× resolution…`, { gradient: true }) : "Building…";
+      const wait = window.EratostLoader ? EratostLoader.block(!ADMIN ? "Building the research-gap landscape…" : RES === "map2d" ? "Building the landscape of the 2D map…" : String(RES).startsWith("knn") ? `Building the kNN density field (k = ${String(RES).slice(3)})…` : `Building the landscape at ${RES}× resolution…`, { gradient: true }) : "Building…";
       mountEl.innerHTML = tools + `<div class="dg-3d-wait">${wait}</div>`;
       wireToolbar(session, mountEl);
       if (typeof window.dgEnsureRes === "function" && !ENSURING) {
