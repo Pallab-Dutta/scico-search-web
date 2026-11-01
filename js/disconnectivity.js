@@ -107,6 +107,7 @@
   let FLOOR_BRIGHT = true; // 3D: keep the map floor unfaded while something is highlighted
   let FLOOR_HD = false;  // admin, 3D: colour the floor by the SAME high-dimensional free energy as the heights
                          // (interpolated between papers) instead of the Topic Map's own 2D density
+  let REC = null;        // drone tool: when set, buildDG3 also records its scene in world coordinates
   let SURFACE = false;   // admin, 3D on the 2D-map landscape: draw the free-energy surface itself
   let SURF_ALPHA = 0.35; // its opacity (0..1), adjustable live
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
@@ -743,8 +744,9 @@
     const S = Math.min(W, H) * 0.6;
     const rot = w => { const x1 = w[0] * ca - w[1] * sa, y1 = w[0] * sa + w[1] * ca; return [x1, w[2] * ce + y1 * se, y1 * ce - w[2] * se]; };
     const c0 = rot([0, 0, ZH / 2]);
-    const P = w => { const r = rot(w); return { x: W / 2 + S * (r[0] - c0[0]), y: H / 2 - S * (r[1] - c0[1]), d: r[2] }; };
+    const P = w => { const r = rot(w); return { x: W / 2 + S * (r[0] - c0[0]), y: H / 2 - S * (r[1] - c0[1]), d: r[2], w }; };
     const xy = q => q.x.toFixed(1) + " " + q.y.toFixed(1);
+    const flo = [];                                       // drone tool: floor-level marks (paper shadows)
 
     // Floor: the Topic Map's density field, the map border, and each paper's shadow on it.
     let floor = "";
@@ -773,6 +775,8 @@
     const leaves = leafNodes(tree);
     leaves.forEach(l => {                                  // shadow on the map + a faint drop line up to the well
       const top = P(l._w), sh = P([l._w[0], l._w[1], 0]);
+      flo.push({ k: "dot", p: [l._w[0], l._w[1], 0], r: 2.2, fill: "#8e989e" });
+      if (!METRIC) flo.push({ k: "line", a: [l._w[0], l._w[1], 0], b: l._w, c: "#cdd3d7", w: 1, dash: [2, 3] });
       if (METRIC) { floor += `<circle cx="${sh.x.toFixed(1)}" cy="${sh.y.toFixed(1)}" r="2.2" fill="#8e989e"/>`; return; }
       floor += `<line x1="${sh.x.toFixed(1)}" y1="${sh.y.toFixed(1)}" x2="${top.x.toFixed(1)}" y2="${top.y.toFixed(1)}" stroke="#cdd3d7" stroke-width="1" stroke-dasharray="2 3"/>` +
                `<circle cx="${sh.x.toFixed(1)}" cy="${sh.y.toFixed(1)}" r="2.2" fill="#8e989e"/>`;
@@ -785,7 +789,7 @@
     if (METRIC) {
       const lt = levelTree(model), z = e => lt.frac(e || 0) * ZH;
       zOfFe = z;
-      const seg = (u, v, wdt) => lines.push({ d: (u.d + v.d) / 2, svg: `<line x1="${u.x.toFixed(1)}" y1="${u.y.toFixed(1)}" x2="${v.x.toFixed(1)}" y2="${v.y.toFixed(1)}" stroke="#1e2a31" stroke-width="${wdt}" stroke-linecap="round"/>` });
+      const seg = (u, v, wdt) => lines.push({ d: (u.d + v.d) / 2, g: { k: "line", a: u.w, b: v.w, c: "#1e2a31", w: wdt }, svg: `<line x1="${u.x.toFixed(1)}" y1="${u.y.toFixed(1)}" x2="${v.x.toFixed(1)}" y2="${v.y.toFixed(1)}" stroke="#1e2a31" stroke-width="${wdt}" stroke-linecap="round"/>` });
       const place3 = n => { const q0 = pos.get(n.low.paper || n.low) || { x: 0.5, y: 0.5 }; n._w3 = [q0.x - 0.5, 0.5 - q0.y, z(n.e)]; return P(n._w3); };
       (function walk(n, runTop) {                           // runTop: top of the current vertical post run
         const q = place3(n);
@@ -797,10 +801,11 @@
           const b = P([n._w3[0], n._w3[1], z(n.low.fe)]);
           seg(q, b, 1.3);
           const st = n.size === 1 ? paperStyle(n.papers[0], scores) : null;
-          dots.push({ d: b.d, svg: `<circle class="dg-node" data-id="${id}" cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${st ? Math.max(3.5, st.r - 1).toFixed(1) : 4.5}" fill="${st ? st.fill : "#6e7a82"}" stroke="#fff" stroke-width="1"/>` });
+          dots.push({ d: b.d, g: { k: "dot", p: b.w, r: st ? Math.max(3.5, st.r - 1) : 4.5, fill: st ? st.fill : "#6e7a82", stroke: "#fff", sw: 1 },
+            svg: `<circle class="dg-node" data-id="${id}" cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${st ? Math.max(3.5, st.r - 1).toFixed(1) : 4.5}" fill="${st ? st.fill : "#6e7a82"}" stroke="#fff" stroke-width="1"/>` });
           meta[id] = levelMeta(model, n);
         } else if (n.kids.length > 1) {
-          dots.push({ d: q.d, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="4" fill="#d64545" stroke="#fff" stroke-width="1"/>` });
+          dots.push({ d: q.d, g: { k: "dot", p: q.w, r: 4, fill: "#d64545", stroke: "#fff", sw: 1 }, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="4" fill="#d64545" stroke="#fff" stroke-width="1"/>` });
           meta[id] = { type: "gap", title: "Barrier", barrier: n.e, papers: n.papers, split: n.kids.length === 2 ? [n.kids[0].size, n.kids[1].size] : null };
         }
       })(lt.top, null);
@@ -838,22 +843,22 @@
       if (isLeaf(n)) {
         const p = n.paper || n, st = paperStyle(p, scores);
         n._id = id;
-        dots.push({ d: q.d, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>` });
+        dots.push({ d: q.d, g: { k: "dot", p: q.w, r: st.r, fill: st.fill, stroke: "#fff", sw: 1.2 }, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${st.r.toFixed(1)}" fill="${st.fill}" stroke="#fff" stroke-width="1.2"/>` });
         meta[id] = { type: "paper", node: n, paper: p, overlay: st.raw, overlayKind: st.kind, reduce: (model.reduce && model.reduce.get(p)) || 0, pair: (model.reducePair && model.reducePair.get(p)) || null, total: (model.loo && model.loo.get(p)) || 0, fe: model.energy ? model.energy.get(p) : null };
         return;
       }
       kids(n).forEach(c => {
         walk(c);
         const a = P(c._w);
-        lines.push({ d: (a.d + q.d) / 2, svg: `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${q.x.toFixed(1)}" y2="${q.y.toFixed(1)}" stroke="#1e2a31" stroke-width="1.4" stroke-linecap="round"/>` });
+        lines.push({ d: (a.d + q.d) / 2, g: { k: "line", a: a.w, b: q.w, c: "#1e2a31", w: 1.4 }, svg: `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${q.x.toFixed(1)}" y2="${q.y.toFixed(1)}" stroke="#1e2a31" stroke-width="1.4" stroke-linecap="round"/>` });
       });
       if ((n.fe || 0) > Math.max(...kids(n).map(c => c.fe || 0)) + 1e-4) {
-        dots.push({ d: q.d, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>` });
+        dots.push({ d: q.d, g: { k: "dot", p: q.w, r: 5, fill: "#d64545", stroke: "#fff", sw: 1.2 }, svg: `<circle class="dg-node" data-id="${id}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="5" fill="#d64545" stroke="#fff" stroke-width="1.2"/>` });
         meta[id] = { type: "gap", title: n.gap || n.concept || "Research gap", barrier: n.fe || 0, papers: leafPapers(n) };
       }
     })(tree);
     const rootTop = P([tree._w[0], tree._w[1], tree._w[2] + 0.05]), rootQ = P(tree._w);
-    if (!METRIC) lines.push({ d: rootQ.d, svg: `<line x1="${rootQ.x.toFixed(1)}" y1="${rootQ.y.toFixed(1)}" x2="${rootTop.x.toFixed(1)}" y2="${rootTop.y.toFixed(1)}" stroke="#1e2a31" stroke-width="1.4"/>` });
+    if (!METRIC) lines.push({ d: rootQ.d, g: { k: "line", a: rootQ.w, b: rootTop.w, c: "#1e2a31", w: 1.4 }, svg: `<line x1="${rootQ.x.toFixed(1)}" y1="${rootQ.y.toFixed(1)}" x2="${rootTop.x.toFixed(1)}" y2="${rootTop.y.toFixed(1)}" stroke="#1e2a31" stroke-width="1.4"/>` });
     const paint = arr => arr.sort((u, v) => v.d - u.d).map(o => o.svg).join("");
 
     // Energy axis on one corner of the floor (hidden from straight above, where it collapses to a point).
@@ -880,13 +885,14 @@
       if (!j) return;
       const lab = l => { const q = P(l._w); return { x: q.x, y: q.y, title: (l.paper || l).title }; };
       const jq = P(j._w);
-      m.hl = { path: climb(la, j) + climb(lb, j), a: lab(la), b: lab(lb), self: m.node ? lab(m.node) : null, j: { x: jq.x, y: jq.y }, near: true };
+      m.hl = { path: climb(la, j) + climb(lb, j), a: lab(la), b: lab(lb), self: m.node ? lab(m.node) : null, j: { x: jq.x, y: jq.y, w: jq.w }, near: true };
     });
     // Research gaps stand at their exact Topic Map position, at the height of the barrier they sit in,
     // with a dashed link to the tree junction where their two papers meet.
     Object.values(meta).forEach(m => {
       if (m.type !== "rgap" || !m.hl || !m.at) return;
       const q = P([m.at.x - 0.5, 0.5 - m.at.y, zOfFe(m.fe)]);
+      if (REC) flo.push({ k: "gap", p: q.w, j: m.hl.j.w || null, label: "G" + m.num });
       m.hl.junction = { x: m.hl.j.x, y: m.hl.j.y };
       m.hl.link = { x1: m.hl.j.x, y1: m.hl.j.y, x2: q.x, y2: q.y };
       m.hl.j = { x: q.x, y: q.y };
@@ -904,6 +910,18 @@
       m.hl.drops = drops;
     });
 
+    if (REC) {                                             // drone tool: the whole scene in world coordinates
+      const ZS = sf && Array.isArray(sf.z) && sf.z.length > 1 ? sf.z : null;
+      REC.scene = {
+        v: 1, ZH, top: zOfFe(fmax),
+        floor: grid && grid.length > 1 ? grid : null,
+        contours: grid && grid.length > 1 ? contourSegs(grid) : [],
+        surface: ZS ? { z: ZS.map(row => row.map(e => (+e || 0) >= fmax ? null : +zOfFe(Math.max(0, +e || 0)).toFixed(4))),
+                        t: ZS.map(row => row.map(e => +(1 - Math.min(fmax, Math.max(0, +e || 0)) / fmax).toFixed(3))) } : null,
+        flat: flo.filter(o => o.k !== "gap"),
+        prims: [...lines, ...dots].map(o => o.g).filter(Boolean).concat(flo.filter(o => o.k === "gap")),
+      };
+    }
     // The floor sits outside the layer that fades on highlight when FLOOR_BRIGHT is on, so the map stays clear.
     // With the surface on, everything is painted together in depth order (nodes win ties: they sit on it).
     const body = surf.length ? `<g style="--dg-sa:${SURF_ALPHA}">` + paint([...surf, ...lines, ...dots.map(o => ({ d: o.d - 1e-3, svg: o.svg }))]) + `</g>`
@@ -1211,6 +1229,7 @@
       (MODE === "3d" ? `<span style="display:inline-flex;gap:6px">` +
         [["side", "Side"], ["top", "Top"], ["reset", "Reset"]].map(([k, l]) =>
           `<button type="button" class="dg-cam" data-cam="${k}" style="font:inherit;border:1px solid #ddd;background:#fff;border-radius:6px;padding:2px 9px;cursor:pointer">${l}</button>`).join("") +
+        (ADMIN && window.Drone ? `<button type="button" class="dg-drone" title="Plan a drone flythrough of this 3D view and download it as a video flight file (developer tool)" style="font:inherit;border:1px solid #ba5757;color:#ba5757;background:#fff;border-radius:6px;padding:2px 9px;cursor:pointer">Drone video…</button>` : "") +
         `</span>` : "") +
       (ADMIN ? `<label style="cursor:${FEV ? "default" : "pointer"};display:inline-flex;align-items:center;gap:6px;user-select:none${FEV ? ";opacity:.45" : ""}" title="${FEV ? "The free-energy axis is already −ln p; log scaling applies to the MST view." : ""}">` +
       `<input type="checkbox" class="dg-log"${LOG ? " checked" : ""}${FEV ? " disabled" : ""}/> ${FEV ? "Log scale (n/a — energy axis)" : "Log scale (compress large gaps)"}</label>` : "") +
@@ -1280,6 +1299,14 @@
       (MODE !== "mst" ? gapPanel(model) : "");
 
     wireToolbar(session, mountEl);
+    const droneBtn = mountEl.querySelector(".dg-drone");
+    if (droneBtn) droneBtn.addEventListener("click", () => {
+      // Record the 3D view exactly as it is set up now (style, axis, levels, surface, gaps) in world units.
+      REC = {};
+      try { buildDG3(model, W, scores); } finally { var scene = REC.scene; REC = null; }
+      if (!scene) return;
+      window.Drone.openEditor(scene, { sessionId: session.session_id || session.id || "", title: session.base_query || "" });
+    });
     wireTooltip(mountEl, built.meta);
     if (built.is3d) wire3D(mountEl, model, scores, W);
     mountEl.querySelectorAll(".dg-gap-row").forEach(row => {
