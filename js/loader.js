@@ -170,9 +170,9 @@
   let n = 0;
   // CAST SHADOW (large loaders), as on the homepage: sunlight from SUN, the Earth blocks a band as wide as
   // itself and each stick a strip (the stick swept along the rays, away from the sun). One solid shape faded
-  // once through a mask (so overlaps never darken twice), from the still arrow's tip level outwards, drawn
+  // once through a mask (so overlaps never darken twice), from just behind the Earth's centre outwards, drawn
   // under the Earth so the Earth's face stays clear. The rotating stick's strip turns with it.
-  const CAST_FAR = 900, CAST_LEN = 430;
+  const CAST_FAR = 900, CAST_FROM = 40, CAST_TO = 300;   // fade span along the rays (from the Earth's centre)
   const castDir = () => [-Math.cos(rad(SUN)), Math.sin(rad(SUN))];          // screen axes (y down)
   const poly = pts => "M" + pts.map(q => f(q[0]) + " " + f(q[1])).join("L") + "Z";
   function castBand() {
@@ -186,7 +186,7 @@
     return poly([b, t, [t[0] + F * dx, t[1] + F * dy], [b[0] + F * dx, b[1] + F * dy]]);
   }
   function castLayer(id, th) {
-    const [dx, dy] = castDir(), s0 = -R_TIP, s1 = CAST_LEN;
+    const [dx, dy] = castDir(), s0 = CAST_FROM, s1 = CAST_TO;   // nearly gone where it meets the box edge
     let stops = "";
     for (let i = 0; i <= 8; i++) stops += '<stop offset="' + (i / 8) + '" stop-color="#fff" stop-opacity="' + Math.pow(1 - i / 8, 2).toFixed(3) + '"/>';
     return '<defs><linearGradient id="' + id + 'g" gradientUnits="userSpaceOnUse" x1="' + f(CX + dx * s0) + '" y1="' + f(CY + dy * s0) +
