@@ -102,8 +102,10 @@
   D.surfaceZ = function (scene, x, y) {
     const S = scene.surface;
     if (!S || !S.xs) return 0;
-    const [c, fc] = seek(S.xs, x + 0.5), [r, fr] = seek(S.ys, 0.5 - y), Z = S.z;
-    return (Z[r][c] * (1 - fc) + Z[r][c + 1] * fc) * (1 - fr) + (Z[r + 1][c] * (1 - fc) + Z[r + 1][c + 1] * fc) * fr;
+    const [c, fc] = seek(S.xs, x + 0.5), [r, fr] = seek(S.ys, 0.5 - y);
+    const bl = Z => (Z[r][c] * (1 - fc) + Z[r][c + 1] * fc) * (1 - fr) + (Z[r + 1][c] * (1 - fc) + Z[r + 1][c + 1] * fc) * fr;
+    if (S.s && bl(S.s) < 0) return 0;                     // above the top barrier: the surface is cut away there
+    return bl(S.z);
   };
 
   /* ---------------- WebGL landscape ----------------
@@ -394,7 +396,7 @@
       front = [];
       for (const it of items) (hid(it.w) ? behind : front).push(it);
       for (const it of behind) drawPrim(ctx, it.m, pr, s, 0, it);
-      const gcv = D.glSurface(S, D.persp(cam, W, H, o.fov, k), W, H, { k, fade: 0, fog: [1.6, 9], wire: !!o.wire });
+      const gcv = D.glSurface(S, D.persp(cam, W, H, o.fov, k), W, H, { k, fade: 0, cut: !!S.s, wire: !!o.wire });
       if (gcv) {
         ctx.globalAlpha = o.alpha == null ? 0.35 : o.alpha;
         ctx.drawImage(gcv, 0, 0, W, H);

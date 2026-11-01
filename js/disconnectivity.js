@@ -1065,7 +1065,7 @@
         v: 1, ZH, top: zOfFe(fmax),
         floor: grid && grid.length > 1 ? grid : null,
         contours: grid && grid.length > 1 ? contourSegs(grid) : [],
-        surface: ZS ? landscape(model, zOfFe, fmax, ZH, 6, true) : null,   // endless plain, 6 map widths out
+        surface: ZS ? landscape(model, zOfFe, fmax, ZH, 0) : null,   // the same bounded surface as the view, cut at the top barrier
         flat: flo.filter(o => o.k !== "gap"),
         prims: [...lines, ...dots].map(o => o.g).filter(Boolean).concat(flo.filter(o => o.k === "gap")),
       };
