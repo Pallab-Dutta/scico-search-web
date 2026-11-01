@@ -90,17 +90,110 @@
   };
 
   // Height of the drawn surface under (x, y), or 0 off the map / where the surface is not drawn.
+  // Height of the landscape under world point (x, y). The landscape is a grid over map coordinates
+  // (xs across, ys down, not evenly spaced: fine over the papers, coarser toward the far plain).
+  function seek(a, v) {                                   // index i with a[i] <= v <= a[i + 1]
+    let lo = 0, hi = a.length - 1;
+    if (v <= a[0]) return [0, 0];
+    if (v >= a[hi]) return [hi - 1, 1];
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (a[m] <= v) lo = m; else hi = m; }
+    return [lo, (v - a[lo]) / ((a[lo + 1] - a[lo]) || 1)];
+  }
   D.surfaceZ = function (scene, x, y) {
     const S = scene.surface;
-    if (!S) return 0;
-    const G = S.z.length, mx = x + 0.5, my = 0.5 - y;
-    if (mx < 0 || mx > 1 || my < 0 || my > 1) return 0;
-    const c = mx * (G - 1), r = my * (G - 1), c0 = Math.floor(c), r0 = Math.floor(r);
-    const c1 = Math.min(G - 1, c0 + 1), r1 = Math.min(G - 1, r0 + 1);
-    const v = [S.z[r0][c0], S.z[r0][c1], S.z[r1][c0], S.z[r1][c1]];
-    if (v.some(q => q == null)) return 0;
-    const fc = c - c0, fr = r - r0;
-    return (v[0] * (1 - fc) + v[1] * fc) * (1 - fr) + (v[2] * (1 - fc) + v[3] * fc) * fr;
+    if (!S || !S.xs) return 0;
+    const [c, fc] = seek(S.xs, x + 0.5), [r, fr] = seek(S.ys, 0.5 - y), Z = S.z;
+    return (Z[r][c] * (1 - fc) + Z[r][c + 1] * fc) * (1 - fr) + (Z[r + 1][c] * (1 - fc) + Z[r + 1][c + 1] * fc) * fr;
+  };
+
+  /* ---------------- WebGL landscape ----------------
+     The free-energy landscape drawn as smooth-shaded triangles (colour interpolated across every pixel,
+     real depth buffer), into a shared offscreen WebGL canvas. M maps world (x, y, z) to clip space
+     (column-major 4 x 4); the caller lays the canvas onto its picture at the surface opacity.
+     surf = { xs, ys, z, t }: map coordinates, world heights, colour value (0 high plain .. 1 deep well).
+     o = { k: x, y stretch, fade: map units over which the far edge fades out (0 = none), R: reach }. */
+  let GL = null;
+  function glInit() {
+    if (GL) return GL.ok ? GL : null;
+    GL = { ok: false };
+    try {
+      const cv = document.createElement("canvas");
+      const gl = cv.getContext("webgl", { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: true, alpha: true });
+      if (!gl) return null;
+      const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); return x; };
+      const pg = gl.createProgram();
+      gl.attachShader(pg, sh(gl.VERTEX_SHADER, "attribute vec3 p;attribute vec4 c;uniform mat4 M;varying vec4 v;varying float dd;void main(){v=c;gl_Position=M*vec4(p,1.0);dd=gl_Position.w;}"));
+      gl.attachShader(pg, sh(gl.FRAGMENT_SHADER, "precision mediump float;uniform vec2 fog;varying vec4 v;varying float dd;void main(){float f=clamp((dd-fog.x)/(fog.y-fog.x),0.0,1.0);gl_FragColor=vec4(v.rgb,v.a*(1.0-f*f*(3.0-2.0*f)));}"));
+      gl.linkProgram(pg);
+      if (!gl.getProgramParameter(pg, gl.LINK_STATUS)) return null;
+      Object.assign(GL, { ok: true, cv, gl, pg, aP: gl.getAttribLocation(pg, "p"), aC: gl.getAttribLocation(pg, "c"), uM: gl.getUniformLocation(pg, "M"), uF: gl.getUniformLocation(pg, "fog"), bufs: new WeakMap() });
+      return GL;
+    } catch (_) { return null; }
+  }
+  const LIGHTV = norm([-0.45, 0.35, 0.82]);
+  const MESH = new WeakMap();
+  function meshOf(surf, k, fade) {                         // triangle soup with lit per-vertex colours; cached
+    const key = k + "|" + fade;
+    let cache = MESH.get(surf);
+    if (!cache) MESH.set(surf, cache = {});
+    if (cache[key]) return cache[key];
+    const xs = surf.xs, ys = surf.ys, Z = surf.z, T = surf.t, nx = xs.length, ny = ys.length;
+    const R0 = Math.max(-xs[0], xs[nx - 1] - 1, -ys[0], ys[ny - 1] - 1);
+    const vx = new Float32Array(nx * ny * 3), vc = new Float32Array(nx * ny * 4);
+    for (let r = 0; r < ny; r++) for (let c = 0; c < nx; c++) {
+      const i = r * nx + c, z = Z[r][c];
+      vx[i * 3] = xs[c] - 0.5; vx[i * 3 + 1] = 0.5 - ys[r]; vx[i * 3 + 2] = z;
+      const c0 = Math.max(0, c - 1), c1 = Math.min(nx - 1, c + 1), r0 = Math.max(0, r - 1), r1 = Math.min(ny - 1, r + 1);
+      const dzx = (Z[r][c1] - Z[r][c0]) / (((xs[c1] - xs[c0]) || 1) * k), dzy = -(Z[r1][c] - Z[r0][c]) / (((ys[r1] - ys[r0]) || 1) * k);
+      const nl = Math.hypot(dzx, dzy, 1), lit = Math.max(0, (-dzx * LIGHTV[0] - dzy * LIGHTV[1] + LIGHTV[2]) / nl);
+      const sh = 0.8 + 0.28 * lit, col = rgbOf(T[r][c]);
+      const out = Math.max(0, -xs[c], xs[c] - 1, -ys[r], ys[r] - 1);
+      const a = fade > 0 ? clamp(1 - (out - (R0 - fade)) / fade, 0, 1) : 1;
+      vc[i * 4] = Math.min(1, col[0] * sh / 255); vc[i * 4 + 1] = Math.min(1, col[1] * sh / 255); vc[i * 4 + 2] = Math.min(1, col[2] * sh / 255); vc[i * 4 + 3] = a;
+    }
+    const nt = (nx - 1) * (ny - 1) * 6, P = new Float32Array(nt * 3), C = new Float32Array(nt * 4);
+    let o = 0;
+    const put = i => { P.set(vx.subarray(i * 3, i * 3 + 3), o * 3); C.set(vc.subarray(i * 4, i * 4 + 4), o * 4); o++; };
+    for (let r = 0; r < ny - 1; r++) for (let c = 0; c < nx - 1; c++) {
+      const a = r * nx + c, b = a + 1, d = a + nx, e = d + 1;
+      put(a); put(b); put(e); put(a); put(e); put(d);
+    }
+    return (cache[key] = { P, C, n: nt });
+  }
+  D.glSurface = function (surf, M, W, H, o) {
+    const G = glInit();
+    if (!G || !surf || !surf.xs) return null;
+    const gl = G.gl, mesh = meshOf(surf, (o && o.k) || 1, (o && o.fade) || 0);
+    if (G.cv.width !== W || G.cv.height !== H) { G.cv.width = W; G.cv.height = H; }
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clearDepth(1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(G.pg);
+    let b = G.bufs.get(mesh);
+    if (!b) {
+      b = { p: gl.createBuffer(), c: gl.createBuffer() };
+      gl.bindBuffer(gl.ARRAY_BUFFER, b.p); gl.bufferData(gl.ARRAY_BUFFER, mesh.P, gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, b.c); gl.bufferData(gl.ARRAY_BUFFER, mesh.C, gl.STATIC_DRAW);
+      G.bufs.set(mesh, b);
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, b.p); gl.enableVertexAttribArray(G.aP); gl.vertexAttribPointer(G.aP, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, b.c); gl.enableVertexAttribArray(G.aC); gl.vertexAttribPointer(G.aC, 4, gl.FLOAT, false, 0, 0);
+    gl.uniformMatrix4fv(G.uM, false, new Float32Array(M));
+    const fg = (o && o.fog) || [1e8, 2e8];                // distance haze: fades out between these depths
+    gl.uniform2f(G.uF, fg[0], fg[1]);
+    gl.drawArrays(gl.TRIANGLES, 0, mesh.n);
+    return G.cv;
+  };
+  // Clip-space matrix of the drone's perspective camera (with the x, y spread k).
+  D.persp = function (cam, W, H, fov, k) {
+    const C = D.camera(cam, W, H, fov), n = 0.01, fa = 60, A = (fa + n) / (fa - n), B = -2 * fa * n / (fa - n);
+    const row = (v, s) => [v[0] * k * s, v[1] * k * s, v[2] * s, -dot(v, cam.pos) * s];
+    const rx = row(C.r, 2 * C.F / W), ry = row(C.u, 2 * C.F / H), rw = row(C.f, 1);
+    const rz = [rw[0] * A, rw[1] * A, rw[2] * A, rw[3] * A + B];
+    return [rx[0], ry[0], rz[0], rw[0], rx[1], ry[1], rz[1], rw[1], rx[2], ry[2], rz[2], rw[2], rx[3], ry[3], rz[3], rw[3]];
   };
 
   /* ---------------- renderer (canvas 2D) ----------------
@@ -154,11 +247,6 @@
     if (!c) SMOOTH.set(scene, c = {});
     if (c[f]) return c[f];
     const out = {};
-    if (scene.surface) {
-      const top = scene.top;
-      const z = upsample(scene.surface.z.map(row => row.map(v => v == null ? top : v)), f);
-      out.surface = { z, t: upsample(scene.surface.t, f), top };
-    }
     if (scene.floor) out.floor = upsample(scene.floor, f);
     return (c[f] = out);
   }
@@ -183,7 +271,6 @@
     L.ctx.clearRect(0, 0, W, H);
     return L;
   }
-  const LIGHT = norm([-0.45, 0.35, 0.82]);
 
   // o: { W, H, fov, lod (1 full, 2 preview), alpha, surface, bg, spread (x, y stretch), path }.
   D.render = function (ctx, scene, cam, o) {
@@ -262,16 +349,16 @@
     // The surface: one smooth, softly lit sheet. What it hides (seen through it) is drawn first and tinted
     // by the sheet; what stands in front of it is drawn on top. A point is hidden when the line of sight
     // to it passes under the surface.
-    const S = sm.surface, showS = S && o.surface !== false && (o.alpha == null || o.alpha > 0);
+    const S = scene.surface, showS = S && S.xs && o.surface !== false && (o.alpha == null || o.alpha > 0);
     let front = items;
     if (showS) {
-      const top = S.top, Z = S.z, M = Z.length;
-      const hid = w => {
-        const cp = cam.pos, n = 24;
+      const zmax = S.zmax || 2;
+      const hid = w => {                                  // the line of sight passes under the landscape
+        const cp = cam.pos, n = 32;
         for (let i = 1; i < n; i++) {
           const t = i / n * 0.97, x = (cp[0] + (w[0] * k - cp[0]) * t) / k, y = (cp[1] + (w[1] * k - cp[1]) * t) / k, z = cp[2] + (w[2] - cp[2]) * t;
-          const h = D.surfaceZ(scene, x, y);
-          if (h > 0 && z < h - 0.004) return true;
+          if (z > zmax + 0.01) continue;
+          if (z < D.surfaceZ(scene, x, y) - 0.004) return true;
         }
         return false;
       };
@@ -279,17 +366,12 @@
       front = [];
       for (const it of items) (hid(it.w) ? behind : front).push(it);
       for (const it of behind) drawPrim(ctx, it.m, pr, s, 0, it);
-      const step = 1 / (M - 1);
-      const cv = sheet(Z, (r, c) => Z[r][c], (r, c) => {
-        const z00 = Z[r][c], z01 = Z[r][c + 1], z10 = Z[r + 1][c], z11 = Z[r + 1][c + 1];
-        const dzx = ((z01 - z00) + (z11 - z10)) / 2 / (step * k), dzy = -((z10 - z00) + (z11 - z01)) / 2 / (step * k);
-        const nrm = norm([-dzx, -dzy, 1]), sh = 0.8 + 0.28 * Math.max(0, dot(nrm, LIGHT));
-        const t = (S.t[r][c] + S.t[r][c + 1] + S.t[r + 1][c] + S.t[r + 1][c + 1]) / 4, [R, G, B] = rgbOf(t);
-        return `rgb(${Math.min(255, R * sh) | 0},${Math.min(255, G * sh) | 0},${Math.min(255, B * sh) | 0})`;
-      }, (r, c) => Math.min(Z[r][c], Z[r][c + 1], Z[r + 1][c], Z[r + 1][c + 1]) < top - 1e-6);
-      ctx.globalAlpha = o.alpha == null ? 0.35 : o.alpha;
-      ctx.drawImage(cv, 0, 0);
-      ctx.globalAlpha = 1;
+      const gcv = D.glSurface(S, D.persp(cam, W, H, o.fov, k), W, H, { k, fade: 0, fog: [1.6, 9] });
+      if (gcv) {
+        ctx.globalAlpha = o.alpha == null ? 0.35 : o.alpha;
+        ctx.drawImage(gcv, 0, 0, W, H);
+        ctx.globalAlpha = 1;
+      }
     }
     for (const it of front) drawPrim(ctx, it.m, pr, s, 0, it);
 

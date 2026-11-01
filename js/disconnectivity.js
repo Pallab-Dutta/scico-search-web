@@ -109,9 +109,9 @@
                          // (interpolated between papers) instead of the Topic Map's own 2D density
   let REC = null;        // drone tool: when set, buildDG3 also records its scene in world coordinates
   let SURFACE = false;   // admin, 3D on the 2D-map landscape: draw the free-energy surface itself
-  let SURF_ALPHA = 0.45; // its opacity (0..1), adjustable live
+  let SURF_ALPHA = 0.35; // its opacity (0..1), adjustable live
   let DRAG3D = false;    // 3D view is being turned: draw the surface on its coarse mesh
-  const XY = 1.3;        // 3D view: the map is drawn this much wider than tall (x, y stretch)
+  const XY = 1;          // 3D view: x, y stretch of the map against the energy axis (1 = none)
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
                          // the bottom are not squashed under one tall barrier. Tick labels stay true.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
@@ -734,6 +734,59 @@
     FLOORIMG.set(grid, fi);
     return fi;
   }
+  // The ENDLESS LANDSCAPE of the 2D-map density (map2d): F(x) = -ln p(x) - (deepest well), with the same
+  // Gaussian density (bandwidth DENSITY_BW = 0.09 on the Topic Map) the backend reads the wells and cols
+  // from, so it matches fe_surface and the tree exactly, but on a grid reaching R map units past the map
+  // on every side (fine over the papers, coarser outward). Far from every paper F grows without bound, so
+  // it is levelled off smoothly into a high plain a little above the top barrier: a soft minimum with
+  // cap = 1.3 x top (changes F below the top barrier by < 0.2 %). Heights follow this view's energy axis.
+  function landAxis(R) {
+    const a = [], h = 1 / 80;
+    for (let v = -0.15; v <= 1.15 + 1e-9; v += h) a.push(+v.toFixed(5));
+    let st = h, lo = a[0], hi = a[a.length - 1];
+    while (lo > -R) { st *= 1.22; lo = Math.max(-R, lo - st); a.unshift(lo); }
+    st = h;
+    while (hi < 1 + R) { st *= 1.22; hi = Math.min(1 + R, hi + st); a.push(hi); }
+    return a;
+  }
+  const LANDF = new WeakMap();
+  function landF(model, R) {                              // raw -ln p - (deepest well) on the grid; cached
+    const sf = model.surface;
+    let c = LANDF.get(sf);
+    if (!c) LANDF.set(sf, c = {});
+    if (c[R]) return c[R];
+    const pts = [];
+    (model.papers || []).forEach(p => { const q = model.pos && model.pos.get(p); if (q) pts.push([q.x, q.y]); });
+    const bw = +(sf && sf.bw) || 0.09, inv = 1 / (2 * bw * bw);
+    const nlp = (x, y) => {                              // -ln sum_i exp(-|x - x_i|^2 / 2h^2)
+      let m = -Infinity;
+      const v = pts.map(([px, py]) => { const e = -((x - px) ** 2 + (y - py) ** 2) * inv; if (e > m) m = e; return e; });
+      let s = 0;
+      v.forEach(e => { s += Math.exp(e - m); });
+      return -(m + Math.log(s));
+    };
+    const fmin = Math.min(...pts.map(([x, y]) => nlp(x, y)));
+    const xs = landAxis(R), ys = xs;
+    const F = ys.map(y => xs.map(x => nlp(x, y) - fmin));
+    return (c[R] = { xs, ys, F });
+  }
+  function landscape(model, zOfFe, top, ZH, R) {
+    const L = landF(model, R), cap = 1.3 * top, sm = 0.08 * top || 0.01, zTop = zOfFe(top);
+    const soft = e => { const m = Math.min(e, cap); return m - sm * Math.log(Math.exp(-(e - m) / sm) + Math.exp(-(cap - m) / sm)); };
+    let zmax = 0;
+    const z = [], t = [];
+    L.F.forEach(row => {
+      const zr = [], tr = [];
+      row.forEach(e => {
+        const h = soft(Math.max(0, e)), zz = h <= top ? zOfFe(h) : zTop + (h - top) / top * ZH;
+        zr.push(+zz.toFixed(5)); tr.push(+(0.14 + 0.86 * Math.max(0, 1 - h / top)).toFixed(4));   // the plain: light slate, not white
+        if (zz > zmax) zmax = zz;
+      });
+      z.push(zr); t.push(tr);
+    });
+    return { xs: L.xs, ys: L.ys, z, t, zmax };
+  }
+
   const LIGHT3 = (() => { const v = [-0.45, 0.35, 0.82], l = Math.hypot(...v); return v.map(x => x / l); })();
   function shadeRGB(t, k) {                               // the field colour at t, lit by factor k
     const m = fieldColour(t).match(/\d+/g).map(Number);
@@ -872,8 +925,31 @@
     // (bicubic; the coarse mesh while dragging), softly lit, and drawn as ONE translucent sheet so no
     // seams or mesh lines show. Tree parts the sheet hides are drawn under it, the rest on top.
     const sf = model.surface;
-    let surfSheet = "", hasSurf = false, surfH = null;
-    if (SURFACE && sf && Array.isArray(sf.z) && sf.z.length > 1) {
+    let surfSheet = "", hasSurf = false, surfH = null, land = null;
+    const glOn = !!(window.Drone && window.Drone.glSurface);
+    if (SURFACE && sf && Array.isArray(sf.z) && sf.z.length > 1 && glOn) {
+      // Endless landscape, smooth-shaded with WebGL in this view's own (orthographic) projection, laid in
+      // as one image. Its far edge fades out so the plain reads as going on.
+      land = landscape(model, zOfFe, fmax, ZH, 0.75);
+      const o3 = P([0, 0, 0]), ex = P([1, 0, 0]), ey = P([0, 1, 0]), ez = P([0, 0, 1]);
+      const lin = key => [ex[key] - o3[key], ey[key] - o3[key], ez[key] - o3[key], o3[key]];
+      const Lx = lin("x"), Ly = lin("y"), Ld = lin("d");
+      const xs = land.xs, ds = [];
+      [xs[0] - 0.5, xs[xs.length - 1] - 0.5].forEach(x => [0.5 - xs[0], 0.5 - xs[xs.length - 1]].forEach(y => [0, land.zmax].forEach(z =>
+        ds.push(Ld[0] * x + Ld[1] * y + Ld[2] * z + Ld[3]))));
+      const dmin = Math.min(...ds) - 0.01, dmax = Math.max(...ds) + 0.01, dk = 2 / (dmax - dmin);
+      const dpr = DRAG3D ? 1 : Math.min(2, window.devicePixelRatio || 1);
+      // screen (x, y, d) -> clip: X = 2x/W - 1, Y = 1 - 2y/H, Z = 2(d - dmin)/(dmax - dmin) - 1
+      const row = (L, a, b) => [L[0] * a, L[1] * a, L[2] * a, L[3] * a + b];
+      const RX = row(Lx, 2 / W, -1), RY = row(Ly, -2 / H, 1), RZ = row(Ld, dk, -1 - dmin * dk);
+      const M = [RX[0], RY[0], RZ[0], 0, RX[1], RY[1], RZ[1], 0, RX[2], RY[2], RZ[2], 0, RX[3], RY[3], RZ[3], 1];
+      const cv = window.Drone.glSurface(land, M, Math.round(W * dpr), Math.round(H * dpr), { k: XY, fade: 0.35 });
+      if (cv) {
+        hasSurf = true;
+        surfSheet = `<image href="${cv.toDataURL("image/png")}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none" style="opacity:var(--dg-sa)" pointer-events="none"/>`;
+      }
+    }
+    if (!hasSurf && SURFACE && sf && Array.isArray(sf.z) && sf.z.length > 1) {   // no WebGL: the SVG mesh
       hasSurf = true;
       const top = fmax, U = upsampled(sf.z, DRAG3D ? 1 : 2), M = U.length, k = 1 / (M - 1);
       const E = U.map(row => Array.from(row, e => Math.min(top, Math.max(0, e))));
@@ -987,8 +1063,7 @@
         v: 1, ZH, top: zOfFe(fmax),
         floor: grid && grid.length > 1 ? grid : null,
         contours: grid && grid.length > 1 ? contourSegs(grid) : [],
-        surface: ZS ? { z: ZS.map(row => row.map(e => (+e || 0) >= fmax ? null : +zOfFe(Math.max(0, +e || 0)).toFixed(4))),
-                        t: ZS.map(row => row.map(e => +(1 - Math.min(fmax, Math.max(0, +e || 0)) / fmax).toFixed(3))) } : null,
+        surface: ZS ? landscape(model, zOfFe, fmax, ZH, 6) : null,   // endless: reaches 6 map widths out
         flat: flo.filter(o => o.k !== "gap"),
         prims: [...lines, ...dots].map(o => o.g).filter(Boolean).concat(flo.filter(o => o.k === "gap")),
       };
@@ -1000,6 +1075,7 @@
       // Hidden = the line of sight from the point toward the viewer passes under the surface.
       const vx = -XY * sa * ce, vy = -XY * ca * ce, vz = se, vl = Math.hypot(vx, vy, vz) || 1;
       const hAt = (x, y) => {
+        if (!surfH) return null;
         const G = surfH.G, mx = x + 0.5, my = 0.5 - y;
         if (mx < 0 || mx > 1 || my < 0 || my > 1) return null;
         const c = mx * (G - 1), r = my * (G - 1), c0 = Math.min(G - 2, Math.floor(c)), r0 = Math.min(G - 2, Math.floor(r)), fc = c - c0, fr = r - r0;
@@ -1007,11 +1083,13 @@
         if (a == null || b == null || cc == null || dd == null) return null;
         return (a * (1 - fc) + b * fc) * (1 - fr) + (cc * (1 - fc) + dd * fc) * fr;
       };
+      const zCap = land ? land.zmax : ZH, reach = land ? 0.5 + 0.75 : 0.5;
+      const hz0 = land ? ((x, y) => window.Drone.surfaceZ({ surface: land }, x, y)) : hAt;
       const hidden = w => {
-        for (let i = 1; i <= 60; i++) {
+        for (let i = 1; i <= 90; i++) {
           const t = i * 0.025, x = w[0] + vx / vl * t / XY, y = w[1] + vy / vl * t / XY, z = w[2] + vz / vl * t;
-          if (z > ZH + 0.01 || Math.abs(x) > 0.5 || Math.abs(y) > 0.5) return false;
-          const hz = hAt(x, y);
+          if (z > zCap + 0.01 || Math.abs(x) > reach || Math.abs(y) > reach) return false;
+          const hz = hz0(x, y);
           if (hz != null && z < hz - 0.004) return true;
         }
         return false;
