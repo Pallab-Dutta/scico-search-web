@@ -264,7 +264,7 @@
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261103c"></script>
 <script src="js/shell.js?v=20261031b"></script>
-<script src="js/disconnectivity.js?v=20261103f"></script>
+<script src="js/disconnectivity.js?v=20261103g"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -674,7 +674,7 @@
       const dg=data.disconnectivity;
       // Cached on the session and current (version 8: research gaps = the Topic Map's gaps, built against
       // this Topic Map): show it. Otherwise rebuild once; rebuilding a saved graph is free.
-      if(dg && dg.tree && (dg.dg_version||1)>=9 && dg.tm_sig===tmSig(data.topic_map)){ renderDisc(data); return; }
+      if(dg && dg.tree && (dg.dg_version||1)>=10 && dg.tm_sig===tmSig(data.topic_map)){ renderDisc(data); return; }
       $('discStatus').innerHTML=loadBlock('Building the research-gap landscape…');
       renderDisc(await buildDisc());
     }catch(err){
