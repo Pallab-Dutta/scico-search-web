@@ -245,7 +245,8 @@
         const cp = g.close_pair && papers[g.close_pair[0]] && papers[g.close_pair[1]] ? { a: papers[g.close_pair[0]], b: papers[g.close_pair[1]] } : null;
         return { type: "rgap", id: "rg" + i, pair: { a: A, b: B }, close: cp, name: g.label || null,
                  at: { x: +g.x, y: +g.y }, fe: +g.fe || 0, barrier: +g.barrier || 0,
-                 closeMax: +g.close_max || 0, closeTotal: +g.close_total || 0 };
+                 closeMax: +g.close_max || 0, closeTotal: +g.close_total || 0,
+                 closeBefore: +g.close_before || 0, closeAfter: +g.close_after || 0 };
       }).filter(Boolean).sort((u, v) => v.closeTotal - u.closeTotal);
       rgaps.forEach((r, i) => { r.num = i + 1; });
       const tmKnown = typeof d.tm_sig === "string" && d.tm_sig !== "0|";   // the Topic Map had gaps
@@ -354,7 +355,7 @@
     if (m.type === "rgap")
       return `<b>Research gap G${m.num}${m.name ? ": " + esc(m.name) : ""}</b>` +
         `<div class="dg-sub">found on the Topic Map · lies between “${esc(trunc(m.pair.a.title, 40))}” and “${esc(trunc(m.pair.b.title, 40))}” (highlighted) · barrier ${(+m.barrier).toFixed(2)}</div>` +
-        (m.close ? `<div class="dg-sub">if targeted: a paper here would lower the barrier between “${esc(trunc(m.close.a.title, 40))}” and “${esc(trunc(m.close.b.title, 40))}” by ${(+m.closeMax).toFixed(2)} · total across the field ${(+m.closeTotal).toFixed(1)}</div>`
+        (m.close ? `<div class="dg-sub">if targeted: a paper here would best join “${esc(trunc(m.close.a.title, 40))}” and “${esc(trunc(m.close.b.title, 40))}”, their barrier falling from ${(+m.closeBefore).toFixed(2)} to ${(+m.closeAfter).toFixed(2)} · total fall across the field ${(+m.closeTotal).toFixed(1)}</div>`
                  : `<div class="dg-sub">if targeted: no barrier would fall, since these areas are already better connected elsewhere</div>`);
     const reps = m.papers.slice().sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0));
     const list = reps.slice(0, 4).map(p => `<li>${esc(trunc(p.title, 42))}</li>`).join("");
@@ -1017,10 +1018,10 @@
       `<span style="flex:0 0 auto;background:#f2c94c;color:#5a3d00;border:1px solid #9c6b00;border-radius:999px;font-weight:700;font-size:10px;padding:1px 6px">G${r.num}</span>` +
       `<span style="flex:1;min-width:0"><b>${esc(r.name || "Research gap")}</b>` +
       `<span style="display:block;color:#666;margin-top:2px">between “${esc(trunc(r.pair.a.title, 34))}” and “${esc(trunc(r.pair.b.title, 34))}” · barrier ${r.barrier.toFixed(2)}` +
-      (r.close ? ` · if targeted, closes “${esc(trunc(r.close.a.title, 30))}” ↔ “${esc(trunc(r.close.b.title, 30))}” by ${r.closeMax.toFixed(2)} · total ${r.closeTotal.toFixed(1)}`
+      (r.close ? ` · if targeted, best joins “${esc(trunc(r.close.a.title, 30))}” ↔ “${esc(trunc(r.close.b.title, 30))}”: barrier ${r.closeBefore.toFixed(2)} → ${r.closeAfter.toFixed(2)} · total fall ${r.closeTotal.toFixed(1)}`
                : ` · if targeted, no barrier would fall (already better connected elsewhere)`) +
       `</span></span></div>`;
-    return box(`<div style="color:#888;margin-bottom:4px">Targeting a gap = a new paper at its location. Impact = how much it would lower the barriers between existing papers (same energy units as the graph).</div>` +
+    return box(`<div style="color:#888;margin-bottom:4px">Each gap lies between two papers, one on each side. Targeting it = a new paper at its location: shown are the two papers it would join best (lowest barrier afterwards) and the total fall of barriers across the field (same energy units as the graph).</div>` +
       rg.map(row).join(""));
   }
 
@@ -1112,7 +1113,7 @@
   const tmSigOf = tm => { const g = (tm && tm.gaps) || []; return g.length + "|" + g.map(x => String(x.label || "")).join("|"); };
   function variantStale(session) {
     const v = (session.disconnectivity_res || {})[String(RES)];
-    return !v || (v.dg_version || 1) < 8 || v.tm_sig !== tmSigOf(session.topic_map);
+    return !v || (v.dg_version || 1) < 9 || v.tm_sig !== tmSigOf(session.topic_map);
   }
 
   function draw(session, mountEl) {
