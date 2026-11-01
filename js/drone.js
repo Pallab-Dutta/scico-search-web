@@ -63,7 +63,7 @@
       if (i < ks.length - 1) {
         const dur = Math.max(0.05, +ks[i].dur || 0);
         const M = 48, acc = [0];
-        const straight = ks[i].shape !== "curve";
+        const straight = ks[i].shape === "straight";     // default: one continuous smooth curve
         let prev = curve(pos, i, 0, straight);
         for (let m = 1; m <= M; m++) { const q = curve(pos, i, m / M, straight); acc.push(acc[m - 1] + len(sub(q, prev))); prev = q; }
         legs.push({ kind: "fly", i, t0: T, t1: T + dur, ease: EASE[ks[i].ease] || EASE.smooth, acc, total: acc[M], straight });
@@ -628,8 +628,8 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
 <div class="dv-tl"><button class="pri x-play">▶ Preview</button><input type="range" class="x-t" min="0" step="0.01" value="0"/><span class="x-time muted"></span></div>
 <div class="muted">Fly: drag to look around · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>E</kbd>/<kbd>Q</kbd> up/down · wheel forward/back · hold <kbd>Shift</kbd> to go faster. Click the picture first so it takes the keys.</div></div>
 <div class="dp">
-<div><h4>Keyframes</h4><div class="row"><button class="pri x-add">+ Add keyframe here</button><button class="x-path">Hide path</button></div>
-<div class="muted" style="margin-top:4px">Each keyframe is where the drone is and what it looks at. It flies a smooth curve through them in order. Per keyframe: <b>hover</b> = seconds it stays there, <b>fly</b> = seconds to reach the next one (longer = slower), <b>easing</b> = how it speeds up or slows down on that leg, <b>straight line / smooth curve</b> = the leg's shape (a curve bends smoothly through the neighbouring keyframes).</div></div>
+<div><h4>Keyframes</h4><div class="row"><button class="pri x-add">+ Add keyframe here</button><button class="x-path">Hide path</button><button class="x-smooth" title="Set every leg to a smooth curve: one continuous path through all keyframes">All legs smooth</button></div>
+<div class="muted" style="margin-top:4px">Each keyframe is where the drone is and what it looks at. It flies a smooth curve through them in order. Per keyframe: <b>hover</b> = seconds it stays there, <b>fly</b> = seconds to reach the next one (longer = slower), <b>easing</b> = how it speeds up or slows down on that leg, <b>smooth curve / straight line</b> = the leg's shape. Smooth curves join into one continuous path through all keyframes; a straight line makes a corner at its ends. For no slow-down at a keyframe, use constant speed on the legs either side.</div></div>
 <div class="keys"></div>
 <div><h4>New keyframes get</h4><div class="row">fly <input type="number" class="x-ndur" min="0.2" step="0.5" style="width:58px"/> s <select class="x-nease"></select></div></div>
 <div><h4>Look</h4>
@@ -750,7 +750,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
         <div class="row">hover <input type="number" min="0" step="0.5" value="${+k.hold || 0}" data-f="hold"/> s
           ${i < keys.length - 1 ? `· fly <input type="number" min="0.2" step="0.5" value="${+k.dur || 3}" data-f="dur"/> s
           <select data-f="ease">${D.EASES.map(([v, tt]) => `<option value="${v}"${(k.ease || "smooth") === v ? " selected" : ""}>${tt}</option>`).join("")}</select>
-          <select data-f="shape" title="How the drone travels to the next keyframe"><option value="straight"${k.shape !== "curve" ? " selected" : ""}>straight line</option><option value="curve"${k.shape === "curve" ? " selected" : ""}>smooth curve</option></select>` : `<span class="muted">· last keyframe</span>`}</div>
+          <select data-f="shape" title="How the drone travels to the next keyframe"><option value="curve"${k.shape !== "straight" ? " selected" : ""}>smooth curve</option><option value="straight"${k.shape === "straight" ? " selected" : ""}>straight line</option></select>` : `<span class="muted">· last keyframe</span>`}</div>
         <div class="row mini"><button data-a="go">Go to</button><button data-a="set" title="Move this keyframe to where the camera is now">Set to view</button>
           <button data-a="up" title="Earlier">↑</button><button data-a="down" title="Later">↓</button><button data-a="ins" title="Insert a new keyframe after this one, at the current view">+ after</button><button data-a="del">Delete</button></div></div>`).join("")
         : `<div class="muted">No keyframes yet. Fly to where the video should start and click "Add keyframe here".</div>`;
@@ -773,7 +773,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
         if (a === "set") { const c = camNow(); keys[i].pos = c.pos; keys[i].tgt = c.tgt; }
         if (a === "up" && i > 0) { [keys[i - 1], keys[i]] = [keys[i], keys[i - 1]]; sel = i - 1; }
         if (a === "down" && i < keys.length - 1) { [keys[i + 1], keys[i]] = [keys[i], keys[i + 1]]; sel = i + 1; }
-        if (a === "ins") { const c = camNow(); keys.splice(i + 1, 0, { pos: c.pos, tgt: c.tgt, dur: st.newDur, ease: st.newEase, shape: "straight", hold: 0 }); sel = i + 1; }
+        if (a === "ins") { const c = camNow(); keys.splice(i + 1, 0, { pos: c.pos, tgt: c.tgt, dur: st.newDur, ease: st.newEase, shape: "curve", hold: 0 }); sel = i + 1; }
         if (a === "del") { keys.splice(i, 1); sel = Math.min(sel, keys.length - 1); }
         rebuild();
         renderKeys();
@@ -788,9 +788,10 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
 
     $("x-add").onclick = () => {
       const c = camNow();
-      keys.push({ pos: c.pos, tgt: c.tgt, dur: st.newDur, ease: st.newEase, shape: "straight", hold: 0 });
+      keys.push({ pos: c.pos, tgt: c.tgt, dur: st.newDur, ease: st.newEase, shape: "curve", hold: 0 });
       sel = keys.length - 1; rebuild(); renderKeys(); canvas.focus();
     };
+    $("x-smooth").onclick = () => { keys.forEach(k => { k.shape = "curve"; }); rebuild(); renderKeys(); };
     $("x-path").onclick = () => { showPath = !showPath; $("x-path").textContent = showPath ? "Hide path" : "Show path"; dirty = true; };
     playBtn.onclick = () => {
       if (path.keys.length < 2) { timeEl.textContent = "Add at least two keyframes."; return; }
