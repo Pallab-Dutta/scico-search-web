@@ -110,6 +110,7 @@
   let REC = null;        // drone tool: when set, buildDG3 also records its scene in world coordinates
   let SURFACE = false;   // admin, 3D on the 2D-map landscape: draw the free-energy surface itself
   let SURF_ALPHA = 0.35; // its opacity (0..1), adjustable live
+  let WIRE = false;      // admin, 3D surface: draw its wireframe too
   let DRAG3D = false;    // 3D view is being turned: draw the surface on its coarse mesh
   const XY = 1;          // 3D view: x, y stretch of the map against the energy axis (1 = none)
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
@@ -770,21 +771,23 @@
     const F = ys.map(y => xs.map(x => nlp(x, y) - fmin));
     return (c[R] = { xs, ys, F });
   }
-  function landscape(model, zOfFe, top, ZH, R) {
+  function landscape(model, zOfFe, top, ZH, R, plain) {
     const L = landF(model, R), cap = 1.3 * top, sm = 0.08 * top || 0.01, zTop = zOfFe(top);
     const soft = e => { const m = Math.min(e, cap); return m - sm * Math.log(Math.exp(-(e - m) / sm) + Math.exp(-(cap - m) / sm)); };
     let zmax = 0;
-    const z = [], t = [];
+    const z = [], t = [], sc = [];
     L.F.forEach(row => {
-      const zr = [], tr = [];
+      const zr = [], tr = [], sr = [];
       row.forEach(e => {
         const h = soft(Math.max(0, e)), zz = h <= top ? zOfFe(h) : zTop + (h - top) / top * ZH;
-        zr.push(+zz.toFixed(5)); tr.push(+(0.14 + 0.86 * Math.max(0, 1 - h / top)).toFixed(4));   // the plain: light slate, not white
+        zr.push(+zz.toFixed(5));
+        tr.push(+((plain ? 0.14 : 0) + (plain ? 0.86 : 1) * Math.max(0, 1 - h / top)).toFixed(4));   // plain: light slate, not white
+        sr.push((top - Math.max(0, e)) / top);           // > 0 below the top barrier (kept when cut)
         if (zz > zmax) zmax = zz;
       });
-      z.push(zr); t.push(tr);
+      z.push(zr); t.push(tr); sc.push(sr);
     });
-    return { xs: L.xs, ys: L.ys, z, t, zmax };
+    return plain ? { xs: L.xs, ys: L.ys, z, t, zmax } : { xs: L.xs, ys: L.ys, z, t, zmax, s: sc };
   }
 
   const LIGHT3 = (() => { const v = [-0.45, 0.35, 0.82], l = Math.hypot(...v); return v.map(x => x / l); })();
@@ -928,9 +931,9 @@
     let surfSheet = "", hasSurf = false, surfH = null, land = null;
     const glOn = !!(window.Drone && window.Drone.glSurface);
     if (SURFACE && sf && Array.isArray(sf.z) && sf.z.length > 1 && glOn) {
-      // Endless landscape, smooth-shaded with WebGL in this view's own (orthographic) projection, laid in
-      // as one image. Its far edge fades out so the plain reads as going on.
-      land = landscape(model, zOfFe, fmax, ZH, 0.75);
+      // Smooth-shaded with WebGL in this view's own (orthographic) projection and laid in as one image;
+      // cut exactly where it reaches the top barrier (per pixel), as before.
+      land = landscape(model, zOfFe, fmax, ZH, 0);
       const o3 = P([0, 0, 0]), ex = P([1, 0, 0]), ey = P([0, 1, 0]), ez = P([0, 0, 1]);
       const lin = key => [ex[key] - o3[key], ey[key] - o3[key], ez[key] - o3[key], o3[key]];
       const Lx = lin("x"), Ly = lin("y"), Ld = lin("d");
@@ -943,7 +946,7 @@
       const row = (L, a, b) => [L[0] * a, L[1] * a, L[2] * a, L[3] * a + b];
       const RX = row(Lx, 2 / W, -1), RY = row(Ly, -2 / H, 1), RZ = row(Ld, dk, -1 - dmin * dk);
       const M = [RX[0], RY[0], RZ[0], 0, RX[1], RY[1], RZ[1], 0, RX[2], RY[2], RZ[2], 0, RX[3], RY[3], RZ[3], 1];
-      const cv = window.Drone.glSurface(land, M, Math.round(W * dpr), Math.round(H * dpr), { k: XY, fade: 0.35 });
+      const cv = window.Drone.glSurface(land, M, Math.round(W * dpr), Math.round(H * dpr), { k: XY, cut: true, wire: WIRE });
       if (cv) {
         hasSurf = true;
         surfSheet = `<image href="${cv.toDataURL("image/png")}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none" style="opacity:var(--dg-sa)" pointer-events="none"/>`;
@@ -1063,7 +1066,7 @@
         v: 1, ZH, top: zOfFe(fmax),
         floor: grid && grid.length > 1 ? grid : null,
         contours: grid && grid.length > 1 ? contourSegs(grid) : [],
-        surface: ZS ? landscape(model, zOfFe, fmax, ZH, 6) : null,   // endless: reaches 6 map widths out
+        surface: ZS ? landscape(model, zOfFe, fmax, ZH, 6, true) : null,   // endless plain, 6 map widths out
         flat: flo.filter(o => o.k !== "gap"),
         prims: [...lines, ...dots].map(o => o.g).filter(Boolean).concat(flo.filter(o => o.k === "gap")),
       };
@@ -1083,8 +1086,9 @@
         if (a == null || b == null || cc == null || dd == null) return null;
         return (a * (1 - fc) + b * fc) * (1 - fr) + (cc * (1 - fc) + dd * fc) * fr;
       };
-      const zCap = land ? land.zmax : ZH, reach = land ? 0.5 + 0.75 : 0.5;
-      const hz0 = land ? ((x, y) => window.Drone.surfaceZ({ surface: land }, x, y)) : hAt;
+      const zCap = ZH, reach = land ? 0.65 : 0.5;
+      const hz0 = land ? ((x, y) => window.Drone.surfaceZ({ surface: { xs: land.xs, ys: land.ys, z: land.s } }, x, y) < 0 ? null
+                                  : window.Drone.surfaceZ({ surface: land }, x, y)) : hAt;
       const hidden = w => {
         for (let i = 1; i <= 90; i++) {
           const t = i * 0.025, x = w[0] + vx / vl * t / XY, y = w[1] + vy / vl * t / XY, z = w[2] + vz / vl * t;
@@ -1397,7 +1401,8 @@
       `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")}${ADMIN ? " " + radio("mst", "MST") : ""}${model.hasFE ? " " + radio("3d", "3D on the map") : ""}</span>` +
       (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Colour the floor by the same high-dimensional free energy as the heights (interpolated between the papers' map positions) instead of the Topic Map's 2D density."><input type="checkbox" class="dg-floorhd"${FLOOR_HD ? " checked" : ""}/> floor: same free energy as heights</label>` : "") +
       (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none${model.surface ? "" : ";opacity:.5"}" title="${model.surface ? "Draw the free-energy surface itself (−ln p of the 2D map), cut off above the top barrier. Wells and cols are points of this surface, so the tree's nodes sit on it." : "Only for density: 2D map. The other landscapes live in the full embedding space, which has no surface over the map."}"><input type="checkbox" class="dg-surface"${SURFACE && model.surface ? " checked" : ""}${model.surface ? "" : " disabled"}/> 3D surface</label>` +
-        (SURFACE && model.surface ? `<label style="display:inline-flex;align-items:center;gap:5px;user-select:none" title="Opacity of the surface">opacity <input type="range" class="dg-surf-alpha" min="0.05" max="1" step="0.05" value="${SURF_ALPHA}" style="width:90px"/></label>` : "") : "") +
+        (SURFACE && model.surface ? `<label style="display:inline-flex;align-items:center;gap:5px;user-select:none" title="Opacity of the surface">opacity <input type="range" class="dg-surf-alpha" min="0.05" max="1" step="0.05" value="${SURF_ALPHA}" style="width:90px"/></label>` +
+          `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Draw the surface's mesh lines over it"><input type="checkbox" class="dg-wire"${WIRE ? " checked" : ""}/> wireframe</label>` : "") : "") +
       (MODE === "3d" ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Keep the map (floor, contours, paper shadows) unfaded while a paper or gap is highlighted."><input type="checkbox" class="dg-floorbright"${FLOOR_BRIGHT ? " checked" : ""}/> keep the map bright when highlighting</label>` : "") +
       (MODE === "3d" ? `<span style="display:inline-flex;gap:6px">` +
         [["side", "Side"], ["top", "Top"], ["reset", "Reset"]].map(([k, l]) =>
@@ -1521,6 +1526,7 @@
     hook("dg-floorhd", el => { FLOOR_HD = el.checked; });
     hook("dg-floorbright", el => { FLOOR_BRIGHT = el.checked; });
     hook("dg-surface", el => { SURFACE = el.checked; });
+    hook("dg-wire", el => { WIRE = el.checked; });
     const sa = mountEl.querySelector(".dg-surf-alpha");    // live: only the CSS variable changes
     if (sa) sa.addEventListener("input", () => {
       SURF_ALPHA = +sa.value;

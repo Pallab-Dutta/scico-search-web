@@ -123,23 +123,25 @@
       const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); return x; };
       const pg = gl.createProgram();
       gl.attachShader(pg, sh(gl.VERTEX_SHADER, "attribute vec3 p;attribute vec4 c;uniform mat4 M;varying vec4 v;varying float dd;void main(){v=c;gl_Position=M*vec4(p,1.0);dd=gl_Position.w;}"));
-      gl.attachShader(pg, sh(gl.FRAGMENT_SHADER, "precision mediump float;uniform vec2 fog;varying vec4 v;varying float dd;void main(){float f=clamp((dd-fog.x)/(fog.y-fog.x),0.0,1.0);gl_FragColor=vec4(v.rgb,v.a*(1.0-f*f*(3.0-2.0*f)));}"));
+      gl.attachShader(pg, sh(gl.FRAGMENT_SHADER, "precision mediump float;uniform vec2 fog;uniform float cut;uniform float am;varying vec4 v;varying float dd;void main(){float a=v.a;if(cut>0.5){if(a<0.5)discard;a=1.0;}float f=clamp((dd-fog.x)/(fog.y-fog.x),0.0,1.0);gl_FragColor=vec4(v.rgb,a*am*(1.0-f*f*(3.0-2.0*f)));}"));
       gl.linkProgram(pg);
       if (!gl.getProgramParameter(pg, gl.LINK_STATUS)) return null;
-      Object.assign(GL, { ok: true, cv, gl, pg, aP: gl.getAttribLocation(pg, "p"), aC: gl.getAttribLocation(pg, "c"), uM: gl.getUniformLocation(pg, "M"), uF: gl.getUniformLocation(pg, "fog"), bufs: new WeakMap() });
+      Object.assign(GL, { ok: true, cv, gl, pg, aP: gl.getAttribLocation(pg, "p"), aC: gl.getAttribLocation(pg, "c"), uM: gl.getUniformLocation(pg, "M"), uF: gl.getUniformLocation(pg, "fog"), uCut: gl.getUniformLocation(pg, "cut"), uA: gl.getUniformLocation(pg, "am"), bufs: new WeakMap() });
       return GL;
     } catch (_) { return null; }
   }
   const LIGHTV = norm([-0.45, 0.35, 0.82]);
   const MESH = new WeakMap();
-  function meshOf(surf, k, fade) {                         // triangle soup with lit per-vertex colours; cached
-    const key = k + "|" + fade;
+  // cut: drop the part above the top barrier (surf.s = (top - F) / top per vertex; the rim is where it
+  // crosses 0, interpolated per pixel). The fill and the wireframe share this.
+  function meshOf(surf, k, fade, cut) {                    // triangles + wireframe, lit per-vertex colours; cached
+    const key = k + "|" + fade + "|" + (cut ? 1 : 0);
     let cache = MESH.get(surf);
     if (!cache) MESH.set(surf, cache = {});
     if (cache[key]) return cache[key];
     const xs = surf.xs, ys = surf.ys, Z = surf.z, T = surf.t, nx = xs.length, ny = ys.length;
     const R0 = Math.max(-xs[0], xs[nx - 1] - 1, -ys[0], ys[ny - 1] - 1);
-    const vx = new Float32Array(nx * ny * 3), vc = new Float32Array(nx * ny * 4);
+    const vx = new Float32Array(nx * ny * 3), vc = new Float32Array(nx * ny * 4), va = new Float32Array(nx * ny);
     for (let r = 0; r < ny; r++) for (let c = 0; c < nx; c++) {
       const i = r * nx + c, z = Z[r][c];
       vx[i * 3] = xs[c] - 0.5; vx[i * 3 + 1] = 0.5 - ys[r]; vx[i * 3 + 2] = z;
@@ -148,7 +150,8 @@
       const nl = Math.hypot(dzx, dzy, 1), lit = Math.max(0, (-dzx * LIGHTV[0] - dzy * LIGHTV[1] + LIGHTV[2]) / nl);
       const sh = 0.8 + 0.28 * lit, col = rgbOf(T[r][c]);
       const out = Math.max(0, -xs[c], xs[c] - 1, -ys[r], ys[r] - 1);
-      const a = fade > 0 ? clamp(1 - (out - (R0 - fade)) / fade, 0, 1) : 1;
+      const a = cut && surf.s ? 0.5 + 0.5 * clamp(surf.s[r][c], -1, 1) : (fade > 0 ? clamp(1 - (out - (R0 - fade)) / fade, 0, 1) : 1);
+      va[i] = a;
       vc[i * 4] = Math.min(1, col[0] * sh / 255); vc[i * 4 + 1] = Math.min(1, col[1] * sh / 255); vc[i * 4 + 2] = Math.min(1, col[2] * sh / 255); vc[i * 4 + 3] = a;
     }
     const nt = (nx - 1) * (ny - 1) * 6, P = new Float32Array(nt * 3), C = new Float32Array(nt * 4);
@@ -158,12 +161,23 @@
       const a = r * nx + c, b = a + 1, d = a + nx, e = d + 1;
       put(a); put(b); put(e); put(a); put(e); put(d);
     }
-    return (cache[key] = { P, C, n: nt });
+    // Wireframe: every second grid line each way, as line segments.
+    const segs = [];
+    for (let r = 0; r < ny; r += 2) for (let c = 0; c < nx - 1; c++) segs.push(r * nx + c, r * nx + c + 1);
+    for (let c = 0; c < nx; c += 2) for (let r = 0; r < ny - 1; r++) segs.push(r * nx + c, (r + 1) * nx + c);
+    const LP = new Float32Array(segs.length * 3), LC = new Float32Array(segs.length * 4);
+    segs.forEach((i, q) => {
+      LP.set(vx.subarray(i * 3, i * 3 + 3), q * 3);
+      LC[q * 4] = 0.30; LC[q * 4 + 1] = 0.35; LC[q * 4 + 2] = 0.39; LC[q * 4 + 3] = va[i];
+    });
+    return (cache[key] = { P, C, n: nt, LP, LC, ln: segs.length });
   }
+  // o = { k, fade, fog: [start, end], cut (bool), wire (bool) }
   D.glSurface = function (surf, M, W, H, o) {
+    o = o || {};
     const G = glInit();
     if (!G || !surf || !surf.xs) return null;
-    const gl = G.gl, mesh = meshOf(surf, (o && o.k) || 1, (o && o.fade) || 0);
+    const gl = G.gl, mesh = meshOf(surf, o.k || 1, o.fade || 0, !!o.cut);
     if (G.cv.width !== W || G.cv.height !== H) { G.cv.width = W; G.cv.height = H; }
     gl.viewport(0, 0, W, H);
     gl.clearColor(0, 0, 0, 0);
@@ -174,17 +188,31 @@
     gl.useProgram(G.pg);
     let b = G.bufs.get(mesh);
     if (!b) {
-      b = { p: gl.createBuffer(), c: gl.createBuffer() };
+      b = { p: gl.createBuffer(), c: gl.createBuffer(), lp: gl.createBuffer(), lc: gl.createBuffer() };
       gl.bindBuffer(gl.ARRAY_BUFFER, b.p); gl.bufferData(gl.ARRAY_BUFFER, mesh.P, gl.STATIC_DRAW);
       gl.bindBuffer(gl.ARRAY_BUFFER, b.c); gl.bufferData(gl.ARRAY_BUFFER, mesh.C, gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, b.lp); gl.bufferData(gl.ARRAY_BUFFER, mesh.LP, gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, b.lc); gl.bufferData(gl.ARRAY_BUFFER, mesh.LC, gl.STATIC_DRAW);
       G.bufs.set(mesh, b);
     }
-    gl.bindBuffer(gl.ARRAY_BUFFER, b.p); gl.enableVertexAttribArray(G.aP); gl.vertexAttribPointer(G.aP, 3, gl.FLOAT, false, 0, 0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, b.c); gl.enableVertexAttribArray(G.aC); gl.vertexAttribPointer(G.aC, 4, gl.FLOAT, false, 0, 0);
     gl.uniformMatrix4fv(G.uM, false, new Float32Array(M));
-    const fg = (o && o.fog) || [1e8, 2e8];                // distance haze: fades out between these depths
+    const fg = o.fog || [1e8, 2e8];                       // distance haze: fades out between these depths
     gl.uniform2f(G.uF, fg[0], fg[1]);
+    gl.uniform1f(G.uCut, o.cut ? 1 : 0);
+    const bind = (pb, cb) => {
+      gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.enableVertexAttribArray(G.aP); gl.vertexAttribPointer(G.aP, 3, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.enableVertexAttribArray(G.aC); gl.vertexAttribPointer(G.aC, 4, gl.FLOAT, false, 0, 0);
+    };
+    gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1, 1);   // the wireframe sits just on top of the fill
+    gl.uniform1f(G.uA, 1);
+    bind(b.p, b.c);
     gl.drawArrays(gl.TRIANGLES, 0, mesh.n);
+    gl.disable(gl.POLYGON_OFFSET_FILL);
+    if (o.wire) {
+      gl.uniform1f(G.uA, 1);
+      bind(b.lp, b.lc);
+      gl.drawArrays(gl.LINES, 0, mesh.ln);
+    }
     return G.cv;
   };
   // Clip-space matrix of the drone's perspective camera (with the x, y spread k).
@@ -366,7 +394,7 @@
       front = [];
       for (const it of items) (hid(it.w) ? behind : front).push(it);
       for (const it of behind) drawPrim(ctx, it.m, pr, s, 0, it);
-      const gcv = D.glSurface(S, D.persp(cam, W, H, o.fov, k), W, H, { k, fade: 0, fog: [1.6, 9] });
+      const gcv = D.glSurface(S, D.persp(cam, W, H, o.fov, k), W, H, { k, fade: 0, fog: [1.6, 9], wire: !!o.wire });
       if (gcv) {
         ctx.globalAlpha = o.alpha == null ? 0.35 : o.alpha;
         ctx.drawImage(gcv, 0, 0, W, H);
@@ -466,7 +494,7 @@ Drone.player(document.getElementById("c"), FLIGHT);<\/script></body></html>`;
     const N = Math.max(1, Math.round(path.duration * fps) + 1);
     const ctx = canvas.getContext("2d");
     canvas.width = st.W; canvas.height = st.H;
-    const opt = lod => ({ W: st.W, H: st.H, fov: st.fov, lod, alpha: st.alpha, surface: st.surface, bg: st.bg, spread: st.spread || 1 });
+    const opt = lod => ({ W: st.W, H: st.H, fov: st.fov, lod, alpha: st.alpha, surface: st.surface, bg: st.bg, spread: st.spread || 1, wire: !!st.wire });
     const draw = (t, lod) => { const c = D.frameCam(F.scene, path, t, st.keepAbove, st.spread); if (c) D.render(ctx, F.scene, c, opt(lod)); };
     const q = new URLSearchParams(location.search), fr = q.get("frame");
     if (fr != null) {                                      // exact frame for the MP4 script
@@ -543,7 +571,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const storeKey = "eratost_drone:" + (opts.sessionId || "default");
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(storeKey) || "null"); } catch (_) { saved = null; }
-    const st = Object.assign({ W: 1920, H: 1080, fps: 30, fov: 52, alpha: 0.35, surface: !!scene.surface, keepAbove: true, bg: "#ffffff", spread: 1, newDur: 3, newEase: "smooth" },
+    const st = Object.assign({ W: 1920, H: 1080, fps: 30, fov: 52, alpha: 0.35, surface: !!scene.surface, keepAbove: true, bg: "#ffffff", spread: 1, wire: false, newDur: 3, newEase: "smooth" },
                              (saved && saved.settings) || {});
     let keys = (saved && Array.isArray(saved.keys)) ? saved.keys : [];
     let sel = -1;
@@ -601,7 +629,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
 <div class="keys"></div>
 <div><h4>New keyframes get</h4><div class="row">fly <input type="number" class="x-ndur" min="0.2" step="0.5" style="width:58px"/> s <select class="x-nease"></select></div></div>
 <div><h4>Look</h4>
-<div class="row">surface <input type="checkbox" class="x-surf"/> opacity <input type="range" class="x-alpha" min="0" max="1" step="0.05" style="width:110px"/></div>
+<div class="row">surface <input type="checkbox" class="x-surf"/> opacity <input type="range" class="x-alpha" min="0" max="1" step="0.05" style="width:110px"/> <label><input type="checkbox" class="x-wire"/> wireframe</label></div>
 <div class="row">lens (field of view) <input type="range" class="x-fov" min="25" max="95" step="1" style="width:110px"/> <span class="x-fovv"></span></div>
 <div class="row" title="Stretch the landscape sideways (x, y) without changing its heights. Set it before placing keyframes: they live in the stretched space.">spread X,Y <input type="range" class="x-spread" min="1" max="2.5" step="0.05" style="width:110px"/> <span class="x-spreadv"></span></div>
 <div class="row"><label><input type="checkbox" class="x-above"/> keep the drone above the surface</label></div></div>
@@ -642,7 +670,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const draw = lod => {
       const c = playing || (!showPathNow()) ? D.frameCam(scene, path, t, st.keepAbove, st.spread) : camNow();
       if (!c) return;
-      D.render(ctx, scene, c, { W: canvas.width, H: canvas.height, fov: st.fov, lod, alpha: st.alpha, surface: st.surface, bg: st.bg, spread: st.spread,
+      D.render(ctx, scene, c, { W: canvas.width, H: canvas.height, fov: st.fov, lod, alpha: st.alpha, surface: st.surface, bg: st.bg, spread: st.spread, wire: st.wire,
         path: !playing && showPath && !scrubView ? { pts: pathPts, keys: path.keys.map(k => k.pos), sel } : null });
       timeEl.textContent = fmt(t);
       slider.value = t;
@@ -768,6 +796,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     bind("x-nease", x => x.value = st.newEase, x => st.newEase = x.value);
     bind("x-surf", x => { x.checked = st.surface; x.disabled = !scene.surface; }, x => st.surface = x.checked);
     bind("x-alpha", x => x.value = st.alpha, x => st.alpha = +x.value, "input");
+    bind("x-wire", x => x.checked = !!st.wire, x => st.wire = x.checked);
     bind("x-fov", x => { x.value = st.fov; $("x-fovv").textContent = st.fov + "°"; }, x => { st.fov = +x.value; $("x-fovv").textContent = st.fov + "°"; }, "input");
     bind("x-above", x => x.checked = st.keepAbove, x => st.keepAbove = x.checked);
     bind("x-spread", x => { x.value = st.spread; $("x-spreadv").textContent = (+st.spread).toFixed(2) + "×"; }, x => { st.spread = +x.value; $("x-spreadv").textContent = st.spread.toFixed(2) + "×"; }, "input");
@@ -784,7 +813,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const base = () => ("eratost_" + (opts.title || "flight")).replace(/[^\w-]+/g, "_").slice(0, 60);
     $("x-dl").onclick = () => {
       if (path.keys.length < 2) { timeEl.textContent = "Add at least two keyframes first."; return; }
-      const settings = { W: st.W, H: st.H, fps: st.fps, fov: st.fov, alpha: st.alpha, surface: st.surface, keepAbove: st.keepAbove, bg: st.bg, spread: st.spread };
+      const settings = { W: st.W, H: st.H, fps: st.fps, fov: st.fov, alpha: st.alpha, surface: st.surface, keepAbove: st.keepAbove, bg: st.bg, spread: st.spread, wire: !!st.wire };
       download(base() + "_flight.html", D.flightHTML({ title: "Eratost · " + (opts.title || "flight"), scene, keys, settings }), "text/html");
     };
     $("x-savep").onclick = () => download(base() + "_path.json", JSON.stringify({ keys, settings: st }, null, 1), "application/json");
