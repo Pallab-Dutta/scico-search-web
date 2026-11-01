@@ -109,7 +109,9 @@
                          // (interpolated between papers) instead of the Topic Map's own 2D density
   let REC = null;        // drone tool: when set, buildDG3 also records its scene in world coordinates
   let SURFACE = false;   // admin, 3D on the 2D-map landscape: draw the free-energy surface itself
-  let SURF_ALPHA = 0.35; // its opacity (0..1), adjustable live
+  let SURF_ALPHA = 0.45; // its opacity (0..1), adjustable live
+  let DRAG3D = false;    // 3D view is being turned: draw the surface on its coarse mesh
+  const XY = 1.3;        // 3D view: the map is drawn this much wider than tall (x, y stretch)
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
                          // the bottom are not squashed under one tall barrier. Tick labels stay true.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
@@ -660,7 +662,14 @@
   // average of nearby papers' well depths (bandwidth = median nearest-neighbour distance on the map),
   // turned into the floor's 0..1 "dense" scale (deepest well = 1). Where no paper is near, the
   // coverage weight fades the value to 0: the high-dimensional surface is empty there too.
+  const HDF = new WeakMap();
   function hdFloor(model) {
+    if (HDF.has(model)) return HDF.get(model);
+    const g = hdFloor0(model);
+    HDF.set(model, g);
+    return g;
+  }
+  function hdFloor0(model) {
     const pts = [];
     (model.papers || []).forEach(p => {
       const q = model.pos && model.pos.get(p), f = model.energy && model.energy.get(p);
@@ -683,6 +692,52 @@
       out.push(row);
     }
     return out;
+  }
+
+  // Bicubic (Catmull-Rom) upsampling of a square grid, f times finer; cached per grid.
+  const UPS = new WeakMap();
+  function upsampled(g, f) {
+    if (f <= 1) return g;
+    let c = UPS.get(g);
+    if (!c) UPS.set(g, c = {});
+    if (c[f]) return c[f];
+    const G = g.length, M = (G - 1) * f + 1, out = [];
+    const at = (r, cc) => +g[Math.max(0, Math.min(G - 1, r))][Math.max(0, Math.min(G - 1, cc))] || 0;
+    const cub = (p0, p1, p2, p3, t) => p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
+    for (let i = 0; i < M; i++) {
+      const y = i / f, r = Math.min(G - 2, Math.floor(y)), ty = y - r, row = new Float64Array(M);
+      for (let j = 0; j < M; j++) {
+        const x = j / f, cc = Math.min(G - 2, Math.floor(x)), tx = x - cc;
+        const col = q => cub(at(r + q, cc - 1), at(r + q, cc), at(r + q, cc + 1), at(r + q, cc + 2), tx);
+        row[j] = cub(col(-1), col(0), col(1), col(2), ty);
+      }
+      out.push(row);
+    }
+    return (c[f] = out);
+  }
+  // The floor density as an image (4x finer than its grid, bicubic), cached per grid.
+  const FLOORIMG = new WeakMap();
+  function floorImage(grid) {
+    let fi = FLOORIMG.get(grid);
+    if (fi) return fi;
+    const U = upsampled(grid, 4), M = U.length;
+    const cv = document.createElement("canvas");
+    cv.width = M; cv.height = M;
+    const cx = cv.getContext("2d"), img = cx.createImageData(M, M);
+    for (let r = 0; r < M; r++) for (let c = 0; c < M; c++) {
+      const v = Math.max(0, Math.min(1, U[r][c])), m = fieldColour(v).match(/\d+/g).map(Number), o = (r * M + c) * 4;
+      img.data[o] = m[0]; img.data[o + 1] = m[1]; img.data[o + 2] = m[2];
+      img.data[o + 3] = Math.round(255 * Math.max(0, Math.min(1, (v - 0.02) / 0.05)));   // empty map stays clear
+    }
+    cx.putImageData(img, 0, 0);
+    fi = { url: cv.toDataURL("image/png"), M };
+    FLOORIMG.set(grid, fi);
+    return fi;
+  }
+  const LIGHT3 = (() => { const v = [-0.45, 0.35, 0.82], l = Math.hypot(...v); return v.map(x => x / l); })();
+  function shadeRGB(t, k) {                               // the field colour at t, lit by factor k
+    const m = fieldColour(t).match(/\d+/g).map(Number);
+    return "rgb(" + m.map(x => Math.min(255, Math.round(x * k))).join(",") + ")";
   }
 
   // Contour lines (marching squares) of a G x G field in [0, 1]^2 (row = y), at fixed levels; cached per
@@ -744,7 +799,8 @@
     const S = Math.min(W, H) * 0.6;
     const rot = w => { const x1 = w[0] * ca - w[1] * sa, y1 = w[0] * sa + w[1] * ca; return [x1, w[2] * ce + y1 * se, y1 * ce - w[2] * se]; };
     const c0 = rot([0, 0, ZH / 2]);
-    const P = w => { const r = rot(w); return { x: W / 2 + S * (r[0] - c0[0]), y: H / 2 - S * (r[1] - c0[1]), d: r[2], w }; };
+    // The map is drawn XY times wider than it is deep in energy (x, y stretched; heights unchanged).
+    const P = w => { const r = rot([w[0] * XY, w[1] * XY, w[2]]); return { x: W / 2 + S * (r[0] - c0[0]), y: H / 2 - S * (r[1] - c0[1]), d: r[2], w }; };
     const xy = q => q.x.toFixed(1) + " " + q.y.toFixed(1);
     const flo = [];                                       // drone tool: floor-level marks (paper shadows)
 
@@ -752,15 +808,12 @@
     let floor = "";
     const grid = FLOOR_HD ? hdFloor(model) : model.grid;
     if (grid && grid.length > 1) {
-      const G = grid.length, step = Math.max(1, Math.ceil(G / 28));
-      for (let r = 0; r < G - 1; r += step) for (let c = 0; c < G - 1; c += step) {
-        const r1 = Math.min(G - 1, r + step), c1 = Math.min(G - 1, c + step);
-        const v = (grid[r][c] + grid[r][c1] + grid[r1][c] + grid[r1][c1]) / 4;
-        if (v < 0.03) continue;
-        const pts = [[c, r], [c1, r], [c1, r1], [c, r1]].map(([cc, rr]) => P([cc / (G - 1) - 0.5, 0.5 - rr / (G - 1), 0]));
-        const col = fieldColour(v);
-        floor += `<polygon points="${pts.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ")}" fill="${col}" stroke="${col}" stroke-width=".6" fill-opacity=".7" stroke-opacity=".7"/>`;
-      }
+      // The floor is a flat plane and this camera is orthographic, so the plane maps to the screen by an
+      // affine transform: draw the density as ONE smoothly interpolated image instead of tiles.
+      const fi = floorImage(grid), h = 0.5 / (fi.M - 1);
+      const O = P([-0.5 - h, 0.5 + h, 0]), Ux = P([0.5 + h, 0.5 + h, 0]), Vy = P([-0.5 - h, -0.5 - h, 0]), n = 100;
+      floor += `<image href="${fi.url}" x="0" y="0" width="${n}" height="${n}" preserveAspectRatio="none" opacity=".7" ` +
+        `transform="matrix(${((Ux.x - O.x) / n).toFixed(4)} ${((Ux.y - O.y) / n).toFixed(4)} ${((Vy.x - O.x) / n).toFixed(4)} ${((Vy.y - O.y) / n).toFixed(4)} ${O.x.toFixed(2)} ${O.y.toFixed(2)})"/>`;
     }
     if (grid && grid.length > 1)                          // contour lines of the floor's field
       floor += contourSegs(grid).map(([x1, y1, x2, y2]) => {
@@ -815,26 +868,44 @@
     }
 
     // The free-energy SURFACE (admin, 2D-map landscape): the same -ln p the wells and cols are read off,
-    // drawn as a translucent mesh at the heights of this view's axis. Cut off above the top barrier, so
-    // only the part of the landscape the tree spans is shown. Painted in depth order with the tree, so
-    // nodes behind a fold sit behind it.
-    const surf = [];
+    // at the heights of this view's axis, cut off above the top barrier. Interpolated to a finer mesh
+    // (bicubic; the coarse mesh while dragging), softly lit, and drawn as ONE translucent sheet so no
+    // seams or mesh lines show. Tree parts the sheet hides are drawn under it, the rest on top.
     const sf = model.surface;
+    let surfSheet = "", hasSurf = false, surfH = null;
     if (SURFACE && sf && Array.isArray(sf.z) && sf.z.length > 1) {
-      const G = sf.z.length, k = 1 / (G - 1), top = fmax;
-      const Z = sf.z.map(row => row.map(e => Math.min(top, Math.max(0, +e || 0))));
-      const at = (r, c) => P([c * k - 0.5, 0.5 - r * k, zOfFe(Z[r][c])]);
-      const Q = [];
-      for (let r = 0; r < G; r++) { Q.push([]); for (let c = 0; c < G; c++) Q[r].push(at(r, c)); }
-      for (let r = 0; r < G - 1; r++) for (let c = 0; c < G - 1; c++) {
-        const raw = [sf.z[r][c], sf.z[r][c + 1], sf.z[r + 1][c + 1], sf.z[r + 1][c]];
-        if (Math.min(...raw) >= top) continue;                // wholly above the top barrier
-        const q4 = [Q[r][c], Q[r][c + 1], Q[r + 1][c + 1], Q[r + 1][c]];
-        const e = (Z[r][c] + Z[r][c + 1] + Z[r + 1][c + 1] + Z[r + 1][c]) / 4;
-        const col = fieldColour(1 - e / top);              // deep wells red, high ground cream
-        surf.push({ d: q4.reduce((a, q) => a + q.d, 0) / 4,
-          svg: `<polygon points="${q4.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ")}" fill="${col}" stroke="#55626a" stroke-width=".3" pointer-events="none" style="fill-opacity:var(--dg-sa);stroke-opacity:calc(var(--dg-sa) * .6)"/>` });
+      hasSurf = true;
+      const top = fmax, U = upsampled(sf.z, DRAG3D ? 1 : 2), M = U.length, k = 1 / (M - 1);
+      const E = U.map(row => Array.from(row, e => Math.min(top, Math.max(0, e))));
+      const Zw = E.map(row => row.map(e => zOfFe(e)));
+      const Q = Zw.map((row, r) => row.map((z, c) => P([c * k - 0.5, 0.5 - r * k, z])));
+      const tiles = [];
+      for (let r = 0; r < M - 1; r++) for (let c = 0; c < M - 1; c++) {
+        const cr = [[r, c], [r, c + 1], [r + 1, c + 1], [r + 1, c]], uv = cr.map(([i, j]) => U[i][j]);
+        if (Math.min(...uv) >= top) continue;               // wholly above the top barrier
+        let q4 = cr.map(([i, j]) => Q[i][j]);
+        if (Math.max(...uv) > top) {                        // rim cell: cut exactly where the surface reaches the top
+          q4 = [];
+          for (let e = 0; e < 4; e++) {
+            const [i0, j0] = cr[e], [i1, j1] = cr[(e + 1) % 4], u0 = uv[e], u1 = uv[(e + 1) % 4];
+            if (u0 < top) q4.push(Q[i0][j0]);
+            if ((u0 < top) !== (u1 < top)) {
+              const f = (top - u0) / (u1 - u0), ii = i0 + (i1 - i0) * f, jj = j0 + (j1 - j0) * f;
+              q4.push(P([jj * k - 0.5, 0.5 - ii * k, zOfFe(top)]));
+            }
+          }
+        }
+        const z00 = Zw[r][c], z01 = Zw[r][c + 1], z10 = Zw[r + 1][c], z11 = Zw[r + 1][c + 1];
+        const dzx = ((z01 - z00) + (z11 - z10)) / 2 / (k * XY), dzy = -((z10 - z00) + (z11 - z01)) / 2 / (k * XY);
+        const nl = Math.hypot(dzx, dzy, 1), lit = Math.max(0, (-dzx * LIGHT3[0] - dzy * LIGHT3[1] + LIGHT3[2]) / nl);
+        const e = (E[r][c] + E[r][c + 1] + E[r + 1][c + 1] + E[r + 1][c]) / 4;
+        const col = shadeRGB(1 - e / top, 0.8 + 0.28 * lit);
+        tiles.push({ d: q4.reduce((t, q) => t + q.d, 0) / q4.length,
+          svg: `<polygon points="${q4.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ")}" fill="${col}" stroke="${col}" stroke-width=".7"/>` });
       }
+      surfSheet = `<g style="opacity:var(--dg-sa)" pointer-events="none">` + tiles.sort((a, b) => b.d - a.d).map(o => o.svg).join("") + `</g>`;
+      const G = sf.z.length;                              // surface heights (coarse grid) for the hiding test
+      surfH = { G, z: sf.z.map(row => row.map(e => (+e || 0) >= top ? null : zOfFe(Math.max(0, +e || 0)))) };
     }
 
     // Branches (each child to its junction) and nodes, painted far to near.
@@ -867,7 +938,7 @@
       `<text x="${(a0.x - 6).toFixed(1)}" y="${(a0.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">0</text>` +
       `<text x="${(a1.x - 6).toFixed(1)}" y="${(a1.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">${fmax.toFixed(2)}</text>` +
       `<text x="${(a1.x + 6).toFixed(1)}" y="${(a1.y - 6).toFixed(1)}" font-size="10" fill="#888">free energy −ln p ↑</text>`;
-    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = ${FLOOR_HD ? "free energy of the heights, interpolated between papers" : "Topic Map density"} · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : model.estKind === "map2d" ? "landscape of the 2D map itself: heights and floor are one surface" : "heights exact; map distances between far regions are approximate"}${surf.length ? " · surface = −ln p of the 2D map" : ""}</text>`;
+    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = ${FLOOR_HD ? "free energy of the heights, interpolated between papers" : "Topic Map density"} · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : model.estKind === "map2d" ? "landscape of the 2D map itself: heights and floor are one surface" : "heights exact; map distances between far regions are approximate"}${hasSurf ? " · surface = −ln p of the 2D map" : ""}</text>`;
 
     // Hover story for each gap-closer, as in the flat view: its bridged pair traced up to their junction.
     const leafOf = new Map();
@@ -924,8 +995,32 @@
     }
     // The floor sits outside the layer that fades on highlight when FLOOR_BRIGHT is on, so the map stays clear.
     // With the surface on, everything is painted together in depth order (nodes win ties: they sit on it).
-    const body = surf.length ? `<g style="--dg-sa:${SURF_ALPHA}">` + paint([...surf, ...lines, ...dots.map(o => ({ d: o.d - 1e-3, svg: o.svg }))]) + `</g>`
-                             : paint(lines) + paint(dots);
+    let body = paint(lines) + paint(dots);
+    if (hasSurf) {
+      // Hidden = the line of sight from the point toward the viewer passes under the surface.
+      const vx = -XY * sa * ce, vy = -XY * ca * ce, vz = se, vl = Math.hypot(vx, vy, vz) || 1;
+      const hAt = (x, y) => {
+        const G = surfH.G, mx = x + 0.5, my = 0.5 - y;
+        if (mx < 0 || mx > 1 || my < 0 || my > 1) return null;
+        const c = mx * (G - 1), r = my * (G - 1), c0 = Math.min(G - 2, Math.floor(c)), r0 = Math.min(G - 2, Math.floor(r)), fc = c - c0, fr = r - r0;
+        const a = surfH.z[r0][c0], b = surfH.z[r0][c0 + 1], cc = surfH.z[r0 + 1][c0], dd = surfH.z[r0 + 1][c0 + 1];
+        if (a == null || b == null || cc == null || dd == null) return null;
+        return (a * (1 - fc) + b * fc) * (1 - fr) + (cc * (1 - fc) + dd * fc) * fr;
+      };
+      const hidden = w => {
+        for (let i = 1; i <= 60; i++) {
+          const t = i * 0.025, x = w[0] + vx / vl * t / XY, y = w[1] + vy / vl * t / XY, z = w[2] + vz / vl * t;
+          if (z > ZH + 0.01 || Math.abs(x) > 0.5 || Math.abs(y) > 0.5) return false;
+          const hz = hAt(x, y);
+          if (hz != null && z < hz - 0.004) return true;
+        }
+        return false;
+      };
+      const mid = g => g.k === "line" ? [(g.a[0] + g.b[0]) / 2, (g.a[1] + g.b[1]) / 2, (g.a[2] + g.b[2]) / 2] : g.p;
+      const behind = [], front = [];
+      [...lines, ...dots.map(o => ({ d: o.d - 1e-3, svg: o.svg, g: o.g }))].forEach(o => (o.g && hidden(mid(o.g)) ? behind : front).push(o));
+      body = `<g style="--dg-sa:${SURF_ALPHA}">` + paint(behind) + surfSheet + paint(front) + `</g>`;
+    }
     return { inner: (FLOOR_BRIGHT ? floor + `<g class="dg-base">` : `<g class="dg-base">` + floor) + axis + body + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W, is3d: true };
   }
 
@@ -1390,12 +1485,13 @@
       const moved = drag.moved + Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y);
       if (moved > 4 && !mountEl.__dgDragged) {             // a rotation, not a click: now hold the pointer
         mountEl.__dgDragged = true;
+        DRAG3D = true;                                    // lighter surface mesh while turning
         try { svg.setPointerCapture(drag.id); } catch (_) {}
       }
       drag = { x: e.clientX, y: e.clientY, moved, id: drag.id };
       redraw();
     });
-    const end = () => { drag = null; svg.style.cursor = "grab"; };
+    const end = () => { drag = null; svg.style.cursor = "grab"; if (DRAG3D) { DRAG3D = false; redraw(); } };
     svg.addEventListener("pointerup", end);
     svg.addEventListener("pointercancel", end);
     mountEl.querySelectorAll(".dg-cam").forEach(btn => btn.addEventListener("click", () => {

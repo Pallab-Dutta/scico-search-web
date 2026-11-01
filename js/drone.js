@@ -127,41 +127,107 @@
   }
 
   const NEAR = 0.03;
+
+  // Smooth versions of the surface and floor: the grids upsampled f times with bicubic (Catmull-Rom)
+  // interpolation, cached per scene. Where the surface is not drawn (above the top barrier) it is
+  // treated as the top itself, so the cut-off edge stays where the 3D view puts it.
+  const SMOOTH = new WeakMap();
+  function cubic(p0, p1, p2, p3, t) {
+    return p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
+  }
+  function upsample(g, f) {
+    const G = g.length, M = (G - 1) * f + 1, out = [];
+    const at = (r, c) => g[clamp(r, 0, G - 1)][clamp(c, 0, G - 1)];
+    for (let i = 0; i < M; i++) {
+      const y = i / f, r = Math.floor(Math.min(y, G - 2)), ty = y - r, row = new Float32Array(M);
+      for (let j = 0; j < M; j++) {
+        const x = j / f, c = Math.floor(Math.min(x, G - 2)), tx = x - c;
+        const col = k => cubic(at(r + k, c - 1), at(r + k, c), at(r + k, c + 1), at(r + k, c + 2), tx);
+        row[j] = cubic(col(-1), col(0), col(1), col(2), ty);
+      }
+      out.push(row);
+    }
+    return out;
+  }
+  function smoothOf(scene, f) {
+    let c = SMOOTH.get(scene);
+    if (!c) SMOOTH.set(scene, c = {});
+    if (c[f]) return c[f];
+    const out = {};
+    if (scene.surface) {
+      const top = scene.top;
+      const z = upsample(scene.surface.z.map(row => row.map(v => v == null ? top : v)), f);
+      out.surface = { z, t: upsample(scene.surface.t, f), top };
+    }
+    if (scene.floor) out.floor = upsample(scene.floor, f);
+    return (c[f] = out);
+  }
+  function rgbOf(t) {
+    t = clamp(t, 0, 1);
+    const A = [251, 250, 248], B = [132, 151, 176], C = [186, 87, 87];
+    const [a, b, f] = t < 0.5 ? [A, B, t / 0.5] : [B, C, (t - 0.5) / 0.5];
+    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+  }
+  // Offscreen layers: a sheet is drawn opaque (so neighbouring tiles leave no seams) and then laid onto
+  // the frame at its opacity.
+  const LAYERS = new WeakMap();
+  function layerFor(ctx, W, H) {
+    let L = LAYERS.get(ctx);
+    if (!L) {
+      const cv = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(W, H) : Object.assign(document.createElement("canvas"), { width: W, height: H });
+      L = { cv, ctx: cv.getContext("2d") };
+      LAYERS.set(ctx, L);
+    }
+    if (L.cv.width !== W || L.cv.height !== H) { L.cv.width = W; L.cv.height = H; }
+    L.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    L.ctx.clearRect(0, 0, W, H);
+    return L;
+  }
+  const LIGHT = norm([-0.45, 0.35, 0.82]);
+
+  // o: { W, H, fov, lod (1 full, 2 preview), alpha, surface, bg, spread (x, y stretch), path }.
   D.render = function (ctx, scene, cam, o) {
     const W = o.W, H = o.H, C = D.camera(cam, W, H, o.fov), s = H / 1080, lod = o.lod || 1;
+    const k = o.spread || 1, f = lod > 1 ? 1 : 3;
+    const pr = w => C.proj([w[0] * k, w[1] * k, w[2]]);
+    const sm = smoothOf(scene, f);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.fillStyle = o.bg || "#ffffff";
     ctx.fillRect(0, 0, W, H);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    const pr = w => C.proj(w);
-    const poly = (pts, fill, stroke, sw) => {
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-      ctx.closePath();
-      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
-      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.stroke(); }
+    const quad = (c, q, fill) => {
+      c.beginPath(); c.moveTo(q[0][0], q[0][1]); c.lineTo(q[1][0], q[1][1]); c.lineTo(q[2][0], q[2][1]); c.lineTo(q[3][0], q[3][1]); c.closePath();
+      c.fillStyle = fill; c.fill(); c.strokeStyle = fill; c.lineWidth = 1; c.stroke();   // same-colour edge closes seams
+    };
+    const sheet = (grid, zOf, colour, keep) => {          // projected, depth-sorted opaque tiles of one grid
+      const M = grid.length, step = 1 / (M - 1), P = [];
+      for (let r = 0; r < M; r++) {
+        const row = [];
+        for (let c = 0; c < M; c++) row.push(pr([c * step - 0.5, 0.5 - r * step, zOf(r, c)]));
+        P.push(row);
+      }
+      const tiles = [];
+      for (let r = 0; r < M - 1; r++) for (let c = 0; c < M - 1; c++) {
+        if (!keep(r, c)) continue;
+        const q = [P[r][c], P[r][c + 1], P[r + 1][c + 1], P[r + 1][c]];
+        if (q[0][2] < NEAR || q[1][2] < NEAR || q[2][2] < NEAR || q[3][2] < NEAR) continue;
+        tiles.push({ d: (q[0][2] + q[1][2] + q[2][2] + q[3][2]) / 4, q, r, c });
+      }
+      tiles.sort((a, b) => b.d - a.d);
+      const L = layerFor(ctx, W, H);
+      for (const tl of tiles) quad(L.ctx, tl.q, colour(tl.r, tl.c));
+      return L.cv;
     };
 
-    // Floor: the Topic Map density, its contours, the map border, paper shadows.
-    const g = scene.floor;
-    if (g) {
-      const G = g.length, step = lod > 1 ? 2 : 1, k = 1 / (G - 1);
-      ctx.globalAlpha = 0.7;
-      for (let r = 0; r < G - 1; r += step) for (let c = 0; c < G - 1; c += step) {
-        const r1 = Math.min(G - 1, r + step), c1 = Math.min(G - 1, c + step);
-        const v = (g[r][c] + g[r][c1] + g[r1][c] + g[r1][c1]) / 4;
-        if (v < 0.03) continue;
-        const q = [[c, r], [c1, r], [c1, r1], [c, r1]].map(([cc, rr]) => pr([cc * k - 0.5, 0.5 - rr * k, 0]));
-        if (q.some(p => p[2] < NEAR)) continue;
-        const col = colOf(v);
-        poly(q, col, lod > 1 ? null : col, 0.6);
-      }
-      ctx.globalAlpha = 0.55;
-      ctx.strokeStyle = "#55626a";
-      ctx.lineWidth = 0.8 * s * 1.3;
+    // Floor: the Topic Map density as one smooth sheet, its contours, the border, paper shadows.
+    if (sm.floor) {
+      const g = sm.floor;
+      const v4 = (r, c) => (g[r][c] + g[r][c + 1] + g[r + 1][c] + g[r + 1][c + 1]) / 4;
+      const cv = sheet(g, () => 0, (r, c) => { const [R, G, B] = rgbOf(v4(r, c)); return `rgb(${R | 0},${G | 0},${B | 0})`; }, (r, c) => v4(r, c) >= 0.03);
+      ctx.globalAlpha = 0.7; ctx.drawImage(cv, 0, 0); ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = "#55626a"; ctx.lineWidth = 0.8 * s * 1.3;
       ctx.beginPath();
       for (const [x1, y1, x2, y2] of scene.contours || []) {
         const a = pr([x1 - 0.5, 0.5 - y1, 0]), b = pr([x2 - 0.5, 0.5 - y2, 0]);
@@ -172,63 +238,77 @@
       ctx.globalAlpha = 1;
     }
     const bd = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]].map(([a, b]) => pr([a, b, 0]));
-    if (bd.every(p => p[2] > NEAR)) poly(bd, null, "#c9cfd3", 1.2 * s);
+    if (bd.every(p => p[2] > NEAR)) {
+      ctx.beginPath(); bd.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+      ctx.strokeStyle = "#c9cfd3"; ctx.lineWidth = 1.2 * s; ctx.stroke();
+    }
     for (const m of scene.flat || []) drawPrim(ctx, m, pr, s, 1);
 
-    // Depth-sorted: surface quads, tree lines, nodes, gap markers.
+    // Tree, nodes and gap markers, far to near.
     const items = [];
-    const S = scene.surface;
-    if (S && o.surface !== false && (o.alpha == null || o.alpha > 0)) {
-      const G = S.z.length, step = lod > 1 ? 2 : 1, k = 1 / (G - 1);
-      const P = [];
-      for (let r = 0; r < G; r += step) {
-        const row = [];
-        for (let c = 0; c < G; c += step) row.push(S.z[r][c] == null ? null : pr([c * k - 0.5, 0.5 - r * k, S.z[r][c]]));
-        P.push(row);
-      }
-      const T = (r, c) => S.t[Math.min(G - 1, r * step)][Math.min(G - 1, c * step)];
-      for (let r = 0; r < P.length - 1; r++) for (let c = 0; c < P[r].length - 1; c++) {
-        const q = [P[r][c], P[r][c + 1], P[r + 1][c + 1], P[r + 1][c]];
-        if (q.some(p => !p || p[2] < NEAR)) continue;
-        items.push({ d: (q[0][2] + q[1][2] + q[2][2] + q[3][2]) / 4, q, t: (T(r, c) + T(r, c + 1) + T(r + 1, c + 1) + T(r + 1, c)) / 4 });
-      }
-    }
     for (const m of scene.prims || []) {
       if (m.k === "line") {
         const a = pr(m.a), b = pr(m.b);
         if (a[2] < NEAR || b[2] < NEAR) continue;
-        items.push({ d: (a[2] + b[2]) / 2, m, a, b });
+        items.push({ d: (a[2] + b[2]) / 2, m, a, b, w: [(m.a[0] + m.b[0]) / 2, (m.a[1] + m.b[1]) / 2, (m.a[2] + m.b[2]) / 2] });
       } else {
         const p = pr(m.p);
         if (p[2] < NEAR) continue;
-        items.push({ d: p[2] - 1e-3, m, p, j: m.j ? pr(m.j) : null });
+        items.push({ d: p[2] - 1e-3, m, p, j: m.j ? pr(m.j) : null, w: m.p });
       }
     }
-    if (o.path && o.path.pts && o.path.pts.length > 1) {   // the flight path, while editing
-      const pts = o.path.pts.map(pr);
-      for (let i = 0; i < pts.length - 1; i++)
-        if (pts[i][2] > NEAR && pts[i + 1][2] > NEAR) items.push({ d: (pts[i][2] + pts[i + 1][2]) / 2, pathSeg: [pts[i], pts[i + 1]] });
-      (o.path.keys || []).forEach((kp, i) => { const p = pr(kp); if (p[2] > NEAR) items.push({ d: p[2] - 2e-3, key: i + 1, p, sel: o.path.sel === i }); });
-    }
     items.sort((a, b) => b.d - a.d);
-    const alpha = o.alpha == null ? 0.35 : o.alpha;
-    for (const it of items) {
-      if (it.q) {
-        ctx.globalAlpha = alpha;
-        poly(it.q, colOf(it.t), null, 0);
-        if (lod === 1) { ctx.globalAlpha = alpha * 0.6; poly(it.q, null, "#55626a", 0.3 * s); }
-        ctx.globalAlpha = 1;
-      } else if (it.pathSeg) {
-        ctx.strokeStyle = "#ba5757"; ctx.lineWidth = 2.2 * s; ctx.setLineDash([8 * s, 6 * s]);
-        ctx.beginPath(); ctx.moveTo(it.pathSeg[0][0], it.pathSeg[0][1]); ctx.lineTo(it.pathSeg[1][0], it.pathSeg[1][1]); ctx.stroke();
-        ctx.setLineDash([]);
-      } else if (it.key) {
+
+    // The surface: one smooth, softly lit sheet. What it hides (seen through it) is drawn first and tinted
+    // by the sheet; what stands in front of it is drawn on top. A point is hidden when the line of sight
+    // to it passes under the surface.
+    const S = sm.surface, showS = S && o.surface !== false && (o.alpha == null || o.alpha > 0);
+    let front = items;
+    if (showS) {
+      const top = S.top, Z = S.z, M = Z.length;
+      const hid = w => {
+        const cp = cam.pos, n = 24;
+        for (let i = 1; i < n; i++) {
+          const t = i / n * 0.97, x = (cp[0] + (w[0] * k - cp[0]) * t) / k, y = (cp[1] + (w[1] * k - cp[1]) * t) / k, z = cp[2] + (w[2] - cp[2]) * t;
+          const h = D.surfaceZ(scene, x, y);
+          if (h > 0 && z < h - 0.004) return true;
+        }
+        return false;
+      };
+      const behind = [];
+      front = [];
+      for (const it of items) (hid(it.w) ? behind : front).push(it);
+      for (const it of behind) drawPrim(ctx, it.m, pr, s, 0, it);
+      const step = 1 / (M - 1);
+      const cv = sheet(Z, (r, c) => Z[r][c], (r, c) => {
+        const z00 = Z[r][c], z01 = Z[r][c + 1], z10 = Z[r + 1][c], z11 = Z[r + 1][c + 1];
+        const dzx = ((z01 - z00) + (z11 - z10)) / 2 / (step * k), dzy = -((z10 - z00) + (z11 - z01)) / 2 / (step * k);
+        const nrm = norm([-dzx, -dzy, 1]), sh = 0.8 + 0.28 * Math.max(0, dot(nrm, LIGHT));
+        const t = (S.t[r][c] + S.t[r][c + 1] + S.t[r + 1][c] + S.t[r + 1][c + 1]) / 4, [R, G, B] = rgbOf(t);
+        return `rgb(${Math.min(255, R * sh) | 0},${Math.min(255, G * sh) | 0},${Math.min(255, B * sh) | 0})`;
+      }, (r, c) => Math.min(Z[r][c], Z[r][c + 1], Z[r + 1][c], Z[r + 1][c + 1]) < top - 1e-6);
+      ctx.globalAlpha = o.alpha == null ? 0.35 : o.alpha;
+      ctx.drawImage(cv, 0, 0);
+      ctx.globalAlpha = 1;
+    }
+    for (const it of front) drawPrim(ctx, it.m, pr, s, 0, it);
+
+    if (o.path && o.path.pts && o.path.pts.length > 1) {   // the flight path, while editing (in drone space)
+      const pp = w => C.proj(w);
+      const pts = o.path.pts.map(pp);
+      ctx.strokeStyle = "#ba5757"; ctx.lineWidth = 2.2 * s; ctx.setLineDash([8 * s, 6 * s]);
+      ctx.beginPath();
+      for (let i = 0; i < pts.length - 1; i++)
+        if (pts[i][2] > NEAR && pts[i + 1][2] > NEAR) { ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[i + 1][0], pts[i + 1][1]); }
+      ctx.stroke(); ctx.setLineDash([]);
+      (o.path.keys || []).forEach((kp, i) => {
+        const p = pp(kp); if (p[2] <= NEAR) return;
         const R = 11 * s;
-        ctx.beginPath(); ctx.arc(it.p[0], it.p[1], R, 0, Math.PI * 2);
-        ctx.fillStyle = it.sel ? "#ba5757" : "#1e2a31"; ctx.fill();
+        ctx.beginPath(); ctx.arc(p[0], p[1], R, 0, Math.PI * 2);
+        ctx.fillStyle = o.path.sel === i ? "#ba5757" : "#1e2a31"; ctx.fill();
         ctx.fillStyle = "#fff"; ctx.font = `700 ${Math.round(11 * s)}px system-ui,sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText(String(it.key), it.p[0], it.p[1] + 0.5);
-      } else drawPrim(ctx, it.m, pr, s, 0, it);
+        ctx.fillText(String(i + 1), p[0], p[1] + 0.5);
+      });
     }
     ctx.globalAlpha = 1;
   };
@@ -263,11 +343,11 @@
   }
 
   // The camera at time t, kept above the surface when asked (so a path never dives into a ridge).
-  D.frameCam = function (scene, path, t, keepAbove) {
-    const c = D.camAt(path, t);
+  D.frameCam = function (scene, path, t, keepAbove, spread) {
+    const c = D.camAt(path, t), k = spread || 1;
     if (!c) return null;
     const pos = c.pos.slice();
-    if (keepAbove) pos[2] = Math.max(pos[2], D.surfaceZ(scene, pos[0], pos[1]) + 0.04);
+    if (keepAbove) pos[2] = Math.max(pos[2], D.surfaceZ(scene, pos[0] / k, pos[1] / k) + 0.04);
     pos[2] = Math.max(pos[2], 0.01);
     return { pos, tgt: c.tgt };
   };
@@ -304,8 +384,8 @@ Drone.player(document.getElementById("c"), FLIGHT);<\/script></body></html>`;
     const N = Math.max(1, Math.round(path.duration * fps) + 1);
     const ctx = canvas.getContext("2d");
     canvas.width = st.W; canvas.height = st.H;
-    const opt = lod => ({ W: st.W, H: st.H, fov: st.fov, lod, alpha: st.alpha, surface: st.surface, bg: st.bg });
-    const draw = (t, lod) => { const c = D.frameCam(F.scene, path, t, st.keepAbove); if (c) D.render(ctx, F.scene, c, opt(lod)); };
+    const opt = lod => ({ W: st.W, H: st.H, fov: st.fov, lod, alpha: st.alpha, surface: st.surface, bg: st.bg, spread: st.spread || 1 });
+    const draw = (t, lod) => { const c = D.frameCam(F.scene, path, t, st.keepAbove, st.spread); if (c) D.render(ctx, F.scene, c, opt(lod)); };
     const q = new URLSearchParams(location.search), fr = q.get("frame");
     if (fr != null) {                                      // exact frame for the MP4 script
       document.body.classList.add("frame");
@@ -381,7 +461,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const storeKey = "eratost_drone:" + (opts.sessionId || "default");
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(storeKey) || "null"); } catch (_) { saved = null; }
-    const st = Object.assign({ W: 1920, H: 1080, fps: 30, fov: 52, alpha: 0.35, surface: !!scene.surface, keepAbove: true, bg: "#ffffff", newDur: 3, newEase: "smooth" },
+    const st = Object.assign({ W: 1920, H: 1080, fps: 30, fov: 52, alpha: 0.35, surface: !!scene.surface, keepAbove: true, bg: "#ffffff", spread: 1, newDur: 3, newEase: "smooth" },
                              (saved && saved.settings) || {});
     let keys = (saved && Array.isArray(saved.keys)) ? saved.keys : [];
     let sel = -1;
@@ -441,6 +521,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
 <div><h4>Look</h4>
 <div class="row">surface <input type="checkbox" class="x-surf"/> opacity <input type="range" class="x-alpha" min="0" max="1" step="0.05" style="width:110px"/></div>
 <div class="row">lens (field of view) <input type="range" class="x-fov" min="25" max="95" step="1" style="width:110px"/> <span class="x-fovv"></span></div>
+<div class="row" title="Stretch the landscape sideways (x, y) without changing its heights. Set it before placing keyframes: they live in the stretched space.">spread X,Y <input type="range" class="x-spread" min="1" max="2.5" step="0.05" style="width:110px"/> <span class="x-spreadv"></span></div>
 <div class="row"><label><input type="checkbox" class="x-above"/> keep the drone above the surface</label></div></div>
 <div><h4>Video</h4><div class="row"><select class="x-size"></select> <select class="x-fps"><option value="30">30 fps</option><option value="60">60 fps</option><option value="24">24 fps</option></select></div></div>
 <div><h4>Export</h4><div class="row"><button class="pri x-dl">Download flight file</button></div>
@@ -477,9 +558,9 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     };
     const fmt = x => x.toFixed(1) + " s / " + path.duration.toFixed(1) + " s";
     const draw = lod => {
-      const c = playing || (!showPathNow()) ? D.frameCam(scene, path, t, st.keepAbove) : camNow();
+      const c = playing || (!showPathNow()) ? D.frameCam(scene, path, t, st.keepAbove, st.spread) : camNow();
       if (!c) return;
-      D.render(ctx, scene, c, { W: canvas.width, H: canvas.height, fov: st.fov, lod, alpha: st.alpha, surface: st.surface, bg: st.bg,
+      D.render(ctx, scene, c, { W: canvas.width, H: canvas.height, fov: st.fov, lod, alpha: st.alpha, surface: st.surface, bg: st.bg, spread: st.spread,
         path: !playing && showPath && !scrubView ? { pts: pathPts, keys: path.keys.map(k => k.pos), sel } : null });
       timeEl.textContent = fmt(t);
       slider.value = t;
@@ -607,6 +688,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     bind("x-alpha", x => x.value = st.alpha, x => st.alpha = +x.value, "input");
     bind("x-fov", x => { x.value = st.fov; $("x-fovv").textContent = st.fov + "°"; }, x => { st.fov = +x.value; $("x-fovv").textContent = st.fov + "°"; }, "input");
     bind("x-above", x => x.checked = st.keepAbove, x => st.keepAbove = x.checked);
+    bind("x-spread", x => { x.value = st.spread; $("x-spreadv").textContent = (+st.spread).toFixed(2) + "×"; }, x => { st.spread = +x.value; $("x-spreadv").textContent = st.spread.toFixed(2) + "×"; }, "input");
     bind("x-size", x => x.value = st.W + "x" + st.H, x => { const [w, h] = x.value.split("x").map(Number); st.W = w; st.H = h; size(); });
     bind("x-fps", x => x.value = String(st.fps), x => st.fps = +x.value);
 
@@ -620,7 +702,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const base = () => ("eratost_" + (opts.title || "flight")).replace(/[^\w-]+/g, "_").slice(0, 60);
     $("x-dl").onclick = () => {
       if (path.keys.length < 2) { timeEl.textContent = "Add at least two keyframes first."; return; }
-      const settings = { W: st.W, H: st.H, fps: st.fps, fov: st.fov, alpha: st.alpha, surface: st.surface, keepAbove: st.keepAbove, bg: st.bg };
+      const settings = { W: st.W, H: st.H, fps: st.fps, fov: st.fov, alpha: st.alpha, surface: st.surface, keepAbove: st.keepAbove, bg: st.bg, spread: st.spread };
       download(base() + "_flight.html", D.flightHTML({ title: "Eratost · " + (opts.title || "flight"), scene, keys, settings }), "text/html");
     };
     $("x-savep").onclick = () => download(base() + "_path.json", JSON.stringify({ keys, settings: st }, null, 1), "application/json");
