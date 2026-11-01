@@ -455,11 +455,62 @@
   }
 
   // The camera at time t, kept above the surface when asked (so a path never dives into a ridge).
+  // Ground for "keep the drone above the surface": the landscape as a SOLID, continuous height -- each
+  // well's walls carried on up to the rim height (no sudden drop where the drawn surface is cut away),
+  // easing down to the floor over 0.3 map widths beyond the grid. A hard step here made the drone leap
+  // up and back down in one frame whenever its path crossed a rim.
+  D.groundZ = function (scene, x, y) {
+    const S = scene.surface;
+    if (!S || !S.xs) return 0;
+    const X = x + 0.5, Y = 0.5 - y, xs = S.xs, ys = S.ys, top = scene.top || 0.8;
+    const [c, fc] = seek(xs, X), [r, fr] = seek(ys, Y), Z = S.z;
+    const h = Math.min(top, (Z[r][c] * (1 - fc) + Z[r][c + 1] * fc) * (1 - fr) + (Z[r + 1][c] * (1 - fc) + Z[r + 1][c + 1] * fc) * fr);
+    const out = Math.max(0, xs[0] - X, X - xs[xs.length - 1], ys[0] - Y, Y - ys[ys.length - 1]);
+    if (out <= 0) return h;
+    const f = clamp(out / 0.3, 0, 1);
+    return h * (1 - f * f * (3 - 2 * f));
+  };
+  // Where t falls within a flight leg (0..1), or -1 while hovering at a keyframe.
+  function legFrac(path, t) {
+    for (const l of path.legs) if (t <= l.t1) return l.kind === "fly" ? clamp((t - l.t0) / ((l.t1 - l.t0) || 1), 0, 1) : -1;
+    return -1;
+  }
+  // The drone at time t. With keepAbove, it is lifted just enough to clear the ground, but only BETWEEN
+  // keyframes (the lift grows and shrinks smoothly along each leg), so every keyframe view is exactly the
+  // one that was set, and the motion stays continuous.
+  // The lift over the whole flight, worked out once: how far below the ground the path would go, taken as
+  // a running maximum over +-0.7 s (so the drone starts climbing BEFORE a rim, not at it) and smoothed
+  // over time, then faded to zero at every keyframe. Cached on the path.
+  function liftProfile(scene, path, k) {
+    const key = k;
+    if (path._lift && path._lift.scene === scene && path._lift.key === key) return path._lift;
+    const T = path.duration, rate = 30, n = Math.max(2, Math.ceil(T * rate)), need = new Float64Array(n + 1);
+    for (let i = 0; i <= n; i++) {
+      const t = T * i / n, u = legFrac(path, t), c = D.camAt(path, t);
+      need[i] = u > 0 && c ? Math.max(0, D.groundZ(scene, c.pos[0] / k, c.pos[1] / k) + 0.04 - c.pos[2]) : 0;
+    }
+    const win = Math.round(0.7 * rate), mx = new Float64Array(n + 1);
+    for (let i = 0; i <= n; i++) { let m = 0; for (let j = Math.max(0, i - win); j <= Math.min(n, i + win); j++) if (need[j] > m) m = need[j]; mx[i] = m; }
+    const sg = 0.25 * rate, half = Math.ceil(3 * sg), sm = new Float64Array(n + 1);
+    for (let i = 0; i <= n; i++) {
+      let a = 0, w = 0;
+      for (let j = Math.max(0, i - half); j <= Math.min(n, i + half); j++) { const g = Math.exp(-((j - i) ** 2) / (2 * sg * sg)); a += g * mx[j]; w += g; }
+      const u = legFrac(path, T * i / n);
+      sm[i] = u > 0 ? (a / w) * Math.sin(Math.PI * u) : 0;
+    }
+    path._lift = { scene, key, n, T, v: sm };
+    return path._lift;
+  }
+  // The drone at time t. With keepAbove it is lifted clear of the ground (see liftProfile); every
+  // keyframe view stays exactly as it was set and the motion stays smooth.
   D.frameCam = function (scene, path, t, keepAbove, spread) {
     const c = D.camAt(path, t), k = spread || 1;
     if (!c) return null;
     const pos = c.pos.slice();
-    if (keepAbove) pos[2] = Math.max(pos[2], D.surfaceZ(scene, pos[0] / k, pos[1] / k) + 0.04);
+    if (keepAbove && scene.surface) {
+      const L = liftProfile(scene, path, k), x = clamp(t / (L.T || 1), 0, 1) * L.n, i = Math.min(L.n - 1, Math.floor(x)), f = x - i;
+      pos[2] += L.v[i] * (1 - f) + L.v[i + 1] * f;
+    }
     pos[2] = Math.max(pos[2], 0.01);
     return { pos, tgt: c.tgt };
   };
@@ -573,7 +624,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const storeKey = "eratost_drone:" + (opts.sessionId || "default");
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(storeKey) || "null"); } catch (_) { saved = null; }
-    const st = Object.assign({ W: 1920, H: 1080, fps: 30, fov: 52, alpha: 0.35, surface: !!scene.surface, keepAbove: true, bg: "#ffffff", spread: 1, wire: true, newDur: 3, newEase: "smooth" },
+    const st = Object.assign({ W: 1920, H: 1080, fps: 30, fov: 52, alpha: 0.35, surface: !!scene.surface, keepAbove: false, bg: "#ffffff", spread: 1, wire: true, newDur: 3, newEase: "smooth" },
                              (saved && saved.settings) || {});
     let keys = (saved && Array.isArray(saved.keys)) ? saved.keys : [];
     let sel = -1;
@@ -653,7 +704,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const rebuild = () => {
       path = D.prepare(keys);
       pathPts = [];
-      if (path.keys.length > 1) for (let i = 0; i <= 160; i++) { const c = D.camAt(path, path.duration * i / 160); if (c) pathPts.push(c.pos); }
+      if (path.keys.length > 1) for (let i = 0; i <= 200; i++) { const c = D.frameCam(scene, path, path.duration * i / 200, st.keepAbove, st.spread); if (c) pathPts.push(c.pos); }
       slider.max = Math.max(0.01, path.duration);
       if (t > path.duration) t = path.duration;
       save(); dirty = true;
@@ -800,7 +851,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     bind("x-alpha", x => x.value = st.alpha, x => st.alpha = +x.value, "input");
     bind("x-wire", x => x.checked = !!st.wire, x => st.wire = x.checked);
     bind("x-fov", x => { x.value = st.fov; $("x-fovv").textContent = st.fov + "°"; }, x => { st.fov = +x.value; $("x-fovv").textContent = st.fov + "°"; }, "input");
-    bind("x-above", x => x.checked = st.keepAbove, x => st.keepAbove = x.checked);
+    bind("x-above", x => x.checked = st.keepAbove, x => { st.keepAbove = x.checked; rebuild(); });
     bind("x-spread", x => { x.value = st.spread; $("x-spreadv").textContent = (+st.spread).toFixed(2) + "×"; }, x => { st.spread = +x.value; $("x-spreadv").textContent = st.spread.toFixed(2) + "×"; }, "input");
     bind("x-size", x => x.value = st.W + "x" + st.H, x => { const [w, h] = x.value.split("x").map(Number); st.W = w; st.H = h; size(); });
     bind("x-fps", x => x.value = String(st.fps), x => st.fps = +x.value);
