@@ -571,7 +571,7 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
     const storeKey = "eratost_drone:" + (opts.sessionId || "default");
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(storeKey) || "null"); } catch (_) { saved = null; }
-    const st = Object.assign({ W: 1920, H: 1080, fps: 30, fov: 52, alpha: 0.35, surface: !!scene.surface, keepAbove: true, bg: "#ffffff", spread: 1, wire: false, newDur: 3, newEase: "smooth" },
+    const st = Object.assign({ W: 1920, H: 1080, fps: 30, fov: 52, alpha: 0.35, surface: !!scene.surface, keepAbove: true, bg: "#ffffff", spread: 1, wire: true, newDur: 3, newEase: "smooth" },
                              (saved && saved.settings) || {});
     let keys = (saved && Array.isArray(saved.keys)) ? saved.keys : [];
     let sel = -1;

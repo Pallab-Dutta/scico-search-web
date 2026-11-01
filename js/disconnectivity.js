@@ -110,7 +110,6 @@
   let REC = null;        // drone tool: when set, buildDG3 also records its scene in world coordinates
   let SURFACE = false;   // admin, 3D on the 2D-map landscape: draw the free-energy surface itself
   let SURF_ALPHA = 0.35; // its opacity (0..1), adjustable live
-  let WIRE = false;      // admin, 3D surface: draw its wireframe too
   let DRAG3D = false;    // 3D view is being turned: draw the surface on its coarse mesh
   const XY = 1;          // 3D view: x, y stretch of the map against the energy axis (1 = none)
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
@@ -946,7 +945,7 @@
       const row = (L, a, b) => [L[0] * a, L[1] * a, L[2] * a, L[3] * a + b];
       const RX = row(Lx, 2 / W, -1), RY = row(Ly, -2 / H, 1), RZ = row(Ld, dk, -1 - dmin * dk);
       const M = [RX[0], RY[0], RZ[0], 0, RX[1], RY[1], RZ[1], 0, RX[2], RY[2], RZ[2], 0, RX[3], RY[3], RZ[3], 1];
-      const cv = window.Drone.glSurface(land, M, Math.round(W * dpr), Math.round(H * dpr), { k: XY, cut: true, wire: WIRE });
+      const cv = window.Drone.glSurface(land, M, Math.round(W * dpr), Math.round(H * dpr), { k: XY, cut: true });
       if (cv) {
         hasSurf = true;
         surfSheet = `<image href="${cv.toDataURL("image/png")}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none" style="opacity:var(--dg-sa)" pointer-events="none"/>`;
@@ -1401,8 +1400,7 @@
       `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")}${ADMIN ? " " + radio("mst", "MST") : ""}${model.hasFE ? " " + radio("3d", "3D on the map") : ""}</span>` +
       (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Colour the floor by the same high-dimensional free energy as the heights (interpolated between the papers' map positions) instead of the Topic Map's 2D density."><input type="checkbox" class="dg-floorhd"${FLOOR_HD ? " checked" : ""}/> floor: same free energy as heights</label>` : "") +
       (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none${model.surface ? "" : ";opacity:.5"}" title="${model.surface ? "Draw the free-energy surface itself (−ln p of the 2D map), cut off above the top barrier. Wells and cols are points of this surface, so the tree's nodes sit on it." : "Only for density: 2D map. The other landscapes live in the full embedding space, which has no surface over the map."}"><input type="checkbox" class="dg-surface"${SURFACE && model.surface ? " checked" : ""}${model.surface ? "" : " disabled"}/> 3D surface</label>` +
-        (SURFACE && model.surface ? `<label style="display:inline-flex;align-items:center;gap:5px;user-select:none" title="Opacity of the surface">opacity <input type="range" class="dg-surf-alpha" min="0.05" max="1" step="0.05" value="${SURF_ALPHA}" style="width:90px"/></label>` +
-          `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Draw the surface's mesh lines over it"><input type="checkbox" class="dg-wire"${WIRE ? " checked" : ""}/> wireframe</label>` : "") : "") +
+        (SURFACE && model.surface ? `<label style="display:inline-flex;align-items:center;gap:5px;user-select:none" title="Opacity of the surface">opacity <input type="range" class="dg-surf-alpha" min="0.05" max="1" step="0.05" value="${SURF_ALPHA}" style="width:90px"/></label>` : "") : "") +
       (MODE === "3d" ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Keep the map (floor, contours, paper shadows) unfaded while a paper or gap is highlighted."><input type="checkbox" class="dg-floorbright"${FLOOR_BRIGHT ? " checked" : ""}/> keep the map bright when highlighting</label>` : "") +
       (MODE === "3d" ? `<span style="display:inline-flex;gap:6px">` +
         [["side", "Side"], ["top", "Top"], ["reset", "Reset"]].map(([k, l]) =>
@@ -1526,7 +1524,6 @@
     hook("dg-floorhd", el => { FLOOR_HD = el.checked; });
     hook("dg-floorbright", el => { FLOOR_BRIGHT = el.checked; });
     hook("dg-surface", el => { SURFACE = el.checked; });
-    hook("dg-wire", el => { WIRE = el.checked; });
     const sa = mountEl.querySelector(".dg-surf-alpha");    // live: only the CSS variable changes
     if (sa) sa.addEventListener("input", () => {
       SURF_ALPHA = +sa.value;
