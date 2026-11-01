@@ -1338,6 +1338,7 @@
   function userSetup() {
     if (ADMIN) return;
     GC_ALT = true; LEVELLED = true; METRIC = true; NLEV = 100; MINB = 1; LOGLV = false; RES = "map2d"; SIG = false;
+    SURFACE = true;                                         // the 3D view shows the free-energy terrain
     if (!USER_INIT) { OVERLAY = true; USER_INIT = true; }
     if (MODE === "mst") MODE = "dg";
   }
@@ -1347,7 +1348,7 @@
   function variantStale(session) {
     const v = (session.disconnectivity_res || {})[String(RES)];
     return !v || (v.dg_version || 1) < 10 || v.tm_sig !== tmSigOf(session.topic_map) ||
-      (ADMIN && RES === "map2d" && !("fe_surface" in v));   // admin surface needs a graph built with it
+      (RES === "map2d" && !("fe_surface" in v));          // the terrain needs a graph built with it
   }
 
   function draw(session, mountEl) {
@@ -1399,8 +1400,8 @@
       `font:12px system-ui,sans-serif;color:#555">` +
       `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")}${ADMIN ? " " + radio("mst", "MST") : ""}${model.hasFE ? " " + radio("3d", "3D on the map") : ""}</span>` +
       (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Colour the floor by the same high-dimensional free energy as the heights (interpolated between the papers' map positions) instead of the Topic Map's 2D density."><input type="checkbox" class="dg-floorhd"${FLOOR_HD ? " checked" : ""}/> floor: same free energy as heights</label>` : "") +
-      (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none${model.surface ? "" : ";opacity:.5"}" title="${model.surface ? "Draw the free-energy surface itself (−ln p of the 2D map), cut off above the top barrier. Wells and cols are points of this surface, so the tree's nodes sit on it." : "Only for density: 2D map. The other landscapes live in the full embedding space, which has no surface over the map."}"><input type="checkbox" class="dg-surface"${SURFACE && model.surface ? " checked" : ""}${model.surface ? "" : " disabled"}/> 3D surface</label>` +
-        (SURFACE && model.surface ? `<label style="display:inline-flex;align-items:center;gap:5px;user-select:none" title="Opacity of the surface">opacity <input type="range" class="dg-surf-alpha" min="0.05" max="1" step="0.05" value="${SURF_ALPHA}" style="width:90px"/></label>` : "") : "") +
+      (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none${model.surface ? "" : ";opacity:.5"}" title="${model.surface ? "Draw the free-energy surface itself (−ln p of the 2D map), cut off above the top barrier. Wells and cols are points of this surface, so the tree's nodes sit on it." : "Only for density: 2D map. The other landscapes live in the full embedding space, which has no surface over the map."}"><input type="checkbox" class="dg-surface"${SURFACE && model.surface ? " checked" : ""}${model.surface ? "" : " disabled"}/> 3D surface</label>` : "") +
+      (MODE === "3d" && SURFACE && model.surface ? `<label style="display:inline-flex;align-items:center;gap:5px;user-select:none" title="Opacity of the surface">opacity <input type="range" class="dg-surf-alpha" min="0.05" max="1" step="0.05" value="${SURF_ALPHA}" style="width:90px"/></label>` : "") +
       (MODE === "3d" ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Keep the map (floor, contours, paper shadows) unfaded while a paper or gap is highlighted."><input type="checkbox" class="dg-floorbright"${FLOOR_BRIGHT ? " checked" : ""}/> keep the map bright when highlighting</label>` : "") +
       (MODE === "3d" ? `<span style="display:inline-flex;gap:6px">` +
         [["side", "Side"], ["top", "Top"], ["reset", "Reset"]].map(([k, l]) =>
