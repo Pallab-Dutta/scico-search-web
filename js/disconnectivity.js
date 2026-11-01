@@ -107,6 +107,8 @@
   let FLOOR_BRIGHT = true; // 3D: keep the map floor unfaded while something is highlighted
   let FLOOR_HD = false;  // admin, 3D: colour the floor by the SAME high-dimensional free energy as the heights
                          // (interpolated between papers) instead of the Topic Map's own 2D density
+  let SURFACE = false;   // admin, 3D on the 2D-map landscape: draw the free-energy surface itself
+  let SURF_ALPHA = 0.35; // its opacity (0..1), adjustable live
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
                          // the bottom are not squashed under one tall barrier. Tick labels stay true.
   let OVERLAY = false; // "Highlight gap-closers": tint/size papers by their bridge score (both views).
@@ -253,7 +255,7 @@
       rgaps.forEach((r, i) => { r.num = i + 1; });
       const tmKnown = typeof d.tm_sig === "string" && d.tm_sig !== "0|";   // the Topic Map had gaps
       const estInfo = d.estimator === "knn" ? { d: d.intrinsic_dim, k: d.knn_k, kstar: d.kstar_median, sigma: d.chord_sigma } : null;
-      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid, hasAlt, rgaps, estInfo,
+      return { root, edges, loo, reduce, reducePair, energy, hasFE, reduceFE, papers, pos, grid: tm && tm.grid, surface: d.fe_surface || null, hasAlt, rgaps, estInfo,
                estKind: d.estimator || "kde", tmKnown, hasTopic: !!(tm && Array.isArray(tm.points)) };
     }
     // Legacy server tree (root node only, no wrapper) — keep working.
@@ -807,6 +809,29 @@
       levelHL(lt, meta, n => P(n._w3), n => P([n._w3[0], n._w3[1], z(n.low.fe)]), model.rgaps);
     }
 
+    // The free-energy SURFACE (admin, 2D-map landscape): the same -ln p the wells and cols are read off,
+    // drawn as a translucent mesh at the heights of this view's axis. Cut off above the top barrier, so
+    // only the part of the landscape the tree spans is shown. Painted in depth order with the tree, so
+    // nodes behind a fold sit behind it.
+    const surf = [];
+    const sf = model.surface;
+    if (SURFACE && sf && Array.isArray(sf.z) && sf.z.length > 1) {
+      const G = sf.z.length, k = 1 / (G - 1), top = fmax;
+      const Z = sf.z.map(row => row.map(e => Math.min(top, Math.max(0, +e || 0))));
+      const at = (r, c) => P([c * k - 0.5, 0.5 - r * k, zOfFe(Z[r][c])]);
+      const Q = [];
+      for (let r = 0; r < G; r++) { Q.push([]); for (let c = 0; c < G; c++) Q[r].push(at(r, c)); }
+      for (let r = 0; r < G - 1; r++) for (let c = 0; c < G - 1; c++) {
+        const raw = [sf.z[r][c], sf.z[r][c + 1], sf.z[r + 1][c + 1], sf.z[r + 1][c]];
+        if (Math.min(...raw) >= top) continue;                // wholly above the top barrier
+        const q4 = [Q[r][c], Q[r][c + 1], Q[r + 1][c + 1], Q[r + 1][c]];
+        const e = (Z[r][c] + Z[r][c + 1] + Z[r + 1][c + 1] + Z[r + 1][c]) / 4;
+        const col = fieldColour(1 - e / top);              // deep wells red, high ground cream
+        surf.push({ d: q4.reduce((a, q) => a + q.d, 0) / 4,
+          svg: `<polygon points="${q4.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ")}" fill="${col}" stroke="#55626a" stroke-width=".3" pointer-events="none" style="fill-opacity:var(--dg-sa);stroke-opacity:calc(var(--dg-sa) * .6)"/>` });
+      }
+    }
+
     // Branches (each child to its junction) and nodes, painted far to near.
     if (!METRIC) (function walk(n) {
       const id = "t" + (uid++), q = P(n._w);
@@ -837,7 +862,7 @@
       `<text x="${(a0.x - 6).toFixed(1)}" y="${(a0.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">0</text>` +
       `<text x="${(a1.x - 6).toFixed(1)}" y="${(a1.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">${fmax.toFixed(2)}</text>` +
       `<text x="${(a1.x + 6).toFixed(1)}" y="${(a1.y - 6).toFixed(1)}" font-size="10" fill="#888">free energy −ln p ↑</text>`;
-    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = ${FLOOR_HD ? "free energy of the heights, interpolated between papers" : "Topic Map density"} · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : model.estKind === "map2d" ? "landscape of the 2D map itself: heights and floor are one surface" : "heights exact; map distances between far regions are approximate"}</text>`;
+    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = ${FLOOR_HD ? "free energy of the heights, interpolated between papers" : "Topic Map density"} · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : model.estKind === "map2d" ? "landscape of the 2D map itself: heights and floor are one surface" : "heights exact; map distances between far regions are approximate"}${surf.length ? " · surface = −ln p of the 2D map" : ""}</text>`;
 
     // Hover story for each gap-closer, as in the flat view: its bridged pair traced up to their junction.
     const leafOf = new Map();
@@ -880,7 +905,10 @@
     });
 
     // The floor sits outside the layer that fades on highlight when FLOOR_BRIGHT is on, so the map stays clear.
-    return { inner: (FLOOR_BRIGHT ? floor + `<g class="dg-base">` : `<g class="dg-base">` + floor) + axis + paint(lines) + paint(dots) + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W, is3d: true };
+    // With the surface on, everything is painted together in depth order (nodes win ties: they sit on it).
+    const body = surf.length ? `<g style="--dg-sa:${SURF_ALPHA}">` + paint([...surf, ...lines, ...dots.map(o => ({ d: o.d - 1e-3, svg: o.svg }))]) + `</g>`
+                             : paint(lines) + paint(dots);
+    return { inner: (FLOOR_BRIGHT ? floor + `<g class="dg-base">` : `<g class="dg-base">` + floor) + axis + body + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W, is3d: true };
   }
 
   /* ---- View B: minimum spanning tree graph (force-directed) ---- */
@@ -1124,7 +1152,8 @@
   const tmSigOf = tm => { const g = (tm && tm.gaps) || []; return g.length + "|" + g.map(x => String(x.label || "")).join("|"); };
   function variantStale(session) {
     const v = (session.disconnectivity_res || {})[String(RES)];
-    return !v || (v.dg_version || 1) < 10 || v.tm_sig !== tmSigOf(session.topic_map);
+    return !v || (v.dg_version || 1) < 10 || v.tm_sig !== tmSigOf(session.topic_map) ||
+      (ADMIN && RES === "map2d" && !("fe_surface" in v));   // admin surface needs a graph built with it
   }
 
   function draw(session, mountEl) {
@@ -1176,6 +1205,8 @@
       `font:12px system-ui,sans-serif;color:#555">` +
       `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")}${ADMIN ? " " + radio("mst", "MST") : ""}${model.hasFE ? " " + radio("3d", "3D on the map") : ""}</span>` +
       (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Colour the floor by the same high-dimensional free energy as the heights (interpolated between the papers' map positions) instead of the Topic Map's 2D density."><input type="checkbox" class="dg-floorhd"${FLOOR_HD ? " checked" : ""}/> floor: same free energy as heights</label>` : "") +
+      (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none${model.surface ? "" : ";opacity:.5"}" title="${model.surface ? "Draw the free-energy surface itself (−ln p of the 2D map), cut off above the top barrier. Wells and cols are points of this surface, so the tree's nodes sit on it." : "Only for density: 2D map. The other landscapes live in the full embedding space, which has no surface over the map."}"><input type="checkbox" class="dg-surface"${SURFACE && model.surface ? " checked" : ""}${model.surface ? "" : " disabled"}/> 3D surface</label>` +
+        (SURFACE && model.surface ? `<label style="display:inline-flex;align-items:center;gap:5px;user-select:none" title="Opacity of the surface">opacity <input type="range" class="dg-surf-alpha" min="0.05" max="1" step="0.05" value="${SURF_ALPHA}" style="width:90px"/></label>` : "") : "") +
       (MODE === "3d" ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Keep the map (floor, contours, paper shadows) unfaded while a paper or gap is highlighted."><input type="checkbox" class="dg-floorbright"${FLOOR_BRIGHT ? " checked" : ""}/> keep the map bright when highlighting</label>` : "") +
       (MODE === "3d" ? `<span style="display:inline-flex;gap:6px">` +
         [["side", "Side"], ["top", "Top"], ["reset", "Reset"]].map(([k, l]) =>
@@ -1289,6 +1320,12 @@
     hook("dg-sig", el => { SIG = el.checked; });
     hook("dg-floorhd", el => { FLOOR_HD = el.checked; });
     hook("dg-floorbright", el => { FLOOR_BRIGHT = el.checked; });
+    hook("dg-surface", el => { SURFACE = el.checked; });
+    const sa = mountEl.querySelector(".dg-surf-alpha");    // live: only the CSS variable changes
+    if (sa) sa.addEventListener("input", () => {
+      SURF_ALPHA = +sa.value;
+      mountEl.querySelectorAll("svg.dg-svg g[style*='--dg-sa']").forEach(g => g.style.setProperty("--dg-sa", SURF_ALPHA));
+    });
     mountEl.querySelectorAll(".dg-mode").forEach(r =>
       r.addEventListener("change", () => { if (r.checked) { MODE = r.value; draw(session, mountEl); } }));
     const chk = mountEl.querySelector(".dg-log");
