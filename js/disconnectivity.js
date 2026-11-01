@@ -104,6 +104,7 @@
   let RES = 1;           // admin density: 1 / 0.75 / 0.5 = KDE bandwidth multiplier; "knn3" / "knn5" / "knn8" =
                          // kNN field in the intrinsic dimension with k neighbours. 1 = the standard landscape.
   let SIG = false;       // admin, kNN field: keep only barriers larger than 1.65x their combined error
+  let FLOOR_BRIGHT = true; // 3D: keep the map floor unfaded while something is highlighted
   let FLOOR_HD = false;  // admin, 3D: colour the floor by the SAME high-dimensional free energy as the heights
                          // (interpolated between papers) instead of the Topic Map's own 2D density
   let LOGLV = true;      // textbook styles: compressed (log) energy axis, so the many small barriers near
@@ -875,7 +876,8 @@
       m.hl.drops = drops;
     });
 
-    return { inner: `<g class="dg-base">` + floor + axis + paint(lines) + paint(dots) + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W, is3d: true };
+    // The floor sits outside the layer that fades on highlight when FLOOR_BRIGHT is on, so the map stays clear.
+    return { inner: (FLOOR_BRIGHT ? floor + `<g class="dg-base">` : `<g class="dg-base">` + floor) + axis + paint(lines) + paint(dots) + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W, is3d: true };
   }
 
   /* ---- View B: minimum spanning tree graph (force-directed) ---- */
@@ -1150,6 +1152,7 @@
       `font:12px system-ui,sans-serif;color:#555">` +
       `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")}${ADMIN ? " " + radio("mst", "MST") : ""}${model.hasFE ? " " + radio("3d", "3D on the map") : ""}</span>` +
       (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Colour the floor by the same high-dimensional free energy as the heights (interpolated between the papers' map positions) instead of the Topic Map's 2D density."><input type="checkbox" class="dg-floorhd"${FLOOR_HD ? " checked" : ""}/> floor: same free energy as heights</label>` : "") +
+      (MODE === "3d" ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Keep the map (floor, contours, paper shadows) unfaded while a paper or gap is highlighted."><input type="checkbox" class="dg-floorbright"${FLOOR_BRIGHT ? " checked" : ""}/> keep the map bright when highlighting</label>` : "") +
       (MODE === "3d" ? `<span style="display:inline-flex;gap:6px">` +
         [["side", "Side"], ["top", "Top"], ["reset", "Reset"]].map(([k, l]) =>
           `<button type="button" class="dg-cam" data-cam="${k}" style="font:inherit;border:1px solid #ddd;background:#fff;border-radius:6px;padding:2px 9px;cursor:pointer">${l}</button>`).join("") +
@@ -1261,6 +1264,7 @@
     hook("dg-res", el => { RES = (el.value.startsWith("knn") || el.value === "map2d") ? el.value : +el.value; });
     hook("dg-sig", el => { SIG = el.checked; });
     hook("dg-floorhd", el => { FLOOR_HD = el.checked; });
+    hook("dg-floorbright", el => { FLOOR_BRIGHT = el.checked; });
     mountEl.querySelectorAll(".dg-mode").forEach(r =>
       r.addEventListener("change", () => { if (r.checked) { MODE = r.value; draw(session, mountEl); } }));
     const chk = mountEl.querySelector(".dg-log");
