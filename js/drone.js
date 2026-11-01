@@ -773,17 +773,22 @@ ffmpeg -framerate ${fps} -i frames/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 
         if (a === "set") { const c = camNow(); keys[i].pos = c.pos; keys[i].tgt = c.tgt; }
         if (a === "up" && i > 0) { [keys[i - 1], keys[i]] = [keys[i], keys[i - 1]]; sel = i - 1; }
         if (a === "down" && i < keys.length - 1) { [keys[i + 1], keys[i]] = [keys[i], keys[i + 1]]; sel = i + 1; }
-        if (a === "ins") { const c = camNow(); keys.splice(i + 1, 0, { pos: c.pos, tgt: c.tgt, dur: st.newDur, ease: st.newEase, hold: 0 }); sel = i + 1; }
+        if (a === "ins") { const c = camNow(); keys.splice(i + 1, 0, { pos: c.pos, tgt: c.tgt, dur: st.newDur, ease: st.newEase, shape: "straight", hold: 0 }); sel = i + 1; }
         if (a === "del") { keys.splice(i, 1); sel = Math.min(sel, keys.length - 1); }
         rebuild();
+        renderKeys();
+      } else {
+        // A click on a dropdown or box only marks this keyframe as selected. Re-drawing the list here
+        // would replace the dropdown while it opens, so it could never be used.
+        keysEl.querySelectorAll(".key").forEach(el => el.classList.toggle("sel", +el.dataset.i === sel));
       }
-      renderKeys(); dirty = true;
+      dirty = true;
     });
     const keyTime = i => { const l = path.legs.find(x => x.kind === "hold" && x.i === i); return l ? l.t0 : 0; };
 
     $("x-add").onclick = () => {
       const c = camNow();
-      keys.push({ pos: c.pos, tgt: c.tgt, dur: st.newDur, ease: st.newEase, hold: 0 });
+      keys.push({ pos: c.pos, tgt: c.tgt, dur: st.newDur, ease: st.newEase, shape: "straight", hold: 0 });
       sel = keys.length - 1; rebuild(); renderKeys(); canvas.focus();
     };
     $("x-path").onclick = () => { showPath = !showPath; $("x-path").textContent = showPath ? "Hide path" : "Show path"; dirty = true; };
