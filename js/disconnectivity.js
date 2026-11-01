@@ -678,6 +678,32 @@
     return out;
   }
 
+  // Contour lines (marching squares) of a G x G field in [0, 1]^2 (row = y), at fixed levels; cached per
+  // field. Returns segments [x1, y1, x2, y2] in map coordinates.
+  const CONTOURS = new WeakMap();
+  function contourSegs(grid) {
+    if (CONTOURS.has(grid)) return CONTOURS.get(grid);
+    const G = grid.length, segs = [], levels = [0.15, 0.3, 0.45, 0.6, 0.75, 0.9], k = 1 / (G - 1);
+    for (let r = 0; r < G - 1; r++) for (let c = 0; c < G - 1; c++) {
+      const v = [grid[r][c], grid[r][c + 1], grid[r + 1][c + 1], grid[r + 1][c]];
+      const P4 = [[c, r], [c + 1, r], [c + 1, r + 1], [c, r + 1]];
+      levels.forEach(L => {
+        const pts = [];
+        for (let e = 0; e < 4; e++) {
+          const a = e, b = (e + 1) % 4;
+          if ((v[a] < L) !== (v[b] < L)) {
+            const t = (L - v[a]) / (v[b] - v[a]);
+            pts.push([(P4[a][0] + t * (P4[b][0] - P4[a][0])) * k, (P4[a][1] + t * (P4[b][1] - P4[a][1])) * k]);
+          }
+        }
+        if (pts.length >= 2) segs.push([...pts[0], ...pts[1]]);
+        if (pts.length === 4) segs.push([...pts[2], ...pts[3]]);
+      });
+    }
+    CONTOURS.set(grid, segs);
+    return segs;
+  }
+
   function buildDG3(model, W, scores) {
     const tree = model.root, papers = model.papers || [], pos = model.pos;
     const H = 600, ZH = 0.8;
@@ -728,6 +754,11 @@
         floor += `<polygon points="${pts.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ")}" fill="${col}" stroke="${col}" stroke-width=".6" fill-opacity=".7" stroke-opacity=".7"/>`;
       }
     }
+    if (grid && grid.length > 1)                          // contour lines of the floor's field
+      floor += contourSegs(grid).map(([x1, y1, x2, y2]) => {
+        const u = P([x1 - 0.5, 0.5 - y1, 0]), v = P([x2 - 0.5, 0.5 - y2, 0]);
+        return `<line x1="${u.x.toFixed(1)}" y1="${u.y.toFixed(1)}" x2="${v.x.toFixed(1)}" y2="${v.y.toFixed(1)}" stroke="#55626a" stroke-opacity=".55" stroke-width=".8"/>`;
+      }).join("");
     const corners = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]].map(([a, b]) => P([a, b, 0]));
     floor += `<polygon points="${corners.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ")}" fill="none" stroke="#c9cfd3" stroke-width="1"/>`;
 
@@ -827,8 +858,21 @@
     Object.values(meta).forEach(m => {
       if (m.type !== "rgap" || !m.hl || !m.at) return;
       const q = P([m.at.x - 0.5, 0.5 - m.at.y, zOfFe(m.fe)]);
+      m.hl.junction = { x: m.hl.j.x, y: m.hl.j.y };
       m.hl.link = { x1: m.hl.j.x, y1: m.hl.j.y, x2: q.x, y2: q.y };
       m.hl.j = { x: q.x, y: q.y };
+    });
+    // Projection onto the map plane, drawn when highlighted: from each highlighted paper (and the gap)
+    // straight down to its own spot on the Topic Map.
+    const floorOf = q => q ? P([q.x - 0.5, 0.5 - q.y, 0]) : null;
+    Object.values(meta).forEach(m => {
+      if (!m.hl) return;
+      const drops = [];
+      const add = (top, mq) => { const f = floorOf(mq); if (top && f) drops.push({ x1: top.x, y1: top.y, x2: f.x, y2: f.y }); };
+      if (m.pair) { add(m.hl.a, pos.get(m.pair.a)); add(m.hl.b, pos.get(m.pair.b)); }
+      if (m.hl.self && m.paper) add(m.hl.self, pos.get(m.paper));
+      if (m.type === "rgap" && m.at) add(m.hl.j, m.at);
+      m.hl.drops = drops;
     });
 
     return { inner: `<g class="dg-base">` + floor + axis + paint(lines) + paint(dots) + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W, is3d: true };
@@ -935,9 +979,24 @@
     if (!built) return built;
     const gm = Object.values(built.meta).filter(m => m.type === "rgap" && m.hl && m.hl.j);
     if (!gm.length) return built;
+    const shared = new Map();                             // gaps meeting at the same junction fan out
+    gm.forEach(m => {
+      // Flat views: lift the node just above the junction where its two papers' branches meet, joined to
+      // it by a dashed line (3D already stands it at its Topic Map position, linked the same way).
+      if (!m.hl.link) {
+        const key = m.hl.j.x.toFixed(0) + "," + m.hl.j.y.toFixed(0), k = shared.get(key) || 0;
+        shared.set(key, k + 1);
+        const jx = m.hl.j.x, jy = m.hl.j.y, gx = jx + 18 + 24 * k, gy = Math.max(12, jy - 28);
+        m.hl.junction = { x: jx, y: jy };
+        m.hl.link = { x1: jx, y1: jy, x2: gx, y2: gy };
+        m.hl.j = { x: gx, y: gy };
+      }
+    });
     const svg = gm.map(m => {
-      const x = m.hl.j.x.toFixed(1), y = m.hl.j.y.toFixed(1);
-      return `<circle class="dg-node" data-id="${m.id}" cx="${x}" cy="${y}" r="9" fill="#f2c94c" stroke="#9c6b00" stroke-width="1.5"/>` +
+      const x = m.hl.j.x.toFixed(1), y = m.hl.j.y.toFixed(1), L = m.hl.link;
+      return `<line x1="${L.x1.toFixed(1)}" y1="${L.y1.toFixed(1)}" x2="${L.x2.toFixed(1)}" y2="${L.y2.toFixed(1)}" stroke="#9c6b00" stroke-width="1.4" stroke-dasharray="4 3"/>` +
+        `<circle cx="${L.x1.toFixed(1)}" cy="${L.y1.toFixed(1)}" r="2.6" fill="#9c6b00"/>` +
+        `<circle class="dg-node" data-id="${m.id}" cx="${x}" cy="${y}" r="9" fill="#f2c94c" stroke="#9c6b00" stroke-width="1.5"/>` +
         `<text x="${x}" y="${(m.hl.j.y + 3.3).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#5a3d00" pointer-events="none">G${m.num}</text>`;
     }).join("");
     built.inner = built.inner.replace('</g><g class="dg-hl"', svg + '</g><g class="dg-hl"');
@@ -975,41 +1034,63 @@
       ? `<text x="${(q.x + 11).toFixed(1)}" y="${(q.y - 9).toFixed(1)}" font-size="11" font-weight="700" fill="${col}" stroke="#fff" stroke-width="3" paint-order="stroke">${esc(trunc(q.title, 40))}</text>`
       : `<text transform="translate(${q.x.toFixed(1)} ${(h.bottomY + 8).toFixed(1)}) rotate(90)" font-size="10.5" font-weight="700" fill="${col}">${esc(trunc(q.title, 22))}</text>`;
     base.style.opacity = ".22";
-    layer.innerHTML =
+    const f1 = n => n.toFixed(1);
+    const drops = (h.drops || []).map(d =>                 // 3D: highlighted points projected onto the map
+      `<line x1="${f1(d.x1)}" y1="${f1(d.y1)}" x2="${f1(d.x2)}" y2="${f1(d.y2)}" stroke="${RED}" stroke-width="1.2" stroke-dasharray="3 3"/>` +
+      `<circle cx="${f1(d.x2)}" cy="${f1(d.y2)}" r="4" fill="none" stroke="${RED}" stroke-width="1.6"/>`).join("");
+    const isGap = m.type === "rgap";
+    layer.innerHTML = drops +
       `<path d="${h.path}" stroke="${RED}" stroke-width="3" fill="none" stroke-linejoin="round"/>` +
-      (h.link ? `<line x1="${h.link.x1.toFixed(1)}" y1="${h.link.y1.toFixed(1)}" x2="${h.link.x2.toFixed(1)}" y2="${h.link.y2.toFixed(1)}" stroke="${RED}" stroke-width="2" stroke-dasharray="5 4"/>` : "") +
-      `<circle cx="${h.j.x.toFixed(1)}" cy="${h.j.y.toFixed(1)}" r="7" fill="${RED}" stroke="#fff" stroke-width="1.5"/>` +
+      (h.link ? `<line x1="${f1(h.link.x1)}" y1="${f1(h.link.y1)}" x2="${f1(h.link.x2)}" y2="${f1(h.link.y2)}" stroke="${RED}" stroke-width="2" stroke-dasharray="5 4"/>` : "") +
+      (h.junction ? `<circle cx="${f1(h.junction.x)}" cy="${f1(h.junction.y)}" r="6" fill="${RED}" stroke="#fff" stroke-width="1.5"/>` : "") +
+      (isGap ? `<circle cx="${f1(h.j.x)}" cy="${f1(h.j.y)}" r="11" fill="#f2c94c" stroke="${RED}" stroke-width="2.5"/>` +
+               `<text x="${f1(h.j.x)}" y="${f1(h.j.y + 3.4)}" text-anchor="middle" font-size="9" font-weight="700" fill="#5a3d00">G${m.num}</text>`
+             : `<circle cx="${f1(h.j.x)}" cy="${f1(h.j.y)}" r="7" fill="${RED}" stroke="#fff" stroke-width="1.5"/>`) +
       ring(h.a, RED) + ring(h.b, RED) + (h.self ? ring(h.self, INK) : "") +
       title(h.a, RED) + title(h.b, RED) + (h.self ? title(h.self, INK) : "");
   }
 
   /* ---- Shared shell: toolbar, svg wrapper, tooltip ---- */
+  // Details appear in a box BELOW the figure (never over it). Hover shows a node's details and highlight;
+  // a click PINS them (click again, or on empty space, to release). The pin survives 3D rotation and
+  // switching between views when the same paper or research gap is still there.
+  const INFO_HINT = "Hover a paper, barrier or G-node for details · click to keep it highlighted (click again to release)";
+  function pinMatches(pin, m) {
+    if (!pin || !m) return false;
+    if (pin.kind === "paper") return m.type === "paper" && m.paper === pin.paper;
+    return m.id === pin.id;
+  }
   function wireTooltip(mountEl, meta) {
-    mountEl.querySelectorAll(".dg-tip").forEach(t => t.remove());
-    const tip = document.createElement("div");
-    tip.className = "dg-tip";
-    tip.style.cssText = "position:absolute;display:none;max-width:260px;background:#151515;color:#fff;" +
-      "padding:8px 10px;border-radius:7px;font:12px/1.4 system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.28);" +
-      "pointer-events:none;z-index:20";
-    tip.innerHTML = "<style>.dg-sub{opacity:.75;font-size:11px;margin-top:2px}" +
-      ".dg-list{margin:6px 0 0;padding-left:16px}.dg-list li{margin:1px 0}</style>";
-    const tipBody = document.createElement("div");
-    tip.appendChild(tipBody);
-    mountEl.appendChild(tip);
+    const info = mountEl.querySelector(".dg-info");
+    const pinned = () => { const pin = mountEl.__dgPin; return pin ? Object.values(meta).find(m => pinMatches(pin, m)) || null : null; };
+    const show = m => {
+      if (info) info.innerHTML = m ? tipHTML(m) : `<span style="color:#888">${INFO_HINT}</span>`;
+      showGap(mountEl, m);
+    };
+    const setPin = m => {
+      mountEl.__dgPin = !m ? null : m.type === "paper" ? { kind: "paper", paper: m.paper } : { kind: "id", id: m.id };
+      if (info) info.style.borderColor = m ? "#d64545" : "#e6e6e6";
+      show(m);
+    };
+    mountEl.__dgShow = m => show(m || pinned());
+    mountEl.__dgPinToggle = m => setPin(pinMatches(mountEl.__dgPin, m) ? null : m);
+    const still = pinned();
+    if (!still && mountEl.__dgPin) mountEl.__dgPin = null;
+    if (info) info.style.borderColor = still ? "#d64545" : "#e6e6e6";
+    show(still);
 
     mountEl.querySelectorAll(".dg-node").forEach(el => {
       el.style.cursor = "pointer";
-      const baseR = el.getAttribute("r");
-      el.addEventListener("mouseenter", () => { tipBody.innerHTML = tipHTML(meta[el.dataset.id]); tip.style.display = "block"; el.setAttribute("r", (+baseR + 2).toFixed(1)); showGap(mountEl, meta[el.dataset.id]); });
-      el.addEventListener("mouseleave", () => { tip.style.display = "none"; el.setAttribute("r", baseR); showGap(mountEl, null); });
-      el.addEventListener("mousemove", e => {
-        const r = mountEl.getBoundingClientRect();
-        let x = e.clientX - r.left + 14, y = e.clientY - r.top + 14;
-        if (x + tip.offsetWidth > r.width) x = e.clientX - r.left - tip.offsetWidth - 14;
-        tip.style.left = Math.max(0, x) + "px";
-        tip.style.top = Math.max(0, y) + "px";
-      });
+      const baseR = el.getAttribute("r"), m = meta[el.dataset.id];
+      el.addEventListener("mouseenter", () => { el.setAttribute("r", (+baseR + 2).toFixed(1)); show(m); });
+      el.addEventListener("mouseleave", () => { el.setAttribute("r", baseR); show(pinned()); });
+      el.addEventListener("click", e => { e.stopPropagation(); if (mountEl.__dgDragged) return; mountEl.__dgPinToggle(m); });
     });
+    const svg = mountEl.querySelector("svg.dg-svg");
+    if (svg && !svg.__dgClick) {                          // click on empty space releases the pin
+      svg.__dgClick = true;
+      svg.addEventListener("click", () => { if (mountEl.__dgDragged) { mountEl.__dgDragged = false; return; } setPin(null); });
+    }
   }
 
   // Everyone except admins: original + time gap-closers, the Levelled textbook graph at 100 levels,
@@ -1135,6 +1216,9 @@
       `<div style="overflow-x:auto;overflow-y:hidden;max-width:100%">` +
       `<svg class="dg-svg" viewBox="0 0 ${DW} ${built.H}" width="${DW}" height="${built.H}" preserveAspectRatio="xMinYMin meet" ` +
       `style="font-family:system-ui,sans-serif;display:block${built.is3d ? ";cursor:grab;touch-action:none;user-select:none" : ""}">` + built.inner + `</svg></div>` +
+      `<div class="dg-info" style="margin-top:8px;min-height:56px;border:1px solid #e6e6e6;border-radius:8px;padding:8px 11px;` +
+      `background:#fbfbfa;font:12px/1.45 system-ui,sans-serif;color:#222"></div>` +
+      `<style>.dg-info .dg-sub{color:#555;font-size:11.5px;margin-top:2px}.dg-info .dg-list{margin:5px 0 0;padding-left:16px}.dg-info .dg-list li{margin:1px 0}</style>` +
       (MODE !== "mst" ? gapPanel(model) : "");
 
     wireToolbar(session, mountEl);
@@ -1142,8 +1226,10 @@
     if (built.is3d) wire3D(mountEl, model, scores, W);
     mountEl.querySelectorAll(".dg-gap-row").forEach(row => {
       const r = (model.rgaps || []).find(x => x.id === row.dataset.id);
-      row.addEventListener("mouseenter", () => { row.style.background = "#fbf4dc"; showGap(mountEl, r); });
-      row.addEventListener("mouseleave", () => { row.style.background = ""; showGap(mountEl, null); });
+      row.style.cursor = "pointer";
+      row.addEventListener("mouseenter", () => { row.style.background = "#fbf4dc"; mountEl.__dgShow(r); });
+      row.addEventListener("mouseleave", () => { row.style.background = ""; mountEl.__dgShow(null); });
+      row.addEventListener("click", () => mountEl.__dgPinToggle(r));
     });
   }
 
@@ -1201,15 +1287,20 @@
     };
     let drag = null;
     svg.addEventListener("pointerdown", e => {
-      drag = { x: e.clientX, y: e.clientY };
-      svg.setPointerCapture(e.pointerId);
+      drag = { x: e.clientX, y: e.clientY, moved: 0, id: e.pointerId };
+      mountEl.__dgDragged = false;
       svg.style.cursor = "grabbing";
     });
     svg.addEventListener("pointermove", e => {
       if (!drag) return;
       AZ += (e.clientX - drag.x) * 0.45;
       EL = Math.max(0, Math.min(90, EL + (e.clientY - drag.y) * 0.35));
-      drag = { x: e.clientX, y: e.clientY };
+      const moved = drag.moved + Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y);
+      if (moved > 4 && !mountEl.__dgDragged) {             // a rotation, not a click: now hold the pointer
+        mountEl.__dgDragged = true;
+        try { svg.setPointerCapture(drag.id); } catch (_) {}
+      }
+      drag = { x: e.clientX, y: e.clientY, moved, id: drag.id };
       redraw();
     });
     const end = () => { drag = null; svg.style.cursor = "grab"; };
