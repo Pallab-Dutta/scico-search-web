@@ -9,7 +9,8 @@
 (function () {
   const KEY = "eratost_ref";
   const qs = new URLSearchParams(location.search);
-  const ref = { source: qs.get("ref") || qs.get("utm_source") || "", campaign: qs.get("utm_campaign") || "" };
+  const ref = { source: qs.get("ref") || qs.get("utm_source") || "", campaign: qs.get("utm_campaign") || "",
+                report: qs.get("r") || (/report\.html$/.test(location.pathname) ? qs.get("id") || "" : "") };
   try {
     if ((ref.source || ref.campaign) && !sessionStorage.getItem(KEY)) sessionStorage.setItem(KEY, JSON.stringify(ref));
   } catch (_) { /* storage blocked: the tag is still sent from this page */ }
@@ -103,7 +104,8 @@
         email, name: f.elements.name.value.trim(), role: f.elements.role.value, field: f.elements.field.value.trim(),
         plan: plan.value, period: (f.querySelector('input[name="period"]:checked') || {}).value || "",
         team_size: plan.value === "team" && f.elements.team_size.value ? +f.elements.team_size.value : null,
-        source: r.source || "", campaign: r.campaign || "", page: o.page || "", timezone: tz, website: f.elements.website.value,
+        source: r.source || "", campaign: r.campaign || "", report_id: r.report || "", page: o.page || "", timezone: tz,
+        website: f.elements.website.value,
       };
       try {
         const base = ((window.SCICO_CONFIG || {}).API_BASE || "").replace(/\/$/, "");

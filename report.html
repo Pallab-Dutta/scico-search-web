@@ -1,0 +1,386 @@
+<!-- @dsCard group="Pages" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Your Eratost Literature Report</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192x192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="description" content="A private Eratost report: related work and a research-gap map for one paper.">
+<meta name="robots" content="noindex, nofollow">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Eratosthenes by SciCoagent">
+<meta property="og:title" content="Eratost literature report">
+<meta property="og:description" content="Eratost literature report">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Eratost literature report">
+<meta name="twitter:description" content="Eratost literature report">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cutive+Mono&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet">
+<style>
+/* Same structure and type as Benjamin's pricing page; same palette as the Eratosthenes homepage. */
+:root{
+  --bg:#f7f4ee; --bg-alt:#eeeae1; --surface:#fffdf9; --border:#dcd5c7;
+  --text:#1e2a31; --muted:#5e6a71; --slate:#6e7a82;
+  --accent:#ba5757; --accent-dark:#9c4343;
+  --red-soft:#f3dcd9; --slate-soft:#dfe5e8;
+  --shadow:0 8px 24px -12px rgba(30,42,49,.28);
+  --radius:16px;
+  --font-serif:"Cutive Mono",monospace;
+  --font-sans:"Cutive Mono",monospace;
+  --font-prose:"Lora",Georgia,"Times New Roman",serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-sans);font-weight:700;background:var(--bg);color:var(--text);
+     line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+img,svg{display:block;max-width:100%}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4em;
+     font-family:var(--font-sans);font-weight:600;text-decoration:none;border-radius:999px;cursor:pointer;
+     border:1px solid transparent;transition:transform .15s,box-shadow .15s,background-color .15s,color .15s;white-space:nowrap}
+.btn--primary{background:var(--red-soft);color:var(--accent-dark)}
+.btn--primary:hover{background:var(--slate-soft);color:var(--text);transform:translateY(-1px)}
+.btn--ghost{background:transparent;border-color:var(--border);color:var(--text)}
+.btn--ghost:hover{border-color:var(--text);transform:translateY(-1px)}
+.btn--lg{padding:.85rem 1.7rem;font-size:1rem}
+.btn--sm{padding:.5rem 1.1rem;font-size:.85rem}
+.btn--block{width:100%}
+
+/* ── Nav ─────────────────────────────────────────────────────────────────── */
+.nav{position:sticky;top:0;z-index:100;background:rgba(247,244,238,.72);
+     backdrop-filter:blur(10px);border-bottom:1px solid transparent;transition:border-color .25s,box-shadow .25s}
+.nav--scrolled{border-bottom-color:var(--border);box-shadow:0 4px 20px -16px rgba(30,42,49,.45)}
+.nav__inner{max-width:1100px;margin:0 auto;padding:1rem 1.5rem;
+            display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+.nav__links{display:flex;align-items:center;gap:1.75rem;font-size:.95rem;font-weight:700}
+.nav__links a{color:var(--accent-dark);transition:color .2s}
+.nav__links a:hover,.nav__links a.active{color:var(--text)}
+.nav__toggle{display:none;flex-direction:column;justify-content:center;gap:5px;
+             width:36px;height:36px;background:transparent;border:1px solid var(--border);border-radius:8px;cursor:pointer}
+.nav__toggle span{display:block;height:2px;width:18px;margin:0 auto;background:var(--text);transition:transform .2s,opacity .2s}
+
+/* ── Logo lockup: the mark and the name ("Eratost" in the logo's shadow) ─── */
+.lockup{display:inline-flex;align-items:center;gap:.45em;font-family:"Cutive Mono",monospace;
+        font-weight:700;line-height:1;white-space:nowrap}
+.lockup .era-mark{width:1.75em;height:1.75em;flex:0 0 auto}
+.lockup .era-a{color:#1e2a31}
+.lockup .era-b{color:#d1d1d1}
+.lockup--nav{font-size:1.55rem}
+.lockup--footer{font-size:1.25rem}
+
+/* ── Scroll-reveal ───────────────────────────────────────────────────────── */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease-out,transform .7s ease-out}
+.reveal.in-view{opacity:1;transform:translateY(0)}
+
+/* ── Shared section ──────────────────────────────────────────────────────── */
+section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76px}
+.section-title{font-family:var(--font-serif);font-size:clamp(1.7rem,4vw,2.4rem);text-align:center;margin-bottom:.75rem}
+.section-sub{text-align:center;color:var(--muted);max-width:650px;margin:0 auto 3rem;font-size:1rem}
+
+/* ── Pricing header ──────────────────────────────────────────────────────── */
+.pricing-hero{padding:4.5rem 1.5rem 1rem;text-align:center}
+.pricing-hero .section-sub{margin-bottom:1.5rem}
+.billing-toggle{display:inline-flex;align-items:center;gap:.25rem;margin:.5rem auto 0;
+                background:var(--bg-alt);border:1px solid var(--border);border-radius:999px;padding:.28rem}
+.billing-toggle button{font-family:var(--font-sans);font-weight:700;font-size:.9rem;border:0;background:transparent;
+                       color:var(--muted);cursor:pointer;border-radius:999px;padding:.5rem 1.2rem;transition:background .2s,color .2s}
+.billing-toggle button.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+.billing-toggle .save-hint{font-size:.72rem;font-weight:700;color:var(--accent-dark);margin-left:.35rem}
+
+/* ── Plan cards ──────────────────────────────────────────────────────────── */
+.plans{padding-top:2rem;padding-bottom:1.5rem;max-width:1260px}
+.plans__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;max-width:1200px;margin:0 auto}
+.plan-card{position:relative;display:flex;flex-direction:column;gap:1.1rem;background:var(--surface);
+           border:1px solid var(--border);border-radius:var(--radius);padding:2rem 1.75rem;transition:transform .2s,box-shadow .2s}
+.plan-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.plan-card--pro{border-color:var(--accent);box-shadow:0 0 0 2px rgba(186,87,87,.14),var(--shadow)}
+.plan-badge{position:absolute;top:-.8rem;left:50%;transform:translateX(-50%);font-size:.7rem;font-weight:700;
+            letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--accent);border-radius:999px;
+            padding:.28rem .85rem;white-space:nowrap}
+.plan-name{font-family:var(--font-serif);font-size:1.25rem}
+.plan-for{font-size:.85rem;color:var(--muted);margin-top:-.7rem}
+.plan-price{display:flex;align-items:baseline;gap:.3rem;flex-wrap:wrap}
+.plan-price .amount{font-family:var(--font-serif);font-size:2.6rem;line-height:1;color:var(--text)}
+.plan-price .unit{font-size:.95rem;color:var(--muted);font-weight:700}
+.plan-sub{font-size:.85rem;color:var(--muted);min-height:1.2em}
+.plan-save{display:inline-block;font-size:.75rem;font-weight:700;color:var(--accent-dark);background:var(--red-soft);
+           border-radius:999px;padding:.2rem .6rem;width:max-content}
+.plan-save:empty{display:none}
+.plan-feats{list-style:none;display:flex;flex-direction:column;gap:.6rem;font-size:.9rem;font-weight:400;
+            font-family:var(--font-prose);color:var(--text)}
+.plan-feats li{display:flex;align-items:flex-start;gap:.55rem}
+.plan-feats .tick{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;
+                  border-radius:50%;background:var(--slate-soft);color:var(--text);font-size:.72rem;margin-top:.12em}
+.plan-feats li.soon{color:var(--muted)}
+.plan-feats li.soon .tick{background:var(--bg-alt);color:var(--muted)}
+.plan-feats b{font-weight:600}
+.soon-pill{align-self:center;font-size:.6rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+           border:1px dashed var(--border);border-radius:999px;padding:.08rem .45rem;white-space:nowrap;font-family:var(--font-sans)}
+.plan-card .btn{margin-top:auto}
+.plan-fineprint{font-size:.75rem;color:var(--muted);text-align:center;max-width:760px;margin:1.5rem auto 0}
+.plan-fineprint a{text-decoration:underline}
+
+/* ── Labs & institutions ─────────────────────────────────────────────────── */
+.enterprise{max-width:1040px;padding-top:1rem}
+.enterprise__inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1.5rem;
+                   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:2rem 2.25rem}
+.enterprise__text{flex:1 1 340px}
+.enterprise__text h2{font-family:var(--font-serif);font-size:1.35rem;margin-bottom:.5rem}
+.enterprise__text p{color:var(--muted);font-size:.95rem;font-weight:400;font-family:var(--font-prose)}
+
+/* ── Features ────────────────────────────────────────────────────────────── */
+.features__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.5rem;margin-top:1rem}
+.feature-card{position:relative;border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;
+              background:var(--surface);transition:transform .2s,box-shadow .2s}
+.feature-card--pro{border-color:var(--accent)}
+.feature-card--soon{border-style:dashed}
+.feat-badge{position:absolute;top:1.1rem;right:1.1rem;font-size:.6rem;font-weight:700;letter-spacing:.06em;
+            text-transform:uppercase;color:#fff;background:var(--accent);border-radius:999px;padding:.16rem .5rem}
+.feat-badge--soon{color:var(--muted);background:var(--bg-alt);border:1px dashed var(--border)}
+.feature-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.feature-card h3{font-family:var(--font-serif);font-size:1.1rem;margin-bottom:.5rem}
+.feature-card .feat-badge ~ h3{padding-right:3.5rem}
+.feature-card p{color:var(--muted);font-size:.95rem;font-weight:400;font-family:var(--font-prose)}
+@media(min-width:900px){.features__grid{grid-template-columns:repeat(4,1fr)}}
+
+/* ── FAQ ─────────────────────────────────────────────────────────────────── */
+.faq{max-width:760px}
+.faq__item{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:1.1rem 1.35rem;margin-bottom:1rem}
+.faq__item summary{cursor:pointer;font-weight:700;font-size:1rem;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.faq__item summary::-webkit-details-marker{display:none}
+.faq__item summary::after{content:"+";color:var(--accent);font-size:1.3rem;transition:transform .2s}
+.faq__item[open] summary::after{transform:rotate(45deg)}
+.faq__item p{margin-top:.85rem;color:var(--muted);font-size:.95rem;font-weight:400;font-family:var(--font-prose)}
+.faq__item a{color:var(--accent-dark);text-decoration:underline}
+
+/* ── CTA ─────────────────────────────────────────────────────────────────── */
+.cta__inner{text-align:center;background:var(--red-soft);transition:background .35s ease;border-radius:24px;padding:3.5rem 2rem;color:var(--text)}
+.cta__inner h2{font-family:var(--font-serif);font-size:clamp(1.5rem,3.5vw,2.1rem);margin-bottom:.5rem}
+.cta__inner p{opacity:.8;margin-bottom:1.75rem}
+.cta__inner:hover{background:var(--slate-soft)}
+.cta__inner .btn--primary{background:transparent;color:var(--accent-dark);border:2px solid var(--accent-dark)}
+.cta__inner:hover .btn--primary{color:var(--text);border-color:var(--text)}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.footer{border-top:1px solid var(--border);padding:2rem 1.5rem}
+.footer__inner{max-width:1100px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem}
+.footer__copy{color:var(--muted);font-size:.9rem}
+.footer__copy a:hover{color:var(--accent-dark)}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media(max-width:760px){
+  .nav__links{position:absolute;top:100%;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);
+              flex-direction:column;align-items:stretch;gap:1rem;padding:1.25rem 1.5rem;display:none}
+  .nav--open .nav__links{display:flex}
+  .nav__links a{text-align:center}
+  .nav__toggle{display:flex}
+  .nav--open .nav__toggle span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+  .nav--open .nav__toggle span:nth-child(2){opacity:0}
+  .nav--open .nav__toggle span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+  section{padding:3.5rem 1rem}
+  .pricing-hero{padding:3rem 1rem 1rem}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .reveal{transition:none!important;opacity:1!important;transform:none!important}
+}
+
+/* ── Report page ─────────────────────────────────────────────────────────── */
+.rp{max-width:1080px;margin:0 auto;padding:2.6rem 1.5rem 3rem}
+.rp .kicker{font-family:var(--font-sans);color:var(--accent-dark);letter-spacing:.04em;font-size:.85rem;text-transform:uppercase}
+.rp h1{font-family:var(--font-serif);font-size:clamp(1.5rem,3.4vw,2.2rem);line-height:1.2;margin:.35rem 0 .6rem}
+.rp .meta{font-family:var(--font-prose);font-weight:400;color:var(--muted)}
+.rp .meta a{text-decoration:underline}
+.rp .intro{font-family:var(--font-prose);font-weight:400;font-size:1.05rem;line-height:1.7;margin:1.4rem 0 0;max-width:820px}
+.rp h2{font-family:var(--font-serif);font-size:1.4rem;margin:2.6rem 0 .4rem}
+.rp .sub{font-family:var(--font-prose);font-weight:400;color:var(--muted);margin-bottom:1rem;max-width:820px;line-height:1.6}
+.rp .grp{font-family:var(--font-sans);font-size:.95rem;margin:1.4rem 0 .5rem;color:var(--slate)}
+.rp .cand{display:flex;gap:.9rem;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;margin-bottom:.7rem}
+.rp .cand .n{flex:0 0 1.9rem;height:1.9rem;border-radius:50%;background:#f2c94c;color:#5a3d00;border:1px solid #9c6b00;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-sans)}
+.rp .cand .t{font-family:var(--font-prose);font-weight:600;font-size:1.02rem;line-height:1.4}
+.rp .cand .t a:hover{text-decoration:underline}
+.rp .cand .a{font-family:var(--font-prose);font-weight:400;color:var(--muted);font-size:.9rem;margin:.15rem 0 .35rem}
+.rp .cand .w{font-family:var(--font-prose);font-weight:400;line-height:1.55}
+.rp .cand .near{font-family:var(--font-prose);font-weight:400;font-size:.85rem;color:var(--slate);margin-top:.35rem}
+.rp .tag{display:inline-block;font-family:var(--font-sans);font-size:.72rem;border-radius:999px;padding:0 .5rem;margin-left:.35rem;background:var(--slate-soft);vertical-align:2px}
+.rp .tag.hot{background:var(--red-soft);color:var(--accent-dark)}
+.rp .mapbox{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1rem;overflow:hidden}
+.rp .legend{display:flex;flex-wrap:wrap;gap:1.2rem;font-family:var(--font-prose);font-weight:400;font-size:.9rem;margin:.2rem 0 .8rem;color:var(--muted)}
+.rp .legend i{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin-right:.35rem}
+.rp .how{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:.8rem;margin-top:.4rem}
+.rp .how div{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:.9rem 1rem;font-family:var(--font-prose);font-weight:400;line-height:1.55}
+.rp .how b{font-family:var(--font-sans);display:block;margin-bottom:.2rem}
+.rp .cta{margin-top:2.6rem;background:var(--red-soft);border-radius:18px;padding:2rem 1.6rem;text-align:center}
+.rp .cta h2{margin:0 0 .4rem}.rp .cta p{font-family:var(--font-prose);font-weight:400;margin-bottom:1.2rem}
+.rp .cta .row{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap}
+.rp .cta .btn--primary{background:var(--text);color:#fff}.rp .cta .btn--primary:hover{background:var(--accent-dark);color:#fff}
+.rp .fine{font-family:var(--font-prose);font-weight:400;font-size:.85rem;color:var(--muted);margin-top:2rem;line-height:1.6}
+.rp .state{text-align:center;padding:4rem 1rem;font-family:var(--font-prose);font-weight:400;color:var(--muted)}
+</style>
+<!-- ── Microsoft Clarity ────────────────────────────────────────────────────
+     Session recordings + heatmaps for Eratosthenes (eratost.scicoagent.com). The project ID is the last
+     argument below; get it from clarity.microsoft.com -> Settings -> Overview.
+     Until a real ID replaces the placeholder the guard returns early, so the
+     page makes no request to clarity.ms. -->
+<script>
+(function (c, l, a, r, i, t, y) {
+  if (!i || i.indexOf("PASTE_") === 0) return;   // no project ID pasted in yet
+  c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) };
+  t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
+  y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+})(window, document, "clarity", "script", "y4p1zoary7");
+</script>
+<script src="js/loader.js?v=20261103c"></script>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────────── -->
+<header class="nav" id="top">
+  <div class="nav__inner">
+    <a href="index.html" class="lockup lockup--nav js-mark" aria-label="Eratosthenes home"><span><span class="era-a">Eratost</span><span class="era-b">henes</span></span></a>
+    <nav class="nav__links" id="nav-links">
+      <a href="index.html#showcase">Demo</a>
+      <a href="index.html#how-it-works">How it works</a>
+      <a href="index.html#features">Features</a>
+      <a href="index.html#faq">FAQ</a>
+      <a href="pricing.html">Pricing</a>
+      <button class="btn btn--primary btn--sm js-signin" type="button">Sign in with Google</button>
+    </nav>
+    <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<main><div class="rp" id="rp"><div class="state" id="state">Loading your report…</div></div></main>
+
+<footer class="footer">
+  <div class="footer__inner">
+    <a href="index.html" class="lockup lockup--footer js-mark" aria-label="Eratosthenes home"><span><span class="era-a">Eratost</span><span class="era-b">henes</span></span></a>
+    <span class="footer__copy">An AI literature search co-agent, part of the SciCoagent ecosystem.</span>
+    <span class="footer__copy"><a href="https://scicoagent.com/terms/">Terms</a> · <a href="https://scicoagent.com/privacy/">Privacy</a> · <a href="mailto:contact@scicoagent.com">Contact</a></span>
+  </div>
+</footer>
+
+<script src="js/config.js?v=20261030a"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseClient.js?v=20260829m"></script>
+<script src="js/waitlist.js?v=20261105b"></script>
+<script src="js/drone.js?v=20261104j"></script>
+<script src="js/disconnectivity.js?v=20261105b"></script>
+<script>
+(function(){
+  var L = window.EratostLoader;
+  if (L) document.querySelectorAll('.js-mark').forEach(function(a){ a.insertAdjacentHTML('afterbegin', L.mark()); });
+  var esc = function(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var rp = document.getElementById('rp'), state = document.getElementById('state');
+  var id = new URLSearchParams(location.search).get('id') || '';
+  var fmtDate = function(t){ try { return new Date(t).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' }); } catch(_) { return ''; } };
+  var authorsShort = function(a, n){ a = a || []; return a.slice(0, 3).join(', ') + ((n || a.length) > 3 ? ' et al.' : ''); };
+
+  var signedIn = false;
+  function openApp(e){
+    if (e) e.preventDefault();
+    if (signedIn) { location.href = 'search.html'; return; }
+    if (window.SciCoAuth) window.SciCoAuth.signInWithGoogle().catch(function(err){ console.error(err); });
+  }
+
+  function render(d){
+    var r = d.report || {}, cands = r.candidates || [];
+    var groups = [['main','Closely related work'], ['preprint','Recent preprints'], ['foundational','Foundational work']];
+    var n = 0, marks = [], list = '';
+    groups.forEach(function(g){
+      var cs = cands.filter(function(c){ return (c.group || 'main') === g[0]; });
+      if (!cs.length) return;
+      list += '<div class="grp">' + esc(g[1]) + '</div>';
+      cs.forEach(function(c){
+        n += 1; marks.push({ title: c.title, n: n });
+        list += '<div class="cand"><span class="n">' + n + '</span><div>' +
+          '<div class="t">' + (c.link ? '<a href="' + esc(c.link) + '" target="_blank" rel="noopener">' + esc(c.title) + '</a>' : esc(c.title)) +
+            (c.highly_cited ? '<span class="tag hot">highly cited</span>' : '') + (c.recent ? '<span class="tag">recent</span>' : '') + '</div>' +
+          '<div class="a">' + esc(authorsShort(c.authors, c.n_authors)) + (c.venue ? ' · ' + esc(c.venue) : '') + (c.year ? ' · ' + esc(c.year) : '') + '</div>' +
+          (c.why ? '<div class="w">' + esc(c.why) + '</div>' : '') +
+          (c.near && c.near.opening ? '<div class="near">Close to your paragraph' + (c.near.section ? ' in ' + esc(c.near.section) : '') + ': "' + esc(c.near.opening) + '…"</div>' : '') +
+        '</div></div>';
+      });
+    });
+    var nMap = d.graph && d.graph.papers ? d.graph.papers.length : 0;
+    rp.innerHTML =
+      '<div class="kicker">Eratost literature report</div>' +
+      '<h1>' + esc(r.title) + '</h1>' +
+      '<div class="meta">' + esc(authorsShort(r.authors)) + ' · <a href="https://arxiv.org/abs/' + esc(r.arxiv_id) + '" target="_blank" rel="noopener">arXiv:' + esc(r.arxiv_id) + '</a>' +
+        (r.submitted ? ' · submitted ' + esc(fmtDate(r.submitted)) : '') + '</div>' +
+      '<p class="intro">We read the related-work section of this paper and ran Eratost, our literature search, on each of its ' + esc(r.n_paragraphs || '') + ' paragraphs. ' +
+        'Below are <b>' + cands.length + ' papers</b> close to what those paragraphs discuss that the reference list does not include. You may know some of them and have left them out on purpose; we hope a few are useful.' +
+        (nMap ? ' Further down, a map shows where your paper sits among the ' + nMap + ' papers around it, and where the open gaps are.' : '') + '</p>' +
+      '<h2>Related work you may find useful</h2>' +
+      '<p class="sub">Each is matched to the paragraph it is closest to, with one sentence on why, written only from the two abstracts. The numbers match the gold markers on the map.</p>' +
+      list +
+      (nMap ?
+        '<h2>Where your paper sits</h2>' +
+        '<p class="sub">The research-gap map of the ' + nMap + ' papers Eratost found around your related-work section. Drag to rotate; switch to "Disconnectivity" for the same tree drawn flat.</p>' +
+        '<div class="legend"><span><i style="border:2.5px solid #ba5757"></i>your paper</span><span><i style="background:#f2c94c;border:1px solid #9c6b00"></i>suggested papers (numbered)</span><span><i style="background:#f2c94c;border:2px solid #d64545"></i>G = research gap</span></div>' +
+        '<div class="mapbox"><div id="dg"></div></div>' +
+        '<h2>How to read the gap graph</h2>' +
+        '<div class="how">' +
+          '<div><b>Dots are papers</b>Your paper is ringed in red and labelled. The papers listed above are ringed in gold with their number. Hover any dot for its title and details; click to keep it highlighted.</div>' +
+          '<div><b>Height is how sparse a region is</b>The vertical axis is a free energy, minus the log of how densely papers sit around that point. Well-studied topics are deep wells near the floor; thinly covered ground is high.</div>' +
+          '<div><b>Posts are topics, joins are barriers</b>Each vertical post stands in a topic basin, at its most central paper. Two posts join at the lowest pass between their basins: the higher that join, the more separate the two literatures.</div>' +
+          '<div><b>Gold G-nodes are research gaps</b>Found on the topic map as empty ground between two crowded topics. Hover one to see which two papers a new paper placed there would bring closest together, and how much the barrier between them would fall.</div>' +
+          '<div><b>Floor and terrain</b>The floor is the topic map seen from above: papers about similar things sit close, and colour shows how crowded each area is. The translucent terrain over it is the same landscape in 3D; the opacity slider makes it lighter.</div>' +
+          '<div><b>What it covers</b>The map is built from the papers Eratost found around your related-work section, not the whole field. Positions come from title embeddings, so read neighbourhoods, not exact distances.</div>' +
+        '</div>' : '') +
+      '<div class="cta"><h2>Find the gaps around your next idea</h2><p>Describe an idea and Eratost finds the prior work and maps where the field is still open. Search and topic maps are free.</p>' +
+        '<div class="row"><button class="btn btn--primary btn--lg js-open">Try Eratost free</button><button class="btn btn--ghost btn--lg js-wait">Join the early-access list</button></div></div>' +
+      '<p class="fine">This page is private to people with its link and is removed on ' + esc(fmtDate(d.expires_at)) + '. ' +
+        'Made by Eratost, part of SciCoagent, from public arXiv and OpenAlex data. If you would rather not hear from us, reply to the email or write to <a href="mailto:contact@scicoagent.com" style="text-decoration:underline">contact@scicoagent.com</a> and we will not contact you again.</p>';
+
+    rp.querySelectorAll('.js-open').forEach(function(b){ b.addEventListener('click', openApp); });
+    rp.querySelectorAll('.js-wait').forEach(function(b){ b.addEventListener('click', function(){ window.EratostWaitlist.open({ plan: 'pro', page: 'report' }); }); });
+    if (nMap) {
+      var session = { disconnectivity: d.graph, disconnectivity_res: { map2d: d.graph }, topic_map: d.topic_map };
+      window.dgEnsureRes = function(){ return Promise.resolve(); };
+      window.renderDisconnectivity(session, document.getElementById('dg'), { admin: false, mode: '3d', focus: r.title, marks: marks });
+    }
+  }
+
+  function fail(msg){ rp.innerHTML = '<div class="state">' + msg + '</div>'; }
+  if (!/^[A-Za-z0-9_-]{8,40}$/.test(id)) { fail('This report link is not complete. Please open the link from your email again.'); return; }
+  (async function(){
+    var h = {};
+    try {
+      if (window.SciCoAuth) {
+        var u = await window.SciCoAuth.getUser();
+        if (u) { signedIn = true; var nb = document.querySelector('.nav .js-signin'); if (nb) nb.textContent = 'Back to app'; }
+        var tok = u ? await window.SciCoAuth.getToken() : null;
+        if (tok) h.Authorization = 'Bearer ' + tok;
+      }
+    } catch(_) {}
+    try {
+      var base = ((window.SCICO_CONFIG || {}).API_BASE || '').replace(/\/$/, '');
+      var res = await fetch(base + '/reports/' + encodeURIComponent(id), { headers: h });
+      if (res.status === 410) { fail('This report has expired. <a href="search.html" class="js-open" style="text-decoration:underline">Run a fresh search with Eratost</a>.'); return; }
+      if (!res.ok) { fail('We could not find this report. It may have been removed.'); return; }
+      render(await res.json());
+    } catch (e) { fail('The report could not load just now. Please try again in a minute.'); }
+  })();
+
+  document.querySelectorAll('.js-signin').forEach(function(b){ b.addEventListener('click', openApp); });
+  var nav = document.querySelector('.nav');
+  var onScroll = function(){ nav.classList.toggle('nav--scrolled', window.scrollY > 10); };
+  onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+  var toggle = document.getElementById('nav-toggle');
+  toggle.addEventListener('click', function(){ var open = nav.classList.toggle('nav--open'); toggle.setAttribute('aria-expanded', String(open)); });
+})();
+</script>
+</body>
+</html>

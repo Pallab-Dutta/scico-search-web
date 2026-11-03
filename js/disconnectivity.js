@@ -107,6 +107,8 @@
   let FLOOR_BRIGHT = true; // 3D: keep the map floor unfaded while something is highlighted
   let FLOOR_HD = false;  // admin, 3D: colour the floor by the SAME high-dimensional free energy as the heights
                          // (interpolated between papers) instead of the Topic Map's own 2D density
+  let FOCUS = "";        // report pages: the reader's own paper (title), ringed and labelled "Your paper"
+  let MARKS = [];        // report pages: [{ title, n }] papers to ring and number (the suggested reading)
   let REC = null;        // drone tool: when set, buildDG3 also records its scene in world coordinates
   let SURFACE = false;   // admin, 3D on the 2D-map landscape: draw the free-energy surface itself
   let SURF_ALPHA = 0.35; // its opacity (0..1), adjustable live
@@ -1296,11 +1298,52 @@
     if (pin.kind === "paper") return m.type === "paper" && m.paper === pin.paper;
     return m.id === pin.id;
   }
+  // Report pages: ring the reader's own paper (red, "Your paper") and the suggested papers (gold, numbered
+  // as in the list) wherever the current view draws them, lumped basins included.
+  function markFocus(mountEl, meta) {
+    mountEl.__dgFocusMeta = null;
+    if (!FOCUS && !MARKS.length) return;
+    const svg = mountEl.querySelector("svg.dg-svg");
+    if (!svg) return;
+    const key = t => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const want = new Map();
+    MARKS.forEach(m => want.set(key(m.title), { n: m.n }));
+    if (FOCUS) want.set(key(FOCUS), { focus: true });
+    const done = new Set();
+    let out = "";
+    for (const [id, m] of Object.entries(meta)) {
+      const ps = m.paper ? [m.paper] : (m.type === "basin" && m.papers) ? m.papers : [];
+      for (const p of ps) {
+        const k = key(p && p.title), w = want.get(k);
+        if (!w || done.has(k)) continue;
+        const c = svg.querySelector(`.dg-node[data-id="${id}"]`);
+        if (!c) continue;
+        done.add(k);
+        const x = +c.getAttribute("cx"), y = +c.getAttribute("cy"), r = +c.getAttribute("r") || 4;
+        if (w.focus) {
+          mountEl.__dgFocusMeta = m;
+          out += `<circle cx="${x}" cy="${y}" r="${r + 6}" fill="none" stroke="#ba5757" stroke-width="2.6"/>` +
+            `<circle cx="${x}" cy="${y}" r="${r + 10}" fill="none" stroke="#ba5757" stroke-width="1" stroke-dasharray="3 3"/>` +
+            `<g transform="translate(${(x + r + 13).toFixed(1)} ${(y - r - 12).toFixed(1)})"><rect x="0" y="-10" width="${ps.length > 1 ? 150 : 76}" height="18" rx="9" fill="#ba5757"/>` +
+            `<text x="8" y="3" font-size="11" font-weight="700" fill="#fff">${ps.length > 1 ? "Your paper (in this group)" : "Your paper"}</text></g>`;
+        } else {
+          out += `<circle cx="${x}" cy="${y}" r="${r + 4}" fill="none" stroke="#b07d10" stroke-width="2"/>` +
+            `<g transform="translate(${(x - r - 4).toFixed(1)} ${(y - r - 6).toFixed(1)})"><circle r="7.5" fill="#f2c94c" stroke="#9c6b00" stroke-width="1"/>` +
+            `<text y="3.3" text-anchor="middle" font-size="9" font-weight="700" fill="#5a3d00">${w.n}</text></g>`;
+        }
+      }
+    }
+    const old = svg.querySelector("g.dg-mark");
+    if (old) old.remove();
+    svg.insertAdjacentHTML("beforeend", `<g class="dg-mark" pointer-events="none">${out}</g>`);
+  }
+
   function wireTooltip(mountEl, meta) {
     const info = mountEl.querySelector(".dg-info");
     const pinned = () => { const pin = mountEl.__dgPin; return pin ? Object.values(meta).find(m => pinMatches(pin, m)) || null : null; };
     const show = m => {
-      if (info) info.innerHTML = m ? tipHTML(m) : `<span style="color:#888">${INFO_HINT}</span>`;
+      const idle = mountEl.__dgFocusMeta;                 // report pages rest on the reader's own paper
+      if (info) info.innerHTML = m ? tipHTML(m) : idle ? tipHTML(idle) : `<span style="color:#888">${INFO_HINT}</span>`;
       showGap(mountEl, m);
     };
     const setPin = m => {
@@ -1476,6 +1519,7 @@
       (MODE !== "mst" ? gapPanel(model) : "");
 
     wireToolbar(session, mountEl);
+    markFocus(mountEl, built.meta);
     const droneBtn = mountEl.querySelector(".dg-drone");
     if (droneBtn) droneBtn.addEventListener("click", () => {
       // Record the 3D view exactly as it is set up now (style, axis, levels, surface, gaps) in world units.
@@ -1551,6 +1595,7 @@
         queued = false;
         const b = addGapMarkers(buildDG3(model, W, scores));
         svg.innerHTML = b.inner;
+        markFocus(mountEl, b.meta);
         wireTooltip(mountEl, b.meta);
       });
     };
@@ -1586,6 +1631,9 @@
   let _last = null;
   function renderDisconnectivity(session, mountEl, opts) {
     if (opts && "admin" in opts) ADMIN = !!opts.admin;
+    if (opts && opts.focus != null) FOCUS = String(opts.focus || "");
+    if (opts && Array.isArray(opts.marks)) MARKS = opts.marks;
+    if (opts && opts.mode && !mountEl.__dgModeSet) { MODE = opts.mode; mountEl.__dgModeSet = true; }
     _last = { session, mountEl };
     draw(session, mountEl);
   }
