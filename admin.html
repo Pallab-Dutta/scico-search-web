@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Eratost Admin: Waitlist and Activity</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cutive+Mono&family=Lora:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f7f4ee;--surface:#fffdf9;--border:#dcd5c7;--text:#1e2a31;--muted:#5e6a71;--accent:#ba5757;--accent-dark:#9c4343;--red-soft:#f3dcd9;--slate-soft:#dfe5e8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:400 14px/1.5 "Lora",Georgia,serif}
+h1,h2,.mono{font-family:"Cutive Mono",monospace;font-weight:700}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 18px 60px}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}.top h1{margin:0;font-size:1.5rem}.sp{flex:1}
+button,select,input{font:inherit}button{border:1px solid var(--border);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer}
+button:hover{border-color:var(--text)}button.pri{background:var(--red-soft);border-color:var(--red-soft);color:var(--accent-dark)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0 18px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+.card .n{font:700 1.6rem "Cutive Mono",monospace}.card .l{color:var(--muted);font-size:.85rem}
+.tabs{display:flex;gap:8px;margin:6px 0 10px}.tabs button.on{background:var(--text);color:#fff;border-color:var(--text)}
+.bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:16px}
+.bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+.bar h3{margin:0 0 6px;font:700 .9rem "Cutive Mono",monospace}
+.bar .r{display:flex;gap:8px;align-items:center;font-size:.85rem;margin:3px 0}.bar .r .k{width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .r .b{flex:1;height:8px;background:var(--slate-soft);border-radius:4px;overflow:hidden}.bar .r .b i{display:block;height:100%;background:var(--accent)}
+.bar .r .v{width:34px;text-align:right;font-family:"Cutive Mono",monospace}
+.tw{overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:.85rem}th,td{padding:7px 9px;border-bottom:1px solid #eee7da;text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:#f1ece2;font:700 .8rem "Cutive Mono",monospace;cursor:pointer;user-select:none}
+td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
+.pill{display:inline-block;border-radius:999px;padding:0 8px;font:700 .75rem "Cutive Mono",monospace;background:var(--slate-soft)}
+.pill.pro{background:#e6eef7}.pill.max{background:var(--red-soft);color:var(--accent-dark)}.pill.team{background:#e7f2e4}
+.msg{padding:40px;text-align:center;color:var(--muted)}.filter{padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:#fff;min-width:220px}
+.hot{color:var(--accent-dark);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>Eratost admin</h1><span class="mono" style="color:var(--muted)">waitlist and activity</span><span class="sp"></span>
+    <input class="filter" id="q" placeholder="Filter: email, field, source…"/>
+    <button id="reload">Reload</button><button class="pri" id="csv">Download CSV</button></div>
+  <div id="body"><div class="msg">Loading…</div></div>
+</div>
+<script src="js/config.js?v=20261030a"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseClient.js?v=20260829m"></script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id), body = $("body");
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+  const day = t => t ? String(t).slice(0, 10) : "";
+  const ago = t => { if (!t) return ""; const d = (Date.now() - new Date(t)) / 864e5; return d < 1 ? "today" : d < 2 ? "yesterday" : Math.round(d) + " d ago"; };
+  let data = null, tab = "waitlist", sortKey = null, sortDir = -1;
+
+  // One row per person for each tab, with the activity flattened into columns.
+  const use = (a, f) => (a && a.usage && a.usage[f]) || 0;
+  const COLS = {
+    waitlist: [["#", r => r.id], ["joined", r => day(r.created_at)], ["email", r => r.email], ["name", r => r.name], ["plan", r => r.plan],
+      ["billing", r => r.period], ["role", r => r.role], ["field", r => r.field], ["team", r => r.team_size], ["source", r => r.source],
+      ["campaign", r => r.campaign], ["page", r => r.page], ["country", r => r.country || ""], ["time zone", r => r.timezone],
+      ["account", r => r.has_account ? (r.plan_now || "free") : ""], ["searches", r => r.activity ? r.activity.sessions : 0],
+      ["quick", r => use(r.activity, "shallow_search")], ["deep", r => use(r.activity, "deep_search")], ["gap graphs", r => use(r.activity, "research_gap")],
+      ["PI finder", r => use(r.activity, "pi_profiling")],
+      ["last active", r => r.activity ? r.activity.last : ""]],
+    users: [["joined", r => day(r.created_at)], ["email", r => r.email], ["plan", r => r.plan], ["on waitlist", r => r.on_waitlist ? "yes" : ""],
+      ["searches", r => r.activity ? r.activity.sessions : 0], ["quick", r => use(r.activity, "shallow_search")], ["deep", r => use(r.activity, "deep_search")],
+      ["gap graphs", r => use(r.activity, "research_gap")], ["PI finder", r => use(r.activity, "pi_profiling")],
+      ["all usage", r => r.activity ? Object.entries(r.activity.usage).map(([k, v]) => k + " " + v).join(", ") : ""],
+      ["first active", r => r.activity ? day(r.activity.first) : ""], ["last active", r => r.activity ? r.activity.last : ""]],
+  };
+  const rows = () => {
+    const list = (data && data[tab]) || [], q = $("q").value.trim().toLowerCase();
+    const cols = COLS[tab];
+    let out = list.map(r => ({ r, v: cols.map(([, f]) => f(r)) }));
+    if (q) out = out.filter(o => o.v.some(v => String(v == null ? "" : v).toLowerCase().includes(q)));
+    if (sortKey != null) out.sort((a, b) => { const x = a.v[sortKey], y = b.v[sortKey]; return (x > y ? 1 : x < y ? -1 : 0) * sortDir; });
+    return out;
+  };
+  const count = (list, f) => { const m = {}; list.forEach(r => { const k = f(r) || "(none)"; m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+  const bars = (title, ent) => { const mx = Math.max(1, ...ent.map(e => e[1])); return `<div class="bar"><h3>${esc(title)}</h3>` +
+    ent.slice(0, 8).map(([k, v]) => `<div class="r"><span class="k" title="${esc(k)}">${esc(k)}</span><span class="b"><i style="width:${100 * v / mx}%"></i></span><span class="v">${v}</span></div>`).join("") + `</div>`; };
+
+  function render() {
+    if (!data) return;
+    const wl = data.waitlist || [], us = data.users || [];
+    const wk = Date.now() - 7 * 864e5;
+    const active7 = us.filter(u => u.activity && u.activity.last && new Date(u.activity.last) > wk).length;
+    const wlActive = wl.filter(w => w.activity && w.activity.sessions > 0).length;
+    const cards = [[wl.length, "on the waitlist"], [wl.filter(w => new Date(w.created_at) > wk).length, "joined this week"],
+      [us.length, "signed-up users"], [active7, "users active in 7 days"], [wlActive, "waitlisters who searched"],
+      [count(wl, w => w.plan).filter(e => e[0] === "max").map(e => e[1])[0] || 0, "want Max"]];
+    const list = rows(), cols = COLS[tab];
+    body.innerHTML = `<div class="cards">${cards.map(([n, l]) => `<div class="card"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("")}</div>
+      <div class="bars">${bars("Plan interest", count(wl, w => w.plan))}${bars("Billing", count(wl, w => w.period))}${bars("Role", count(wl, w => w.role))}
+        ${bars("Source (outreach tag)", count(wl, w => w.source))}${bars("Country / time zone", count(wl, w => w.country || w.timezone))}</div>
+      <div class="tabs"><button data-t="waitlist" class="${tab === "waitlist" ? "on" : ""}">Waitlist (${wl.length})</button><button data-t="users" class="${tab === "users" ? "on" : ""}">All users (${us.length})</button>
+        <span class="sp"></span><span style="color:var(--muted);align-self:center">${list.length} shown · click a column to sort</span></div>
+      <div class="tw"><table><thead><tr>${cols.map(([h], i) => `<th data-i="${i}">${esc(h)}${sortKey === i ? (sortDir > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead>
+      <tbody>${list.map(o => `<tr>${o.v.map((v, i) => {
+        const h = cols[i][0];
+        if (h === "plan" && v) return `<td><span class="pill ${esc(v)}">${esc(v)}</span></td>`;
+        if (h === "last active") return `<td class="${v && new Date(v) > wk ? "hot" : ""}">${esc(ago(v))}</td>`;
+        return `<td class="${h === "field" || h === "all usage" ? "wrap" : ""}">${esc(v)}</td>`;
+      }).join("")}</tr>`).join("") || `<tr><td colspan="${cols.length}" class="msg">Nobody here yet.</td></tr>`}</tbody></table></div>`;
+    body.querySelectorAll(".tabs button[data-t]").forEach(b => b.onclick = () => { tab = b.dataset.t; sortKey = null; render(); });
+    body.querySelectorAll("th").forEach(th => th.onclick = () => { const i = +th.dataset.i; sortDir = sortKey === i ? -sortDir : -1; sortKey = i; render(); });
+  }
+
+  async function load() {
+    body.innerHTML = `<div class="msg">Loading…</div>`;
+    try {
+      const user = await window.SciCoAuth.getUser();
+      if (!user) { body.innerHTML = `<div class="msg">Sign in with an admin account first. <button class="pri" id="si">Sign in with Google</button></div>`;
+        $("si").onclick = () => window.SciCoAuth.signInWithGoogle(); return; }
+      const token = await window.SciCoAuth.getToken();
+      const base = ((window.SCICO_CONFIG || {}).API_BASE || "").replace(/\/$/, "");
+      const res = await fetch(base + "/admin/waitlist", { headers: { Authorization: "Bearer " + token } });
+      if (res.status === 403) { body.innerHTML = `<div class="msg">${esc(user.email)} is not an admin account.</div>`; return; }
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      data = await res.json();
+      render();
+    } catch (e) { body.innerHTML = `<div class="msg">Could not load: ${esc(e.message || e)}</div>`; }
+  }
+  $("q").addEventListener("input", render);
+  $("reload").onclick = load;
+  $("csv").onclick = () => {
+    if (!data) return;
+    const cols = COLS[tab], q = v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
+    const csv = [cols.map(c => q(c[0])).join(",")].concat(rows().map(o => o.v.map(q).join(","))).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "eratost_" + tab + "_" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.click();
+  };
+  load();
+})();
+</script>
+</body>
+</html>

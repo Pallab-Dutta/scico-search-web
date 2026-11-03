@@ -1,0 +1,298 @@
+<!-- @dsCard group="Pages" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Join the Eratost Waitlist: Early Access to Research-Gap Graphs</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192x192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="description" content="Join the Eratost early-access list. Search and topic maps are free today; paid plans with more deep searches and Research-Gap Graphs open soon, with an early-member price for the list.">
+<link rel="canonical" href="https://eratost.scicoagent.com/waitlist.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Eratosthenes by SciCoagent">
+<meta property="og:title" content="Join the Eratost Waitlist">
+<meta property="og:description" content="Join the Eratost early-access list. Search and topic maps are free today; paid plans with more deep searches and Research-Gap Graphs open soon, with an early-member price for the list.">
+<meta property="og:url" content="https://eratost.scicoagent.com/waitlist.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Join the Eratost Waitlist">
+<meta name="twitter:description" content="Early access to Research-Gap Graphs and deep search, with an early-member price.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cutive+Mono&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet">
+<style>
+/* Same structure and type as Benjamin's pricing page; same palette as the Eratosthenes homepage. */
+:root{
+  --bg:#f7f4ee; --bg-alt:#eeeae1; --surface:#fffdf9; --border:#dcd5c7;
+  --text:#1e2a31; --muted:#5e6a71; --slate:#6e7a82;
+  --accent:#ba5757; --accent-dark:#9c4343;
+  --red-soft:#f3dcd9; --slate-soft:#dfe5e8;
+  --shadow:0 8px 24px -12px rgba(30,42,49,.28);
+  --radius:16px;
+  --font-serif:"Cutive Mono",monospace;
+  --font-sans:"Cutive Mono",monospace;
+  --font-prose:"Lora",Georgia,"Times New Roman",serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-sans);font-weight:700;background:var(--bg);color:var(--text);
+     line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+img,svg{display:block;max-width:100%}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4em;
+     font-family:var(--font-sans);font-weight:600;text-decoration:none;border-radius:999px;cursor:pointer;
+     border:1px solid transparent;transition:transform .15s,box-shadow .15s,background-color .15s,color .15s;white-space:nowrap}
+.btn--primary{background:var(--red-soft);color:var(--accent-dark)}
+.btn--primary:hover{background:var(--slate-soft);color:var(--text);transform:translateY(-1px)}
+.btn--ghost{background:transparent;border-color:var(--border);color:var(--text)}
+.btn--ghost:hover{border-color:var(--text);transform:translateY(-1px)}
+.btn--lg{padding:.85rem 1.7rem;font-size:1rem}
+.btn--sm{padding:.5rem 1.1rem;font-size:.85rem}
+.btn--block{width:100%}
+
+/* ── Nav ─────────────────────────────────────────────────────────────────── */
+.nav{position:sticky;top:0;z-index:100;background:rgba(247,244,238,.72);
+     backdrop-filter:blur(10px);border-bottom:1px solid transparent;transition:border-color .25s,box-shadow .25s}
+.nav--scrolled{border-bottom-color:var(--border);box-shadow:0 4px 20px -16px rgba(30,42,49,.45)}
+.nav__inner{max-width:1100px;margin:0 auto;padding:1rem 1.5rem;
+            display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+.nav__links{display:flex;align-items:center;gap:1.75rem;font-size:.95rem;font-weight:700}
+.nav__links a{color:var(--accent-dark);transition:color .2s}
+.nav__links a:hover,.nav__links a.active{color:var(--text)}
+.nav__toggle{display:none;flex-direction:column;justify-content:center;gap:5px;
+             width:36px;height:36px;background:transparent;border:1px solid var(--border);border-radius:8px;cursor:pointer}
+.nav__toggle span{display:block;height:2px;width:18px;margin:0 auto;background:var(--text);transition:transform .2s,opacity .2s}
+
+/* ── Logo lockup: the mark and the name ("Eratost" in the logo's shadow) ─── */
+.lockup{display:inline-flex;align-items:center;gap:.45em;font-family:"Cutive Mono",monospace;
+        font-weight:700;line-height:1;white-space:nowrap}
+.lockup .era-mark{width:1.75em;height:1.75em;flex:0 0 auto}
+.lockup .era-a{color:#1e2a31}
+.lockup .era-b{color:#d1d1d1}
+.lockup--nav{font-size:1.55rem}
+.lockup--footer{font-size:1.25rem}
+
+/* ── Scroll-reveal ───────────────────────────────────────────────────────── */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease-out,transform .7s ease-out}
+.reveal.in-view{opacity:1;transform:translateY(0)}
+
+/* ── Shared section ──────────────────────────────────────────────────────── */
+section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76px}
+.section-title{font-family:var(--font-serif);font-size:clamp(1.7rem,4vw,2.4rem);text-align:center;margin-bottom:.75rem}
+.section-sub{text-align:center;color:var(--muted);max-width:650px;margin:0 auto 3rem;font-size:1rem}
+
+/* ── Pricing header ──────────────────────────────────────────────────────── */
+.pricing-hero{padding:4.5rem 1.5rem 1rem;text-align:center}
+.pricing-hero .section-sub{margin-bottom:1.5rem}
+.billing-toggle{display:inline-flex;align-items:center;gap:.25rem;margin:.5rem auto 0;
+                background:var(--bg-alt);border:1px solid var(--border);border-radius:999px;padding:.28rem}
+.billing-toggle button{font-family:var(--font-sans);font-weight:700;font-size:.9rem;border:0;background:transparent;
+                       color:var(--muted);cursor:pointer;border-radius:999px;padding:.5rem 1.2rem;transition:background .2s,color .2s}
+.billing-toggle button.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+.billing-toggle .save-hint{font-size:.72rem;font-weight:700;color:var(--accent-dark);margin-left:.35rem}
+
+/* ── Plan cards ──────────────────────────────────────────────────────────── */
+.plans{padding-top:2rem;padding-bottom:1.5rem;max-width:1260px}
+.plans__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;max-width:1200px;margin:0 auto}
+.plan-card{position:relative;display:flex;flex-direction:column;gap:1.1rem;background:var(--surface);
+           border:1px solid var(--border);border-radius:var(--radius);padding:2rem 1.75rem;transition:transform .2s,box-shadow .2s}
+.plan-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.plan-card--pro{border-color:var(--accent);box-shadow:0 0 0 2px rgba(186,87,87,.14),var(--shadow)}
+.plan-badge{position:absolute;top:-.8rem;left:50%;transform:translateX(-50%);font-size:.7rem;font-weight:700;
+            letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--accent);border-radius:999px;
+            padding:.28rem .85rem;white-space:nowrap}
+.plan-name{font-family:var(--font-serif);font-size:1.25rem}
+.plan-for{font-size:.85rem;color:var(--muted);margin-top:-.7rem}
+.plan-price{display:flex;align-items:baseline;gap:.3rem;flex-wrap:wrap}
+.plan-price .amount{font-family:var(--font-serif);font-size:2.6rem;line-height:1;color:var(--text)}
+.plan-price .unit{font-size:.95rem;color:var(--muted);font-weight:700}
+.plan-sub{font-size:.85rem;color:var(--muted);min-height:1.2em}
+.plan-save{display:inline-block;font-size:.75rem;font-weight:700;color:var(--accent-dark);background:var(--red-soft);
+           border-radius:999px;padding:.2rem .6rem;width:max-content}
+.plan-save:empty{display:none}
+.plan-feats{list-style:none;display:flex;flex-direction:column;gap:.6rem;font-size:.9rem;font-weight:400;
+            font-family:var(--font-prose);color:var(--text)}
+.plan-feats li{display:flex;align-items:flex-start;gap:.55rem}
+.plan-feats .tick{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;
+                  border-radius:50%;background:var(--slate-soft);color:var(--text);font-size:.72rem;margin-top:.12em}
+.plan-feats li.soon{color:var(--muted)}
+.plan-feats li.soon .tick{background:var(--bg-alt);color:var(--muted)}
+.plan-feats b{font-weight:600}
+.soon-pill{align-self:center;font-size:.6rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+           border:1px dashed var(--border);border-radius:999px;padding:.08rem .45rem;white-space:nowrap;font-family:var(--font-sans)}
+.plan-card .btn{margin-top:auto}
+.plan-fineprint{font-size:.75rem;color:var(--muted);text-align:center;max-width:760px;margin:1.5rem auto 0}
+.plan-fineprint a{text-decoration:underline}
+
+/* ── Labs & institutions ─────────────────────────────────────────────────── */
+.enterprise{max-width:1040px;padding-top:1rem}
+.enterprise__inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1.5rem;
+                   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:2rem 2.25rem}
+.enterprise__text{flex:1 1 340px}
+.enterprise__text h2{font-family:var(--font-serif);font-size:1.35rem;margin-bottom:.5rem}
+.enterprise__text p{color:var(--muted);font-size:.95rem;font-weight:400;font-family:var(--font-prose)}
+
+/* ── Features ────────────────────────────────────────────────────────────── */
+.features__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.5rem;margin-top:1rem}
+.feature-card{position:relative;border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;
+              background:var(--surface);transition:transform .2s,box-shadow .2s}
+.feature-card--pro{border-color:var(--accent)}
+.feature-card--soon{border-style:dashed}
+.feat-badge{position:absolute;top:1.1rem;right:1.1rem;font-size:.6rem;font-weight:700;letter-spacing:.06em;
+            text-transform:uppercase;color:#fff;background:var(--accent);border-radius:999px;padding:.16rem .5rem}
+.feat-badge--soon{color:var(--muted);background:var(--bg-alt);border:1px dashed var(--border)}
+.feature-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.feature-card h3{font-family:var(--font-serif);font-size:1.1rem;margin-bottom:.5rem}
+.feature-card .feat-badge ~ h3{padding-right:3.5rem}
+.feature-card p{color:var(--muted);font-size:.95rem;font-weight:400;font-family:var(--font-prose)}
+@media(min-width:900px){.features__grid{grid-template-columns:repeat(4,1fr)}}
+
+/* ── FAQ ─────────────────────────────────────────────────────────────────── */
+.faq{max-width:760px}
+.faq__item{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:1.1rem 1.35rem;margin-bottom:1rem}
+.faq__item summary{cursor:pointer;font-weight:700;font-size:1rem;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.faq__item summary::-webkit-details-marker{display:none}
+.faq__item summary::after{content:"+";color:var(--accent);font-size:1.3rem;transition:transform .2s}
+.faq__item[open] summary::after{transform:rotate(45deg)}
+.faq__item p{margin-top:.85rem;color:var(--muted);font-size:.95rem;font-weight:400;font-family:var(--font-prose)}
+.faq__item a{color:var(--accent-dark);text-decoration:underline}
+
+/* ── CTA ─────────────────────────────────────────────────────────────────── */
+.cta__inner{text-align:center;background:var(--red-soft);transition:background .35s ease;border-radius:24px;padding:3.5rem 2rem;color:var(--text)}
+.cta__inner h2{font-family:var(--font-serif);font-size:clamp(1.5rem,3.5vw,2.1rem);margin-bottom:.5rem}
+.cta__inner p{opacity:.8;margin-bottom:1.75rem}
+.cta__inner:hover{background:var(--slate-soft)}
+.cta__inner .btn--primary{background:transparent;color:var(--accent-dark);border:2px solid var(--accent-dark)}
+.cta__inner:hover .btn--primary{color:var(--text);border-color:var(--text)}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.footer{border-top:1px solid var(--border);padding:2rem 1.5rem}
+.footer__inner{max-width:1100px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem}
+.footer__copy{color:var(--muted);font-size:.9rem}
+.footer__copy a:hover{color:var(--accent-dark)}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media(max-width:760px){
+  .nav__links{position:absolute;top:100%;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);
+              flex-direction:column;align-items:stretch;gap:1rem;padding:1.25rem 1.5rem;display:none}
+  .nav--open .nav__links{display:flex}
+  .nav__links a{text-align:center}
+  .nav__toggle{display:flex}
+  .nav--open .nav__toggle span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+  .nav--open .nav__toggle span:nth-child(2){opacity:0}
+  .nav--open .nav__toggle span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+  section{padding:3.5rem 1rem}
+  .pricing-hero{padding:3rem 1rem 1rem}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .reveal{transition:none!important;opacity:1!important;transform:none!important}
+}
+
+/* ── Waitlist page ───────────────────────────────────────────────────────── */
+.wl{max-width:1080px;margin:0 auto;padding:4.5rem 1.5rem 4rem;display:grid;grid-template-columns:1.05fr .95fr;gap:3rem;align-items:start}
+.wl h1{font-family:var(--font-serif);font-size:clamp(1.9rem,4.2vw,2.8rem);line-height:1.15;margin-bottom:1rem}
+.wl .lead{font-family:var(--font-prose);font-weight:400;font-size:1.08rem;color:var(--muted);line-height:1.65;margin-bottom:1.6rem}
+.wl ul{list-style:none;display:flex;flex-direction:column;gap:.95rem}
+.wl li{display:flex;gap:.8rem;align-items:flex-start;font-family:var(--font-prose);font-weight:400;line-height:1.55}
+.wl li b{font-family:var(--font-sans);display:block;margin-bottom:.1rem}
+.wl li .ic{flex:0 0 1.9rem;height:1.9rem;border-radius:50%;background:var(--red-soft);color:var(--accent-dark);display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-sans)}
+.wl .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.8rem 1.6rem}
+.wl .note{font-family:var(--font-prose);font-weight:400;font-size:.9rem;color:var(--muted);margin-top:1.4rem}
+@media(max-width:860px){.wl{grid-template-columns:1fr;padding-top:2.5rem;gap:2rem}}
+</style>
+<!-- ── Microsoft Clarity ────────────────────────────────────────────────────
+     Session recordings + heatmaps for Eratosthenes (eratost.scicoagent.com). The project ID is the last
+     argument below; get it from clarity.microsoft.com -> Settings -> Overview.
+     Until a real ID replaces the placeholder the guard returns early, so the
+     page makes no request to clarity.ms. -->
+<script>
+(function (c, l, a, r, i, t, y) {
+  if (!i || i.indexOf("PASTE_") === 0) return;   // no project ID pasted in yet
+  c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) };
+  t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
+  y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+})(window, document, "clarity", "script", "y4p1zoary7");
+</script>
+<script src="js/loader.js?v=20261103c"></script>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────────── -->
+<header class="nav" id="top">
+  <div class="nav__inner">
+    <a href="index.html" class="lockup lockup--nav js-mark" aria-label="Eratosthenes home"><span><span class="era-a">Eratost</span><span class="era-b">henes</span></span></a>
+    <nav class="nav__links" id="nav-links">
+      <a href="index.html#showcase">Demo</a>
+      <a href="index.html#how-it-works">How it works</a>
+      <a href="index.html#features">Features</a>
+      <a href="index.html#faq">FAQ</a>
+      <a href="pricing.html">Pricing</a>
+      <button class="btn btn--primary btn--sm js-signin" type="button">Sign in with Google</button>
+    </nav>
+    <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<main>
+<section class="wl">
+  <div>
+    <h1>Be first to map the open gaps in your field.</h1>
+    <p class="lead">Eratost finds the prior work for your idea and shows where a field is still open. Search and topic maps are free today. Paid plans with more deep searches and Research-Gap Graphs open soon, and people on this list get them first, at an early-member price.</p>
+    <ul>
+      <li><span class="ic">1</span><span><b>Research-Gap Graphs</b>Topics form basins; the barriers between them are the open gaps, each with where a new paper would close it.</span></li>
+      <li><span class="ic">2</span><span><b>Deep search</b>Reads up to 200 papers for broad and cross-disciplinary questions, ranked by how close each is to your idea.</span></li>
+      <li><span class="ic">3</span><span><b>Early-member price</b>The list hears about pricing first, and keeps its launch price.</span></li>
+    </ul>
+    <p class="note">Already curious? <a href="search.html" class="js-open" style="text-decoration:underline">Try the free search now</a>, no card needed.</p>
+  </div>
+  <div class="card" id="wl-form"></div>
+</section>
+</main>
+
+<footer class="footer">
+  <div class="footer__inner">
+    <a href="index.html" class="lockup lockup--footer js-mark" aria-label="Eratosthenes home"><span><span class="era-a">Eratost</span><span class="era-b">henes</span></span></a>
+    <span class="footer__copy">An AI literature search co-agent, part of the SciCoagent ecosystem.</span>
+    <span class="footer__copy"><a href="https://scicoagent.com/terms/">Terms</a> · <a href="https://scicoagent.com/privacy/">Privacy</a> · <a href="mailto:contact@scicoagent.com">Contact</a></span>
+  </div>
+</footer>
+
+<script src="js/config.js?v=20261030a"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabaseClient.js?v=20260829m"></script>
+<script src="js/waitlist.js?v=20261105a"></script>
+<script>
+(function(){
+  var L = window.EratostLoader;
+  if (L) document.querySelectorAll('.js-mark').forEach(function(a){ a.insertAdjacentHTML('afterbegin', L.mark()); });
+  var q = new URLSearchParams(location.search), plan = q.get('plan');
+  window.EratostWaitlist.mount(document.getElementById('wl-form'), {
+    plan: ['pro','max','team','unsure'].indexOf(plan) >= 0 ? plan : 'pro', page: 'waitlist',
+    title: 'Join the early-access list', subtitle: 'Takes ten seconds. No payment, no spam: one email when your plan opens.' });
+  var signedIn = false;
+  function openApp(e){
+    if (e) e.preventDefault();
+    if (signedIn) { location.href = 'search.html'; return; }
+    if (window.SciCoAuth) window.SciCoAuth.signInWithGoogle().catch(function(err){ console.error(err); });
+  }
+  document.querySelectorAll('.js-signin,.js-open').forEach(function(b){ b.addEventListener('click', openApp); });
+  if (window.SciCoAuth) window.SciCoAuth.getUser().then(function(u){
+    if (!u) return; signedIn = true;
+    var nb = document.querySelector('.nav .js-signin'); if (nb) nb.textContent = 'Back to app';
+  }).catch(function(){});
+  var nav = document.querySelector('.nav');
+  var onScroll = function(){ nav.classList.toggle('nav--scrolled', window.scrollY > 10); };
+  onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+  var toggle = document.getElementById('nav-toggle');
+  toggle.addEventListener('click', function(){ var open = nav.classList.toggle('nav--open'); toggle.setAttribute('aria-expanded', String(open)); });
+})();
+</script>
+</body>
+</html>
