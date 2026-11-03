@@ -225,6 +225,15 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
 .rp .cta .btn--primary{background:var(--text);color:#fff}.rp .cta .btn--primary:hover{background:var(--accent-dark);color:#fff}
 .rp .fine{font-family:var(--font-prose);font-weight:400;font-size:.85rem;color:var(--muted);margin-top:2rem;line-height:1.6}
 .rp .state{text-align:center;padding:4rem 1rem;font-family:var(--font-prose);font-weight:400;color:var(--muted)}
+.rp .top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2.2rem;align-items:start}
+.rp .top>*,.rp .cand>div{min-width:0}
+.rp{overflow-wrap:anywhere}
+.rp .tmap{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:.6rem;box-shadow:var(--shadow)}
+.rp .tmap svg{display:block;width:100%;height:auto}
+.rp .tmap .cap{font-family:var(--font-prose);font-weight:400;font-size:.82rem;color:var(--muted);margin:.45rem .3rem .1rem;line-height:1.45}
+.rp .tmap .mk{cursor:pointer}
+.rp .cand:target{box-shadow:0 0 0 2px #f2c94c}
+@media(max-width:860px){.rp .top{grid-template-columns:minmax(0,1fr)}}
 </style>
 <!-- ── Microsoft Clarity ────────────────────────────────────────────────────
      Session recordings + heatmaps for Eratosthenes (eratost.scicoagent.com). The project ID is the last
@@ -304,7 +313,7 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
       list += '<div class="grp">' + esc(g[1]) + '</div>';
       cs.forEach(function(c){
         n += 1; marks.push({ title: c.title, n: n });
-        list += '<div class="cand"><span class="n">' + n + '</span><div>' +
+        list += '<div class="cand" id="cand-' + n + '"><span class="n">' + n + '</span><div>' +
           '<div class="t">' + (c.link ? '<a href="' + esc(c.link) + '" target="_blank" rel="noopener">' + esc(c.title) + '</a>' : esc(c.title)) +
             (c.highly_cited ? '<span class="tag hot">highly cited</span>' : '') + (c.recent ? '<span class="tag">recent</span>' : '') + '</div>' +
           '<div class="a">' + esc(authorsShort(c.authors, c.n_authors)) + (c.venue ? ' · ' + esc(c.venue) : '') + (c.year ? ' · ' + esc(c.year) : '') + '</div>' +
@@ -314,14 +323,19 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
       });
     });
     var nMap = d.graph && d.graph.papers ? d.graph.papers.length : 0;
+    var tm = d.topic_map && d.topic_map.points && d.topic_map.points.length ? d.topic_map : null;
     rp.innerHTML =
+      '<div class="top"><div>' +
       '<div class="kicker">Eratost literature report</div>' +
       '<h1>' + esc(r.title) + '</h1>' +
       '<div class="meta">' + esc(authorsShort(r.authors)) + ' · <a href="https://arxiv.org/abs/' + esc(r.arxiv_id) + '" target="_blank" rel="noopener">arXiv:' + esc(r.arxiv_id) + '</a>' +
         (r.submitted ? ' · submitted ' + esc(fmtDate(r.submitted)) : '') + '</div>' +
       '<p class="intro">We read the related-work section of this paper and ran Eratost, our literature search, on each of its ' + esc(r.n_paragraphs || '') + ' paragraphs. ' +
         'Below are <b>' + cands.length + ' papers</b> close to what those paragraphs discuss that the reference list does not include. You may know some of them and have left them out on purpose; we hope a few are useful.' +
-        (nMap ? ' Further down, a map shows where your paper sits among the ' + nMap + ' papers around it, and where the open gaps are.' : '') + '</p>' +
+        (nMap ? ' Further down, a 3D map shows where your paper sits among the ' + nMap + ' papers around it, and where the open gaps are.' : '') + '</p>' +
+      '</div>' + (tm ? '<div class="tmap"><div id="tmap"></div><div class="cap">The topic map of the papers around yours: papers on similar subjects sit close; shading shows how crowded each area is. ' +
+        '<b style="color:#ba5757">Red</b>: your paper. <b style="color:#9c6b00">Gold</b>: the suggested papers (click a number). G: open research gaps.</div></div>' : '') +
+      '</div>' +
       '<h2>Related work you may find useful</h2>' +
       '<p class="sub">Each is matched to the paragraph it is closest to, with one sentence on why, written only from the two abstracts. The numbers match the gold markers on the map.</p>' +
       list +
@@ -344,6 +358,7 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
       '<p class="fine">This page is private to people with its link and is removed on ' + esc(fmtDate(d.expires_at)) + '. ' +
         'Made by Eratost, part of SciCoagent, from public arXiv and OpenAlex data. If you would rather not hear from us, reply to the email or write to <a href="mailto:contact@scicoagent.com" style="text-decoration:underline">contact@scicoagent.com</a> and we will not contact you again.</p>';
 
+    if (tm) drawTopicMap(document.getElementById('tmap'), tm, r.title, marks);
     rp.querySelectorAll('.js-open').forEach(function(b){ b.addEventListener('click', openApp); });
     rp.querySelectorAll('.js-wait').forEach(function(b){ b.addEventListener('click', function(){ window.EratostWaitlist.open({ plan: 'pro', page: 'report' }); }); });
     if (nMap) {
@@ -351,6 +366,55 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
       window.dgEnsureRes = function(){ return Promise.resolve(); };
       window.renderDisconnectivity(session, document.getElementById('dg'), { admin: false, mode: '3d', focus: r.title, marks: marks });
     }
+  }
+
+  // The 2D topic map: density floor (one smooth image), contours, every paper, the gaps, the reader's
+  // paper (red) and the suggested papers (gold, numbered as in the list; click to jump to it).
+  function drawTopicMap(el, tm, ownTitle, marks){
+    var W = 600, H = 430, key = function(t){ return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); };
+    var X = function(x){ return 8 + x * (W - 16); }, Y = function(y){ return 8 + y * (H - 16); };
+    var g = tm.grid || [], G = g.length, out = '';
+    var col = function(t){ t = Math.max(0, Math.min(1, t)); var A = [251,250,248], B = [132,151,176], C = [186,87,87];
+      var a = t < .5 ? A : B, b = t < .5 ? B : C, f = t < .5 ? t / .5 : (t - .5) / .5; return [0,1,2].map(function(i){ return Math.round(a[i] + (b[i] - a[i]) * f); }); };
+    if (G > 1) {
+      var cv = document.createElement('canvas'); cv.width = G; cv.height = G;
+      var cx = cv.getContext('2d'), im = cx.createImageData(G, G);
+      for (var r = 0; r < G; r++) for (var c = 0; c < G; c++) {
+        var v = Math.max(0, Math.min(1, +g[r][c] || 0)), k = col(v), o = (r * G + c) * 4;
+        im.data[o] = k[0]; im.data[o+1] = k[1]; im.data[o+2] = k[2]; im.data[o+3] = Math.round(200 * Math.max(0, Math.min(1, (v - .02) / .08)));
+      }
+      cx.putImageData(im, 0, 0);
+      var h = 0.5 / (G - 1);
+      out += '<image href="' + cv.toDataURL() + '" x="' + X(-h) + '" y="' + Y(-h) + '" width="' + (X(1 + h) - X(-h)) + '" height="' + (Y(1 + h) - Y(-h)) + '" preserveAspectRatio="none"/>';
+      var segs = '', lv = [.15,.3,.45,.6,.75,.9], s1 = 1 / (G - 1);         // contour lines (marching squares)
+      for (var r2 = 0; r2 < G - 1; r2++) for (var c2 = 0; c2 < G - 1; c2++) {
+        var q = [g[r2][c2], g[r2][c2+1], g[r2+1][c2+1], g[r2+1][c2]], P4 = [[c2,r2],[c2+1,r2],[c2+1,r2+1],[c2,r2+1]];
+        lv.forEach(function(L){
+          var ps = [];
+          for (var e = 0; e < 4; e++) { var a = e, b = (e + 1) % 4;
+            if ((q[a] < L) !== (q[b] < L)) { var t = (L - q[a]) / (q[b] - q[a]); ps.push([(P4[a][0] + t * (P4[b][0] - P4[a][0])) * s1, (P4[a][1] + t * (P4[b][1] - P4[a][1])) * s1]); } }
+          for (var j = 0; j + 1 < ps.length; j += 2) segs += 'M' + X(ps[j][0]).toFixed(1) + ' ' + Y(ps[j][1]).toFixed(1) + 'L' + X(ps[j+1][0]).toFixed(1) + ' ' + Y(ps[j+1][1]).toFixed(1);
+        });
+      }
+      out += '<path d="' + segs + '" fill="none" stroke="#55626a" stroke-opacity=".45" stroke-width=".7"/>';
+    }
+    var pts = tm.points || [], by = {};
+    pts.forEach(function(p){ by[key(p.title)] = p;
+      out += '<circle cx="' + X(p.x).toFixed(1) + '" cy="' + Y(p.y).toFixed(1) + '" r="2.6" fill="#6e7a82" fill-opacity=".8"><title>' + esc(p.title) + '</title></circle>'; });
+    (tm.gaps || []).forEach(function(gp, i){
+      out += '<g><circle cx="' + X(gp.x) + '" cy="' + Y(gp.y) + '" r="9.5" fill="#f2c94c" stroke="#ba5757" stroke-width="1.6"/>' +
+        '<text x="' + X(gp.x) + '" y="' + (Y(gp.y) + 3.2) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="#5a3d00">G' + (i + 1) + '</text><title>' + esc(gp.label || 'Research gap') + '</title></g>'; });
+    marks.forEach(function(m){ var p = by[key(m.title)]; if (!p) return;
+      out += '<g class="mk" data-n="' + m.n + '"><circle cx="' + X(p.x) + '" cy="' + Y(p.y) + '" r="8.5" fill="#f2c94c" stroke="#9c6b00" stroke-width="1.3"/>' +
+        '<text x="' + X(p.x) + '" y="' + (Y(p.y) + 3.4) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#5a3d00">' + m.n + '</text><title>' + esc(m.title) + '</title></g>'; });
+    var me = by[key(ownTitle)];
+    if (me) {
+      var mx = X(me.x), my = Y(me.y), right = me.x < .7;
+      out += '<circle cx="' + mx + '" cy="' + my + '" r="5.5" fill="#ba5757" stroke="#fff" stroke-width="1.3"/><circle cx="' + mx + '" cy="' + my + '" r="11" fill="none" stroke="#ba5757" stroke-width="2.2"/>' +
+        '<g transform="translate(' + (right ? mx + 15 : mx - 95) + ' ' + (my - 22) + ')"><rect width="80" height="19" rx="9.5" fill="#ba5757"/><text x="40" y="13" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">Your paper</text></g>';
+    }
+    el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Topic map with your paper and the suggested papers" style="font-family:system-ui,sans-serif">' + out + '</svg>';
+    el.querySelectorAll('.mk').forEach(function(m){ m.addEventListener('click', function(){ location.hash = 'cand-' + m.dataset.n; }); });
   }
 
   function fail(msg){ rp.innerHTML = '<div class="state">' + msg + '</div>'; }
