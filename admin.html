@@ -46,7 +46,7 @@ td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
 </div>
 <script src="js/config.js?v=20261030a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supabaseClient.js?v=20260829m"></script>
+<script src="js/supabaseClient.js?v=20261106a"></script>
 <script>
 (function () {
   const $ = id => document.getElementById(id), body = $("body");
@@ -65,6 +65,10 @@ td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
       ["quick", r => use(r.activity, "shallow_search")], ["deep", r => use(r.activity, "deep_search")], ["gap graphs", r => use(r.activity, "research_gap")],
       ["PI finder", r => use(r.activity, "pi_profiling")],
       ["last active", r => r.activity ? r.activity.last : ""]],
+    signins: [["day", r => r.day], ["saw a page signed out", r => r.page], ["opened sign-in", r => r.window_open],
+      ["Google", r => r.google_click], ["email entered", r => r.email_click], ["email sent", r => r.email_sent],
+      ["code typed", r => r.code_entered], ["signed in: Google", r => r["signed_in:google"]], ["signed in: email", r => r["signed_in:email"]],
+      ["signed in: other", r => r["signed_in:other"]], ["new users", r => r.new_users], ["from outreach", r => r.outreach]],
     reports: [["made", r => day(r.created_at)], ["arXiv", r => r.arxiv_id], ["title", r => r.title], ["views", r => r.views || 0],
       ["first view", r => r.first_view_at || ""], ["last view", r => r.last_view_at || ""],
       ["waitlist joins", r => ((data && data.waitlist) || []).filter(w => w.report_id === r.id).length],
@@ -75,8 +79,18 @@ td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
       ["all usage", r => r.activity ? Object.entries(r.activity.usage).map(([k, v]) => k + " " + v).join(", ") : ""],
       ["first active", r => r.activity ? day(r.activity.first) : ""], ["last active", r => r.activity ? r.activity.last : ""]],
   };
+  // Sign-in steps arrive as (day, step, n) counts; one row per day for the table.
+  const signinDays = () => {
+    const by = {};
+    ((data && data.signins) || []).forEach(a => {
+      const r = by[a.day] || (by[a.day] = { day: a.day, new_users: 0, outreach: 0 });
+      r[a.step] = (r[a.step] || 0) + a.n;
+      if (a.step.startsWith("signed_in")) { r.new_users += a.new_user || 0; r.outreach += a.outreach || 0; }
+    });
+    return Object.values(by).sort((a, b) => (a.day < b.day ? 1 : -1));
+  };
   const rows = () => {
-    const list = (data && data[tab]) || [], q = $("q").value.trim().toLowerCase();
+    const list = tab === "signins" ? signinDays() : ((data && data[tab]) || []), q = $("q").value.trim().toLowerCase();
     const cols = COLS[tab];
     let out = list.map(r => ({ r, v: cols.map(([, f]) => f(r)) }));
     if (q) out = out.filter(o => o.v.some(v => String(v == null ? "" : v).toLowerCase().includes(q)));
@@ -101,7 +115,7 @@ td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
     body.innerHTML = `<div class="cards">${cards.map(([n, l]) => `<div class="card"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("")}</div>
       <div class="bars">${bars("Plan interest", count(wl, w => w.plan))}${bars("Billing", count(wl, w => w.period))}${bars("Role", count(wl, w => w.role))}
         ${bars("Source (outreach tag)", count(wl, w => w.source))}${bars("Country / time zone", count(wl, w => w.country || w.timezone))}</div>
-      <div class="tabs"><button data-t="waitlist" class="${tab === "waitlist" ? "on" : ""}">Waitlist (${wl.length})</button><button data-t="users" class="${tab === "users" ? "on" : ""}">All users (${us.length})</button><button data-t="reports" class="${tab === "reports" ? "on" : ""}">Reports (${(data.reports || []).length})</button>
+      <div class="tabs"><button data-t="waitlist" class="${tab === "waitlist" ? "on" : ""}">Waitlist (${wl.length})</button><button data-t="users" class="${tab === "users" ? "on" : ""}">All users (${us.length})</button><button data-t="reports" class="${tab === "reports" ? "on" : ""}">Reports (${(data.reports || []).length})</button><button data-t="signins" class="${tab === "signins" ? "on" : ""}">Sign-ins</button>
         <span class="sp"></span><span style="color:var(--muted);align-self:center">${list.length} shown · click a column to sort</span></div>
       <div class="tw"><table><thead><tr>${cols.map(([h], i) => `<th data-i="${i}">${esc(h)}${sortKey === i ? (sortDir > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead>
       <tbody>${list.map(o => `<tr>${o.v.map((v, i) => {
@@ -111,7 +125,7 @@ td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
         if (h === "first view" || h === "last view") return `<td class="${v && new Date(v) > wk ? "hot" : ""}">${esc(ago(v))}</td>`;
         if (h === "link") return `<td><a href="${esc(v)}" target="_blank" rel="noopener" style="text-decoration:underline">open</a></td>`;
         if (h === "title") return `<td class="wrap">${esc(v)}</td>`;
-        return `<td class="${h === "field" || h === "all usage" ? "wrap" : ""}">${esc(v)}</td>`;
+        return `<td class="${h === "field" || h === "all usage" ? "wrap" : ""}">${esc(v == null ? "" : v)}</td>`;
       }).join("")}</tr>`).join("") || `<tr><td colspan="${cols.length}" class="msg">Nobody here yet.</td></tr>`}</tbody></table></div>`;
     body.querySelectorAll(".tabs button[data-t]").forEach(b => b.onclick = () => { tab = b.dataset.t; sortKey = null; render(); });
     body.querySelectorAll("th").forEach(th => th.onclick = () => { const i = +th.dataset.i; sortDir = sortKey === i ? -sortDir : -1; sortKey = i; render(); });

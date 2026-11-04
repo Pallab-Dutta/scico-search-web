@@ -307,6 +307,7 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
 })(window, document, "clarity", "script", "y4p1zoary7");
 </script>
 <script src="js/loader.js?v=20261103c"></script>
+<script src="js/signin.js?v=20261106a"></script>
 <script src="js/sunshadow.js?v=20261031a"></script>
 </head>
 <body>
@@ -321,7 +322,7 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
       <a href="#features">Features</a>
       <a href="#faq">FAQ</a>
       <a href="pricing.html">Pricing</a>
-      <button class="btn btn--primary btn--sm js-signin" type="button">Sign in with Google</button>
+      <button class="btn btn--primary btn--sm js-signin" type="button">Sign in</button>
     </nav>
     <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
       <span></span><span></span><span></span>
@@ -380,7 +381,7 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
     </p>
 
     <div class="hero__actions reveal">
-      <button class="btn btn--primary btn--lg js-signin" type="button">Start free with Google</button>
+      <button class="btn btn--primary btn--lg js-signin" type="button">Start free</button>
       <a class="btn btn--ghost btn--lg" href="#showcase">See it in action</a>
     </div>
 
@@ -550,30 +551,12 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
 
 <script src="js/config.js?v=20261030a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supabaseClient.js?v=20260829m"></script>
+<script src="js/supabaseClient.js?v=20261106a"></script>
 <script src="js/waitlist.js?v=20261105b"></script>
 <script>
-  // Google sign-in; if already authenticated, jump straight to the app.
+  // Sign-in buttons open the sign-in window (js/signin.js). Already signed in, or back from Google or
+  // an email link: straight to the app.
   (function(){
-    function waitScreen(on){
-      var el = document.getElementById('signinWait');
-      if (!el && on) {
-        el = document.createElement('div');
-        el.id = 'signinWait'; el.className = 'signin-wait';
-        el.innerHTML = window.EratostLoader ? EratostLoader.block('Signing you in via Google', { gradient: true }) : 'Signing you in via Google';
-        document.body.appendChild(el);
-      }
-      if (el) el.classList.toggle('on', !!on);
-    }
-    document.querySelectorAll('.js-signin').forEach(function(b){
-      b.addEventListener('click', function(){
-        if (!window.SciCoAuth) return;
-        waitScreen(true);
-        window.SciCoAuth.signInWithGoogle().catch(function(e){ console.error(e); waitScreen(false); });
-      });
-    });
-    // Back button from Google's page: the browser may restore this page as it was.
-    window.addEventListener('pageshow', function(e){ if (e.persisted) waitScreen(false); });
     if(window.SciCoAuth){
       window.SciCoAuth.onChange(function(user){ if(user){ location.href='search.html'; } });
     }
