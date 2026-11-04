@@ -1,6 +1,6 @@
 name: Deploy site + blog to Pages
 
-# eratost.scicoagent.com = the hand-written pages in this repo + Eratosthenes' blog at /blog/.
+# eratost.scicoagent.com = the hand-written pages in this repo + Eratost's blog at /blog/.
 #
 # The blog is NOT written here. Every post lives in the central blog repo
 # (Pallab-Dutta/SciCopilot, blog-src/). Posts whose front matter says `agent: "eratosthenes"`
@@ -8,7 +8,7 @@ name: Deploy site + blog to Pages
 # https://eratost.scicoagent.com/blog/ (blog-src/products/eratosthenes.toml), and deploys them
 # beside the site. Same design as benjamin.scicoagent.com (scicoproof-web).
 #
-# Until the first Eratosthenes post exists, the site deploys without a blog (nothing breaks).
+# Until the first Eratost post exists, the site deploys without a blog (nothing breaks).
 #
 # Pages setting needed once: Settings -> Pages -> Source = "GitHub Actions". Before that switch
 # the site keeps serving from the branch as it does today, and this job's deploy step just fails.
@@ -81,15 +81,15 @@ jobs:
             --exclude='/blog/' \
             ./ _site/
 
-      - name: Build Eratosthenes' blog
-        # No Eratosthenes post yet -> no blog folder; the site itself still deploys.
+      - name: Build Eratost's blog
+        # No Eratost post yet -> no blog folder; the site itself still deploys.
         run: |
           set -euo pipefail
           if python3 _blogrepo/.github/scripts/product_blog.py "$PRODUCT" _blogsrc --src _blogrepo/blog-src; then
             hugo --minify --source _blogsrc --config hugo.toml,product.toml \
                  --destination "$GITHUB_WORKSPACE/_site/blog"
           else
-            echo "no Eratosthenes posts yet: deploying the site without a blog"
+            echo "no Eratost posts yet: deploying the site without a blog"
           fi
 
       - name: Verify the build
