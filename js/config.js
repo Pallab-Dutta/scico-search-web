@@ -10,5 +10,5 @@ window.SCICO_CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdqd2hoZGxvY3h4eWNjemxzZmd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2MTU2NjYsImV4cCI6MjA5ODE5MTY2Nn0.vyj5PZyFZxspFzMqN4vwUjkQQXMk2qXB3zt1BQxs7Rw",
 
   // Where Google OAuth returns to (must be registered in Supabase → Auth → URL config).
-  REDIRECT_URL: "https://eratost.scicoagent.com/",
+  REDIRECT_URL: "https://eratost.scicoagent.com/search.html",   // sign-in (Google or email link) returns straight to the app
 };
