@@ -1,0 +1,130 @@
+name: Deploy site + blog to Pages
+
+# eratost.scicoagent.com = the hand-written pages in this repo + Eratosthenes' blog at /blog/.
+#
+# The blog is NOT written here. Every post lives in the central blog repo
+# (Pallab-Dutta/SciCopilot, blog-src/). Posts whose front matter says `agent: "eratosthenes"`
+# are served HERE: this job copies just those, builds them with Hugo at
+# https://eratost.scicoagent.com/blog/ (blog-src/products/eratosthenes.toml), and deploys them
+# beside the site. Same design as benjamin.scicoagent.com (scicoproof-web).
+#
+# Until the first Eratosthenes post exists, the site deploys without a blog (nothing breaks).
+#
+# Pages setting needed once: Settings -> Pages -> Source = "GitHub Actions". Before that switch
+# the site keeps serving from the branch as it does today, and this job's deploy step just fails.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      indexnow_hours:
+        description: "Submit blog URLs changed in the last N hours to IndexNow (use 100000 once to submit all)"
+        required: false
+        default: "3"
+  # Hourly, like the central blog: a post scheduled for 09:00 is released by the first run after
+  # 09:00 (Hugo withholds future-dated posts). The central blog's deploy also triggers this
+  # workflow on push when it has PRODUCT_SITES_TOKEN, so a post published now appears at once.
+  schedule:
+    - cron: "7 * * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    env:
+      # Same pinned version as the central blog, so both copies of a post render identically.
+      HUGO_VERSION: 0.163.3
+      PRODUCT: eratosthenes
+    steps:
+      - name: Checkout site
+        uses: actions/checkout@v5
+
+      - name: Checkout central blog
+        uses: actions/checkout@v5
+        with:
+          repository: Pallab-Dutta/SciCopilot
+          path: _blogrepo
+
+      - name: Install Hugo
+        run: |
+          set -euo pipefail
+          curl -sSLo /tmp/hugo.tar.gz \
+            "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_linux-amd64.tar.gz"
+          tar -xzf /tmp/hugo.tar.gz -C /tmp hugo
+          sudo install /tmp/hugo /usr/local/bin/hugo
+          hugo version
+
+      - name: Stage the site
+        # Everything that was served before (Pages from branch), minus repo plumbing.
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          rsync -a \
+            --exclude='/.git/' \
+            --exclude='/.github/' \
+            --exclude='/.gitignore' \
+            --exclude='/_site/' \
+            --exclude='/_blogrepo/' \
+            --exclude='/_blogsrc/' \
+            --exclude='/blog/' \
+            ./ _site/
+
+      - name: Build Eratosthenes' blog
+        # No Eratosthenes post yet -> no blog folder; the site itself still deploys.
+        run: |
+          set -euo pipefail
+          if python3 _blogrepo/.github/scripts/product_blog.py "$PRODUCT" _blogsrc --src _blogrepo/blog-src; then
+            hugo --minify --source _blogsrc --config hugo.toml,product.toml \
+                 --destination "$GITHUB_WORKSPACE/_site/blog"
+          else
+            echo "no Eratosthenes posts yet: deploying the site without a blog"
+          fi
+
+      - name: Verify the build
+        # An empty or broken build must never replace the live site: Pages has no undo.
+        run: |
+          set -euo pipefail
+          test -f _site/index.html || { echo "site index missing"; exit 1; }
+          test -f _site/pricing.html || { echo "pricing missing"; exit 1; }
+          test -f _site/search.html || { echo "search page missing"; exit 1; }
+          test -f _site/CNAME || { echo "CNAME missing"; exit 1; }
+          if [ -d _site/blog ]; then
+            test -f _site/blog/index.html || { echo "blog index missing"; exit 1; }
+            posts=$(find _site/blog/posts -mindepth 1 -maxdepth 1 -type d | wc -l)
+            echo "built $posts blog post folder(s)"
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "_site"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Ping IndexNow for freshly changed blog URLs
+        # Only blog URLs whose sitemap <lastmod> is recent (the site's own pages are pinged by
+        # indexnow.yml on push). Best-effort: never fails the deploy.
+        env:
+          INDEXNOW_HOST: eratost.scicoagent.com
+          INDEXNOW_KEY: 50c3c11a188d6e68487b3602e95ca5e5
+          INDEXNOW_WINDOW_HOURS: ${{ github.event.inputs.indexnow_hours || '3' }}
+        run: |
+          [ -f _site/blog/sitemap.xml ] || { echo "no blog yet"; exit 0; }
+          python3 _blogrepo/.github/scripts/indexnow_ping.py _site/blog/sitemap.xml
