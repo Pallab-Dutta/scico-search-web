@@ -150,7 +150,7 @@ td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
   $("reload").onclick = load;
   $("csv").onclick = () => {
     if (!data) return;
-    const cols = COLS[tab], q = v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
+    const cols = COLS[tab], q = v => { let t = String(v == null ? "" : v); if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; return `"${t.replace(/"/g, '""')}"`; };  // a leading = + - @ would run as a spreadsheet formula
     const csv = [cols.map(c => q(c[0])).join(",")].concat(rows().map(o => o.v.map(q).join(","))).join("\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));

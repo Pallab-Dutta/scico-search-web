@@ -223,7 +223,9 @@
       running=false;
       $('eraLoader').innerHTML='';
       $('liveHead').textContent='Could not complete the search.';
-      if(err.code===402 || err.code===429){
+      if(err.code===429 && err.detail && err.detail.code==='busy'){
+        $('liveHead').textContent = err.detail.error;
+      } else if(err.code===402 || err.code===429){
         const d=err.detail||{};
         $('liveHead').textContent = d.error==='quota_exceeded'
           ? `Monthly deep-search limit reached (${d.used}/${d.limit}). Upgrade for more.`
