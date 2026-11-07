@@ -32,7 +32,7 @@ table{border-collapse:collapse;width:100%;font-size:.85rem}th,td{padding:7px 9px
 th{position:sticky;top:0;background:#f1ece2;font:700 .8rem "Cutive Mono",monospace;cursor:pointer;user-select:none}
 td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
 .pill{display:inline-block;border-radius:999px;padding:0 8px;font:700 .75rem "Cutive Mono",monospace;background:var(--slate-soft)}
-.pill.pro{background:#e6eef7}.pill.max{background:var(--red-soft);color:var(--accent-dark)}.pill.team{background:#e7f2e4}
+.pill.pro{background:#e6eef7}.pill.max{background:var(--red-soft);color:var(--accent-dark)}.pill.team{background:#e7f2e4}.pill.dev{background:#f3ecdf;color:#7a5a1e}
 .msg{padding:40px;text-align:center;color:var(--muted)}.filter{padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:#fff;min-width:220px}
 .hot{color:var(--accent-dark);font-weight:600}
 </style>
@@ -61,7 +61,7 @@ td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
     waitlist: [["#", r => r.id], ["joined", r => day(r.created_at)], ["email", r => r.email], ["name", r => r.name], ["plan", r => r.plan],
       ["billing", r => r.period], ["role", r => r.role], ["field", r => r.field], ["team", r => r.team_size], ["source", r => r.source],
       ["campaign", r => r.campaign], ["page", r => r.page], ["country", r => r.country || ""], ["time zone", r => r.timezone],
-      ["account", r => r.has_account ? (r.plan_now || "free") : ""], ["searches", r => r.activity ? r.activity.sessions : 0],
+      ["account", r => r.has_account ? (r.plan_now || "free") : ""], ["dev", r => r.developer ? "developer" : ""], ["searches", r => r.activity ? r.activity.sessions : 0],
       ["quick", r => use(r.activity, "shallow_search")], ["deep", r => use(r.activity, "deep_search")], ["gap graphs", r => use(r.activity, "research_gap")],
       ["PI finder", r => use(r.activity, "pi_profiling")],
       ["last active", r => r.activity ? r.activity.last : ""]],
@@ -73,11 +73,14 @@ td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
       ["first view", r => r.first_view_at || ""], ["last view", r => r.last_view_at || ""],
       ["waitlist joins", r => ((data && data.waitlist) || []).filter(w => w.report_id === r.id).length],
       ["link", r => "https://eratost.scicoagent.com/report.html?id=" + r.id], ["expires", r => day(r.expires_at)]],
-    users: [["joined", r => day(r.created_at)], ["email", r => r.email], ["plan", r => r.plan], ["on waitlist", r => r.on_waitlist ? "yes" : ""],
+    users: [["joined", r => day(r.created_at)], ["email", r => r.email], ["plan", r => r.plan],
+      ["dev", r => r.developer ? "developer" + (r.developer_until ? " until " + day(r.developer_until) : "") : ""], ["on waitlist", r => r.on_waitlist ? "yes" : ""],
       ["searches", r => r.activity ? r.activity.sessions : 0], ["quick", r => use(r.activity, "shallow_search")], ["deep", r => use(r.activity, "deep_search")],
       ["gap graphs", r => use(r.activity, "research_gap")], ["PI finder", r => use(r.activity, "pi_profiling")],
       ["all usage", r => r.activity ? Object.entries(r.activity.usage).map(([k, v]) => k + " " + v).join(", ") : ""],
       ["first active", r => r.activity ? day(r.activity.first) : ""], ["last active", r => r.activity ? r.activity.last : ""]],
+    developers: [["email", r => r.email], ["plan", r => r.plan], ["until", r => r.until ? day(r.until) : "no end date"],
+      ["status", r => !r.until || new Date(r.until) > Date.now() ? "active" : "ended"], ["note", r => r.note], ["added", r => day(r.added_at)]],
   };
   // Sign-in steps arrive as (day, step, n) counts; one row per day for the table.
   const signinDays = () => {
@@ -103,7 +106,9 @@ td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
 
   function render() {
     if (!data) return;
-    const wl = data.waitlist || [], us = data.users || [];
+    // Developer accounts (the owner's own test accounts) are listed in the tables but left out of every number.
+    const wl = (data.waitlist || []).filter(w => !w.developer), us = (data.users || []).filter(u => !u.developer);
+    const nDev = (data.developers || []).length;
     const wk = Date.now() - 7 * 864e5;
     const active7 = us.filter(u => u.activity && u.activity.last && new Date(u.activity.last) > wk).length;
     const wlActive = wl.filter(w => w.activity && w.activity.sessions > 0).length;
@@ -115,12 +120,13 @@ td.wrap{white-space:normal;min-width:160px}tr:hover td{background:#fbf4ec}
     body.innerHTML = `<div class="cards">${cards.map(([n, l]) => `<div class="card"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("")}</div>
       <div class="bars">${bars("Plan interest", count(wl, w => w.plan))}${bars("Billing", count(wl, w => w.period))}${bars("Role", count(wl, w => w.role))}
         ${bars("Source (outreach tag)", count(wl, w => w.source))}${bars("Country / time zone", count(wl, w => w.country || w.timezone))}</div>
-      <div class="tabs"><button data-t="waitlist" class="${tab === "waitlist" ? "on" : ""}">Waitlist (${wl.length})</button><button data-t="users" class="${tab === "users" ? "on" : ""}">All users (${us.length})</button><button data-t="reports" class="${tab === "reports" ? "on" : ""}">Reports (${(data.reports || []).length})</button><button data-t="signins" class="${tab === "signins" ? "on" : ""}">Sign-ins</button>
-        <span class="sp"></span><span style="color:var(--muted);align-self:center">${list.length} shown · click a column to sort</span></div>
+      <div class="tabs"><button data-t="waitlist" class="${tab === "waitlist" ? "on" : ""}">Waitlist (${wl.length})</button><button data-t="users" class="${tab === "users" ? "on" : ""}">All users (${us.length})</button><button data-t="reports" class="${tab === "reports" ? "on" : ""}">Reports (${(data.reports || []).length})</button><button data-t="signins" class="${tab === "signins" ? "on" : ""}">Sign-ins</button><button data-t="developers" class="${tab === "developers" ? "on" : ""}">Developers (${nDev})</button>
+        <span class="sp"></span><span style="color:var(--muted);align-self:center">${list.length} shown · click a column to sort${nDev ? " · developer accounts are not counted in the numbers above" : ""}</span></div>
       <div class="tw"><table><thead><tr>${cols.map(([h], i) => `<th data-i="${i}">${esc(h)}${sortKey === i ? (sortDir > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead>
       <tbody>${list.map(o => `<tr>${o.v.map((v, i) => {
         const h = cols[i][0];
         if (h === "plan" && v) return `<td><span class="pill ${esc(v)}">${esc(v)}</span></td>`;
+        if (h === "dev" && v) return `<td><span class="pill dev">${esc(v)}</span></td>`;
         if (h === "last active") return `<td class="${v && new Date(v) > wk ? "hot" : ""}">${esc(ago(v))}</td>`;
         if (h === "first view" || h === "last view") return `<td class="${v && new Date(v) > wk ? "hot" : ""}">${esc(ago(v))}</td>`;
         if (h === "link") return `<td><a href="${esc(v)}" target="_blank" rel="noopener" style="text-decoration:underline">open</a></td>`;

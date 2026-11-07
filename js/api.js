@@ -29,7 +29,12 @@
   }
 
   window.SciCoAPI = {
-    me() { return req("GET", "/me"); },
+    async me() {
+      const me = await req("GET", "/me");
+      // Remember developer accounts in this browser so their sign-in steps stay out of the admin funnel.
+      try { if (me && me.developer) localStorage.setItem("eratost_dev", "1"); else localStorage.removeItem("eratost_dev"); } catch (_) {}
+      return me;
+    },
     feedback(stars, comment) { return req("POST", "/feedback", { stars, comment: comment || "" }); },
     search(query, opts) {
       opts = opts || {};

@@ -52,6 +52,7 @@
     } catch (e) { return page === "report.html"; }
   }
   function step(name, detail, extra) {
+    try { if (localStorage.getItem("eratost_dev") === "1") return; } catch (e) {}   // developer account: not counted
     var b = { step: name, vid: vid, detail: detail || "", outreach: fromOutreach() };
     if (extra && extra.new_user) b.new_user = true;
     post("/client/signin-step", b);
