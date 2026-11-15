@@ -282,7 +282,7 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
 </footer>
 
 <script src="js/config.js?v=20261106b"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js?v=20261106a"></script>
 <script src="js/waitlist.js?v=20261105b"></script>
 <script src="js/drone.js?v=20261104j"></script>
@@ -422,11 +422,14 @@ section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto;scroll-margin-top:76p
   if (!/^[A-Za-z0-9_-]{8,40}$/.test(id)) { fail('This report link is not complete. Please open the link from your email again.'); return; }
   (async function(){
     var h = {};
+    // Sign-in only decides whether an admin's view is counted, so it must never hold the report up:
+    // give it 3 seconds, then load the report anyway.
+    var within = function(p, ms){ return Promise.race([p, new Promise(function(r){ setTimeout(function(){ r(null); }, ms); })]); };
     try {
       if (window.SciCoAuth) {
-        var u = await window.SciCoAuth.getUser();
+        var u = await within(window.SciCoAuth.getUser(), 3000);
         if (u) { signedIn = true; var nb = document.querySelector('.nav .js-signin'); if (nb) nb.textContent = 'Back to app'; }
-        var tok = u ? await window.SciCoAuth.getToken() : null;
+        var tok = u ? await within(window.SciCoAuth.getToken(), 2000) : null;
         if (tok) h.Authorization = 'Bearer ' + tok;
       }
     } catch(_) {}
