@@ -94,6 +94,12 @@
   let REDUCE_FE = false; // gap-closer barriers measured on the free-energy surface (nats), not cosine.
   let AZ = -35, EL = 28; // 3D view angles in degrees (turn about the vertical; tilt: 0 = side, 90 = top)
   let ENSURING = false;  // 3D view is waiting for the page to build the Topic Map positions
+  // Knowledge Landscape style (developer accounts first; results.html passes opts.landscape): the 3D floor in the
+  // landscape's grey-on-paper colours, and the texts say "Knowledge Landscape" / "Knowledge impact".
+  let LANDSCAPE = false;
+  const T = s => !LANDSCAPE ? s : String(s)
+    .replace(/free energy\s+−ln p/g, "Knowledge impact").replace(/−ln p of the 2D map/g, "Knowledge impact of the 2D map")
+    .replace(/[Ff]ree[- ]energy/g, "Knowledge impact").replace(/Topic Map/g, "Knowledge Landscape");
   // Optional textbook styles (off by default; the exact views stay the reference):
   let LEVELLED = false;  // flat view drawn disconnectionDPS-style: energy in steps, basins lumped per step
   let METRIC = false;    // 3D view drawn as a metric disconnectivity graph: vertical posts per basin
@@ -352,7 +358,7 @@
       // Free-energy well depth (Boltzmann-inverted density): 0 = deepest, most stable / well-populated
       // region; larger = shallower, more isolated, nearer the root.
       const depth = (m.fe != null)
-        ? `free energy ${fmtBar(m.fe)} · ${m.fe <= 1e-6 ? "deepest, most stable well" : "well depth above the deepest"}`
+        ? T(`free energy ${fmtBar(m.fe)} · ${m.fe <= 1e-6 ? "deepest, most stable well" : "well depth above the deepest"}`)
         : "";
       return `<b>${esc(p.title)}</b>` +
         (meta ? `<div class="dg-sub">${esc(meta)}</div>` : "") +
@@ -363,7 +369,7 @@
     }
     if (m.type === "rgap")
       return `<b>Research gap G${m.num}${m.name ? ": " + esc(m.name) : ""}</b>` +
-        `<div class="dg-sub">found on the Topic Map · lies between “${esc(trunc(m.flank.a.title, 40))}” and “${esc(trunc(m.flank.b.title, 40))}”${m.close ? "" : " (highlighted)"} · barrier ${(+m.barrier).toFixed(2)}</div>` +
+        `<div class="dg-sub">${T("found on the Topic Map")} · lies between “${esc(trunc(m.flank.a.title, 40))}” and “${esc(trunc(m.flank.b.title, 40))}”${m.close ? "" : " (highlighted)"} · barrier ${(+m.barrier).toFixed(2)}</div>` +
         (m.close ? `<div class="dg-sub">if targeted: a paper here would lower the barrier between “${esc(trunc(m.close.a.title, 40))}” and “${esc(trunc(m.close.b.title, 40))}” the most (highlighted), from ${(+m.closeBefore).toFixed(2)} to ${(+m.closeAfter).toFixed(2)} · total fall across the field ${(+m.closeTotal).toFixed(1)}</div>`
                  : `<div class="dg-sub">if targeted: no barrier would fall. ${noFallWhy(m)}</div>`);
     const reps = m.papers.slice().sort((a, b) => (b.ai_score || 0) - (a.ai_score || 0));
@@ -515,7 +521,7 @@
       `<line x1="${ax - 4}" y1="${top}" x2="${ax + 4}" y2="${top}" stroke="#bbb"/>` +
       `<text x="${ax - 6}" y="${bottomY + 3}" text-anchor="end" font-size="10" fill="#888">0</text>` +
       `<text x="${ax - 6}" y="${top + 3}" text-anchor="end" font-size="10" fill="#888">${useLog && BMIN > 0 ? Math.log10(maxH / BMIN).toFixed(2) + " dex" : maxH.toFixed(2)}</text>` +
-      `<text transform="translate(14 ${(top + energyH / 2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="10" fill="#888">${FE ? "free energy  −ln p  ↑ (less stable / higher barrier)" : "barrier ↑ (larger gap)"}</text>`;
+      `<text transform="translate(14 ${(top + energyH / 2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="10" fill="#888">${FE ? T("free energy  −ln p  ↑ (less stable / higher barrier)") : "barrier ↑ (larger gap)"}</text>`;
 
     return { inner: `<g class="dg-base">` + guides + branches + axis + dots + labels + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W: DW };
   }
@@ -643,7 +649,7 @@
         `<text x="${ax - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">${lt.at(f).toFixed(2)}</text>`;
     }).join("");
     const axis = `<line x1="${ax}" y1="${top}" x2="${ax}" y2="${bottomY}" stroke="#bbb"/>` + ticks +
-      `<text transform="translate(12 ${(top + energyH / 2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="10" fill="#888">free energy −ln p ↑ (${NLEV} levels${LOGLV ? ", compressed axis" : ""})</text>`;
+      `<text transform="translate(12 ${(top + energyH / 2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="10" fill="#888">${T("free energy −ln p")} ↑ (${NLEV} levels${LOGLV ? ", compressed axis" : ""})</text>`;
     const hint = `<text x="${left}" y="${H - 12}" font-size="10.5" fill="#999">Textbook style: energy in ${NLEV} steps${LOGLV ? " on a compressed axis" : ""}${MINB > 1 ? `, branches under ${MINB} papers hidden` : ""} · grey ends = papers with no barrier between them${ADMIN ? " · exact view: untick “Levelled”" : ""}</text>`;
     return { inner: `<g class="dg-base">` + axis + lines + dots + hint + `</g><g class="dg-hl" pointer-events="none"></g>`, H, meta, W: DW };
   }
@@ -656,6 +662,10 @@
   const R3 = Math.PI / 180;
   function fieldColour(t) {                                // same cream -> slate -> red map as the Topic Map
     t = Math.max(0, Math.min(1, t));
+    if (LANDSCAPE) {                                       // Knowledge Landscape: paper blended with grey at t * 0.62
+      const a = t * 0.62;
+      return "rgb(" + [[251, 82], [247, 81], [239, 78]].map(([p, g]) => Math.round(p + (g - p) * a)).join(",") + ")";
+    }
     const A = [251, 250, 248], B = [132, 151, 176], C = [186, 87, 87];
     const [a, b, f] = t < 0.5 ? [A, B, t / 0.5] : [B, C, (t - 0.5) / 0.5];
     return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * f)).join(",") + ")";
@@ -718,7 +728,7 @@
     return (c[f] = out);
   }
   // The floor density as an image (4x finer than its grid, bicubic), cached per grid.
-  const FLOORIMG = new WeakMap();
+  let FLOORIMG = new WeakMap();
   function floorImage(grid) {
     let fi = FLOORIMG.get(grid);
     if (fi) return fi;
@@ -729,7 +739,7 @@
     for (let r = 0; r < M; r++) for (let c = 0; c < M; c++) {
       const v = Math.max(0, Math.min(1, U[r][c])), m = fieldColour(v).match(/\d+/g).map(Number), o = (r * M + c) * 4;
       img.data[o] = m[0]; img.data[o + 1] = m[1]; img.data[o + 2] = m[2];
-      img.data[o + 3] = Math.round(255 * Math.max(0, Math.min(1, (v - 0.02) / 0.05)));   // empty map stays clear
+      img.data[o + 3] = LANDSCAPE ? 255 : Math.round(255 * Math.max(0, Math.min(1, (v - 0.02) / 0.05)));   // empty map stays clear (landscape: paper)
     }
     cx.putImageData(img, 0, 0);
     fi = { url: cv.toDataURL("image/png"), M };
@@ -869,16 +879,16 @@
       // affine transform: draw the density as ONE smoothly interpolated image instead of tiles.
       const fi = floorImage(grid), h = 0.5 / (fi.M - 1);
       const O = P([-0.5 - h, 0.5 + h, 0]), Ux = P([0.5 + h, 0.5 + h, 0]), Vy = P([-0.5 - h, -0.5 - h, 0]), n = 100;
-      floor += `<image href="${fi.url}" x="0" y="0" width="${n}" height="${n}" preserveAspectRatio="none" opacity=".7" ` +
+      floor += `<image href="${fi.url}" x="0" y="0" width="${n}" height="${n}" preserveAspectRatio="none" opacity="${LANDSCAPE ? 1 : 0.7}" ` +
         `transform="matrix(${((Ux.x - O.x) / n).toFixed(4)} ${((Ux.y - O.y) / n).toFixed(4)} ${((Vy.x - O.x) / n).toFixed(4)} ${((Vy.y - O.y) / n).toFixed(4)} ${O.x.toFixed(2)} ${O.y.toFixed(2)})"/>`;
     }
     if (grid && grid.length > 1)                          // contour lines of the floor's field
       floor += contourSegs(grid).map(([x1, y1, x2, y2]) => {
         const u = P([x1 - 0.5, 0.5 - y1, 0]), v = P([x2 - 0.5, 0.5 - y2, 0]);
-        return `<line x1="${u.x.toFixed(1)}" y1="${u.y.toFixed(1)}" x2="${v.x.toFixed(1)}" y2="${v.y.toFixed(1)}" stroke="#55626a" stroke-opacity=".55" stroke-width=".8"/>`;
+        return `<line x1="${u.x.toFixed(1)}" y1="${u.y.toFixed(1)}" x2="${v.x.toFixed(1)}" y2="${v.y.toFixed(1)}" stroke="${LANDSCAPE ? "#52514e" : "#55626a"}" stroke-opacity="${LANDSCAPE ? 0.5 : 0.55}" stroke-width="${LANDSCAPE ? 1 : 0.8}"/>`;
       }).join("");
     const corners = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]].map(([a, b]) => P([a, b, 0]));
-    floor += `<polygon points="${corners.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ")}" fill="none" stroke="#c9cfd3" stroke-width="1"/>`;
+    floor += `<polygon points="${corners.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ")}" fill="none" stroke="${LANDSCAPE ? "#e3e2de" : "#c9cfd3"}" stroke-width="${LANDSCAPE ? 1.5 : 1}"/>`;
 
     const lines = [], dots = [], meta = {};
     let uid = 0;
@@ -1017,8 +1027,8 @@
     const axis = EL > 80 ? "" : `<line x1="${a0.x.toFixed(1)}" y1="${a0.y.toFixed(1)}" x2="${a1.x.toFixed(1)}" y2="${a1.y.toFixed(1)}" stroke="#9aa3a8" stroke-width="1"/>` +
       `<text x="${(a0.x - 6).toFixed(1)}" y="${(a0.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">0</text>` +
       `<text x="${(a1.x - 6).toFixed(1)}" y="${(a1.y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#888">${fmax.toFixed(2)}</text>` +
-      `<text x="${(a1.x + 6).toFixed(1)}" y="${(a1.y - 6).toFixed(1)}" font-size="10" fill="#888">free energy −ln p ↑</text>`;
-    const hint = `<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = ${FLOOR_HD ? "free energy of the heights, interpolated between papers" : "Topic Map density"} · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : model.estKind === "map2d" ? "landscape of the 2D map itself: heights and floor are one surface" : "heights exact; map distances between far regions are approximate"}${hasSurf ? " · surface = −ln p of the 2D map" : ""}</text>`;
+      `<text x="${(a1.x + 6).toFixed(1)}" y="${(a1.y - 6).toFixed(1)}" font-size="10" fill="#888">${T("free energy −ln p")} ↑</text>`;
+    const hint = T(`<text x="12" y="${H - 12}" font-size="10.5" fill="#999">Drag to rotate · floor = ${FLOOR_HD ? "free energy of the heights, interpolated between papers" : "Topic Map density"} · ${METRIC ? `metric style: ${NLEV} energy steps${LOGLV ? " on a compressed axis" : ""}, posts at each basin's deepest paper` : model.estKind === "map2d" ? "landscape of the 2D map itself: heights and floor are one surface" : "heights exact; map distances between far regions are approximate"}${hasSurf ? " · surface = −ln p of the 2D map" : ""}</text>`);
 
     // Hover story for each gap-closer, as in the flat view: its bridged pair traced up to their junction.
     const leafOf = new Map();
@@ -1237,7 +1247,7 @@
   // already crosses a lower pass somewhere else.
   function noFallWhy(r) {
     return (+r.barrier || 0) < 0.005
-      ? "In this landscape its two sides already meet with no pass between them, so the empty strip on the Topic Map is not a barrier here."
+      ? T("In this landscape its two sides already meet with no pass between them, so the empty strip on the Topic Map is not a barrier here.")
       : "Every route across it already runs over a lower pass elsewhere.";
   }
 
@@ -1245,9 +1255,9 @@
   function gapPanel(model) {
     const rg = model.rgaps || [];
     const box = inner => `<div class="dg-gaps" style="margin-top:12px;font:12px/1.45 system-ui,sans-serif;color:#333">` +
-      `<div style="font-weight:700;margin-bottom:2px">Research gaps <span style="font-weight:400;color:#888">· found on the Topic Map · ranked by impact if targeted · hover to highlight</span></div>` + inner + `</div>`;
+      `<div style="font-weight:700;margin-bottom:2px">Research gaps <span style="font-weight:400;color:#888">· ${T("found on the Topic Map")} · ranked by impact if targeted · hover to highlight</span></div>` + inner + `</div>`;
     if (!rg.length)
-      return model.hasTopic ? box(`<div style="color:#888">The Topic Map found no research gaps for this search.</div>`) : "";
+      return model.hasTopic ? box(`<div style="color:#888">${T("The Topic Map found no research gaps for this search.")}</div>`) : "";
     const row = r =>
       `<div class="dg-gap-row" data-id="${r.id}" style="display:flex;gap:9px;align-items:flex-start;padding:6px 8px;border-top:1px solid #eee;cursor:default">` +
       `<span style="flex:0 0 auto;background:#f2c94c;color:#5a3d00;border:1px solid #9c6b00;border-radius:999px;font-weight:700;font-size:10px;padding:1px 6px">G${r.num}</span>` +
@@ -1442,8 +1452,8 @@
       `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:8px;` +
       `font:12px system-ui,sans-serif;color:#555">` +
       `<span style="display:inline-flex;gap:10px;align-items:center">View: ${radio("dg", "Disconnectivity")}${ADMIN ? " " + radio("mst", "MST") : ""}${model.hasFE ? " " + radio("3d", "3D on the map") : ""}</span>` +
-      (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Colour the floor by the same high-dimensional free energy as the heights (interpolated between the papers' map positions) instead of the Topic Map's 2D density."><input type="checkbox" class="dg-floorhd"${FLOOR_HD ? " checked" : ""}/> floor: same free energy as heights</label>` : "") +
-      (MODE === "3d" && ADMIN ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none${model.surface ? "" : ";opacity:.5"}" title="${model.surface ? "Draw the free-energy surface itself (−ln p of the 2D map), cut off above the top barrier. Wells and cols are points of this surface, so the tree's nodes sit on it." : "Only for density: 2D map. The other landscapes live in the full embedding space, which has no surface over the map."}"><input type="checkbox" class="dg-surface"${SURFACE && model.surface ? " checked" : ""}${model.surface ? "" : " disabled"}/> 3D surface</label>` : "") +
+      (MODE === "3d" && ADMIN ? T(`<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Colour the floor by the same high-dimensional free energy as the heights (interpolated between the papers' map positions) instead of the Topic Map's 2D density."><input type="checkbox" class="dg-floorhd"${FLOOR_HD ? " checked" : ""}/> floor: same free energy as heights</label>`) : "") +
+      (MODE === "3d" && ADMIN ? T(`<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none${model.surface ? "" : ";opacity:.5"}" title="${model.surface ? "Draw the free-energy surface itself (−ln p of the 2D map), cut off above the top barrier. Wells and cols are points of this surface, so the tree's nodes sit on it." : "Only for density: 2D map. The other landscapes live in the full embedding space, which has no surface over the map."}"><input type="checkbox" class="dg-surface"${SURFACE && model.surface ? " checked" : ""}${model.surface ? "" : " disabled"}/> 3D surface</label>`) : "") +
       (MODE === "3d" && SURFACE && model.surface ? `<label style="display:inline-flex;align-items:center;gap:5px;user-select:none" title="Opacity of the surface">opacity <input type="range" class="dg-surf-alpha" min="0.05" max="1" step="0.05" value="${SURF_ALPHA}" style="width:90px"/></label>` : "") +
       (MODE === "3d" ? `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Keep the map (floor, contours, paper shadows) unfaded while a paper or gap is highlighted."><input type="checkbox" class="dg-floorbright"${FLOOR_BRIGHT ? " checked" : ""}/> keep the map bright when highlighting</label>` : "") +
       (MODE === "3d" ? `<span style="display:inline-flex;gap:6px">` +
@@ -1451,13 +1461,13 @@
           `<button type="button" class="dg-cam" data-cam="${k}" style="font:inherit;border:1px solid #ddd;background:#fff;border-radius:6px;padding:2px 9px;cursor:pointer">${l}</button>`).join("") +
         (ADMIN && window.Drone ? `<button type="button" class="dg-drone" title="Plan a drone flythrough of this 3D view and download it as a video flight file (developer tool)" style="font:inherit;border:1px solid #ba5757;color:#ba5757;background:#fff;border-radius:6px;padding:2px 9px;cursor:pointer">Drone video…</button>` : "") +
         `</span>` : "") +
-      (ADMIN ? `<label style="cursor:${FEV ? "default" : "pointer"};display:inline-flex;align-items:center;gap:6px;user-select:none${FEV ? ";opacity:.45" : ""}" title="${FEV ? "The free-energy axis is already −ln p; log scaling applies to the MST view." : ""}">` +
+      (ADMIN ? `<label style="cursor:${FEV ? "default" : "pointer"};display:inline-flex;align-items:center;gap:6px;user-select:none${FEV ? ";opacity:.45" : ""}" title="${FEV ? T("The free-energy axis is already −ln p; log scaling applies to the MST view.") : ""}">` +
       `<input type="checkbox" class="dg-log"${LOG ? " checked" : ""}${FEV ? " disabled" : ""}/> ${FEV ? "Log scale (n/a — energy axis)" : "Log scale (compress large gaps)"}</label>` : "") +
       `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">` +
       `<input type="checkbox" class="dg-overlay"${OVERLAY ? " checked" : ""}/> Highlight gap-closers</label>` +
       (ADMIN && model.hasFE && MODE !== "mst" ? styleControls() : "") +
       (ADMIN && model.hasFE ? `<label title="Density estimate behind the landscape. KDE: Gaussian kernels (bandwidth x 1, 0.75, 0.5). kNN field: k-nearest-neighbour density in the data's intrinsic dimension (TwoNN), with error bars. Each setting is built once per session and cached." style="display:inline-flex;align-items:center;gap:5px">density` +
-        `<select class="dg-res" style="font:inherit">` + [[1, "KDE 1× (standard)"], [0.75, "KDE 0.75×"], [0.5, "KDE 0.5×"], ["knn3", "kNN field, k = 3"], ["knn5", "kNN field, k = 5"], ["knn8", "kNN field, k = 8"], ["map2d", "2D map (Topic Map density)"]]
+        `<select class="dg-res" style="font:inherit">` + [[1, "KDE 1× (standard)"], [0.75, "KDE 0.75×"], [0.5, "KDE 0.5×"], ["knn3", "kNN field, k = 3"], ["knn5", "kNN field, k = 5"], ["knn8", "kNN field, k = 8"], ["map2d", T("2D map (Topic Map density)")]]
           .map(([v, t]) => `<option value="${v}"${String(v) === String(RES) ? " selected" : ""}>${t}</option>`).join("") + `</select></label>` +
         (model.estInfo ? `<span title="TwoNN intrinsic dimension; k used for the field; DADApy's adaptive k* (median, alpha 0.05) for reference; error of each ln density">intrinsic dim ${(+model.estInfo.d).toFixed(1)} · k ${model.estInfo.k} · ref k* ${model.estInfo.kstar} · σ ${(+model.estInfo.sigma).toFixed(2)}</span>` +
           `<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="Keep only barriers larger than 1.65 times their combined error (Density Peak Advanced test); research gaps within the error are hidden."><input type="checkbox" class="dg-sig"${SIG ? " checked" : ""}/> significant barriers only</label>` : "") : "") +
@@ -1491,7 +1501,7 @@
       mountEl.innerHTML = tools + `<div class="dg-3d-wait">${wait}</div>`;
       wireToolbar(session, mountEl);
       if (typeof window.dgEnsureMap !== "function") {
-        mountEl.querySelector(".dg-3d-wait").textContent = "Open the Topic Map tab once, then come back to see the 3D view.";
+        mountEl.querySelector(".dg-3d-wait").textContent = T("Open the Topic Map tab once, then come back to see the 3D view.");
       } else if (!ENSURING) {
         ENSURING = true;
         window.dgEnsureMap().then(s2 => {
@@ -1500,7 +1510,7 @@
         }).catch(() => {
           ENSURING = false;
           const w = mountEl.querySelector(".dg-3d-wait");
-          if (w) w.textContent = "Could not place the papers on the map. Open the Topic Map tab, then try again.";
+          if (w) w.textContent = T("Could not place the papers on the map. Open the Topic Map tab, then try again.");
         });
       }
       return;
@@ -1631,6 +1641,9 @@
   let _last = null;
   function renderDisconnectivity(session, mountEl, opts) {
     if (opts && "admin" in opts) ADMIN = !!opts.admin;
+    if (opts && "landscape" in opts && !!opts.landscape !== LANDSCAPE) {
+      LANDSCAPE = !!opts.landscape; FLOORIMG = new WeakMap(); window.__klLandscape = LANDSCAPE;   // drone.js reads it
+    }
     if (opts && opts.focus != null) FOCUS = String(opts.focus || "");
     if (opts && Array.isArray(opts.marks)) MARKS = opts.marks;
     if (opts && opts.mode && !mountEl.__dgModeSet) { MODE = opts.mode; mountEl.__dgModeSet = true; }

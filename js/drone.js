@@ -232,14 +232,15 @@
      o: { W, H, fov (deg), lod (1 full, 2 preview), alpha (surface opacity), surface (bool), path (optional
      preview of the flight: {pts, keys}) }. Painter's algorithm: the floor first, then the surface, tree,
      nodes and gap markers sorted far to near. Sizes are tuned for 1080p and scale with the frame. */
+  // Knowledge Landscape style (window.__klLandscape, set by disconnectivity.js for developer accounts first):
+  // paper #fbf7ef blended with grey #52514e at t * 0.62, as the 2D landscape. Otherwise cream -> slate -> red.
+  const KL = () => typeof window !== "undefined" && !!window.__klLandscape;
   function fieldColour(t) {
-    t = clamp(t, 0, 1);
-    const A = [251, 250, 248], B = [132, 151, 176], C = [186, 87, 87];
-    const [a, b, f] = t < 0.5 ? [A, B, t / 0.5] : [B, C, (t - 0.5) / 0.5];
-    return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * f)).join(",") + ")";
+    const [r, g, b] = rgbOf(t);
+    return "rgb(" + Math.round(r) + "," + Math.round(g) + "," + Math.round(b) + ")";
   }
   const COLCACHE = new Map();
-  const colOf = t => { const k = Math.round(clamp(t, 0, 1) * 200); let c = COLCACHE.get(k); if (!c) { c = fieldColour(k / 200); COLCACHE.set(k, c); } return c; };
+  const colOf = t => { const k = Math.round(clamp(t, 0, 1) * 200) + (KL() ? 1000 : 0); let c = COLCACHE.get(k); if (!c) { c = fieldColour((k % 1000) / 200); COLCACHE.set(k, c); } return c; };
 
   D.camera = function (cam, W, H, fov) {
     const f = norm(sub(cam.tgt, cam.pos));
@@ -284,6 +285,7 @@
   }
   function rgbOf(t) {
     t = clamp(t, 0, 1);
+    if (KL()) { const a = t * 0.62; return [251 + (82 - 251) * a, 247 + (81 - 247) * a, 239 + (78 - 239) * a]; }
     const A = [251, 250, 248], B = [132, 151, 176], C = [186, 87, 87];
     const [a, b, f] = t < 0.5 ? [A, B, t / 0.5] : [B, C, (t - 0.5) / 0.5];
     return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];

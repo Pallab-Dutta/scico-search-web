@@ -148,6 +148,8 @@
   .proj-foot{display:flex;justify-content:space-between;align-items:center;padding:0 16px 14px;font-size:.78rem;color:var(--ink3);flex-wrap:wrap;gap:8px}
   .cbar{display:flex;align-items:center;gap:8px}.cbar .grad{width:120px;height:8px;border-radius:99px;background:linear-gradient(90deg,#FBFAF8,#8497B0,#BA5757)}
   @media(max-width:760px){.panels{grid-template-columns:1fr}}
+  /* Phones: the tab row scrolls sideways inside itself instead of widening the page. */
+  @media(max-width:600px){.tabs{overflow-x:auto;scrollbar-width:none;gap:18px}.tabs::-webkit-scrollbar{display:none}.tab{white-space:nowrap;flex:0 0 auto}}
 </style>
 <!-- ── Microsoft Clarity ────────────────────────────────────────────────────
      Session recordings + heatmaps for Eratosthenes (eratost.scicoagent.com). The project ID is the last
@@ -179,9 +181,9 @@
 
       <div class="tabs">
         <div class="tab active" data-tab="publications"><span class="mi">description</span> Publications</div>
-        <div class="tab" data-tab="topicmap"><span class="mi">hub</span> Topic Map</div>
-        <div class="tab" data-tab="disc"><span class="mi">account_tree</span> Gap Graph</div>
         <div class="tab" data-tab="authors"><span class="mi">science</span> Authors</div>
+        <div class="tab" data-tab="topicmap"><span class="mi">hub</span> <span id="tmTabLabel">Topic Map</span></div>
+        <div class="tab" data-tab="disc"><span class="mi">account_tree</span> Gap Graph</div>
       </div>
 
       <!-- ===== PUBLICATIONS ===== -->
@@ -204,7 +206,8 @@
 
       <!-- ===== TOPIC MAP (visual preview) ===== -->
       <section class="tabpane" id="pane-topicmap">
-        <div class="maphead">
+        <div id="landscapeHost"></div>
+        <div class="maphead" id="tmHead">
           <h2>Topic Map &amp; Research Gaps</h2>
           <p>Each branch is a sub-area of the field. Sub-branches run from the well-studied core outward — the last is the under-explored <b>research-gap frontier</b>.</p>
           <div class="legend-top" id="legendTop"></div>
@@ -264,8 +267,9 @@
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261103c"></script>
 <script src="js/shell.js?v=20261031b"></script>
-<script src="js/drone.js?v=20261104j"></script>
-<script src="js/disconnectivity.js?v=20261105b"></script>
+<script src="js/drone.js?v=20261124a"></script>
+<script src="js/disconnectivity.js?v=20261124a"></script>
+<script src="js/landscape.js?v=20261124a"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -280,7 +284,14 @@
 
   // ---------- Tab switching (no reload) ----------
   let topicInit=false, authorsInit=false, discInit=false, TOPIC=null;
+  // Knowledge Landscape rollout: "dev" = developer and admin accounts only; "all" = everyone (one-line go-live).
+  // A developer can compare with ?landscape=0 (the old Topic Map).
+  const LANDSCAPE_FOR="dev";
+  let LANDSCAPE=false, _meDone;
+  const ME_READY=new Promise(r=>{ _meDone=r; });   // resolved by hydrate() once /me has answered (or failed)
+  const tmName=()=>LANDSCAPE?'Knowledge Landscape':'Topic Map';
   function setTab(name){
+    if(name==='landscape') name='topicmap';
     document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
     document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('show', p.id==='pane-'+name));
     if(name!=='publications') closePanel();
@@ -617,18 +628,40 @@
     el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');  // restart the flash
   }
 
+  // Knowledge Landscape (developers first): the redesigned Topic Map, drawn by js/landscape.js.
+  // Paper details come from the session's papers: by pid (index in the session's list), else exact title
+  // (topic maps cached before pid existed).
+  function paperFor(pt){
+    if(pt.pid!=null){ const p=PAPERS[pt.pid]; if(p && (p.title||'')===(pt.title||'')) return p; }
+    return PAPERS.find(p=>(p.title||'')===(pt.title||'')) || null;
+  }
+  function renderLandscape(tm){
+    const status=$('topicStatus'), host=$('landscapeHost');
+    $('tmHead').style.display='none'; $('topicPanels').style.display='none'; $('gapSection').innerHTML='';
+    if(!tm || !(tm.points||[]).length){
+      host.innerHTML='';
+      status.textContent = tm && tm.n_points!=null && tm.n_points<3
+        ? 'Not enough papers in this session to build a knowledge landscape.'
+        : 'No knowledge landscape available for this session yet.';
+      return;
+    }
+    status.textContent='';
+    window.KnowledgeLandscape.render(host, tm, { lookup: paperFor, onGap: i=>window.KnowledgeLandscape.flashGap(i) });
+  }
+  const drawTopic = tm => LANDSCAPE ? renderLandscape(tm) : renderTopic(tm);
   async function startTopic(){
     if(!SID){ $('topicStatus').textContent='No session specified.'; return; }
+    await ME_READY;
     try{
-      if(TOPIC){ renderTopic(TOPIC); return; }          // already computed / cached on the session
-      $('topicStatus').innerHTML=loadBlock('Building the topic map & research gaps…');
+      if(TOPIC){ drawTopic(TOPIC); return; }          // already computed / cached on the session
+      $('topicStatus').innerHTML=loadBlock(LANDSCAPE?'Building the knowledge landscape & research gaps…':'Building the topic map & research gaps…');
       const { job_id }=await window.SciCoAPI.topicMap(SID);
       await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('topicStatus').innerHTML=loadBlock(d.message); } });
       const data=await window.SciCoAPI.getSession(SID);
       TOPIC=data.topic_map||null;
-      renderTopic(TOPIC);
+      drawTopic(TOPIC);
     }catch(err){
-      $('topicStatus').textContent = err.code===401 ? 'Please sign in again.' : ('Could not build the topic map ('+(err.message||'error')+').');
+      $('topicStatus').textContent = err.code===401 ? 'Please sign in again.' : ('Could not build the '+(LANDSCAPE?'knowledge landscape':'topic map')+' ('+(err.message||'error')+').');
     }
   }
 
@@ -641,7 +674,7 @@
     }
     $('discStatus').textContent='';
     // Admins see every view and control; everyone else the fixed setup (Levelled + metric 3D).
-    window.renderDisconnectivity(data, $('discHost'), { admin: IS_ADMIN });
+    window.renderDisconnectivity(data, $('discHost'), { admin: IS_ADMIN, landscape: LANDSCAPE });
   }
   // The Gap Graph's 3D view stands the tree on the Topic Map. If the map hasn't been built yet, build it
   // (free) and hand back the refreshed session; the Topic Map tab then reuses it.
@@ -652,7 +685,7 @@
     if(TOPIC) return;
     const cur=await window.SciCoAPI.getSession(SID);        // the page may not have loaded it yet
     if(cur.topic_map && cur.topic_map.points){ TOPIC=cur.topic_map; return; }
-    $('discStatus').innerHTML=loadBlock('Finding the research gaps on the Topic Map…');
+    $('discStatus').innerHTML=loadBlock('Finding the research gaps on the '+tmName()+'…');
     const { job_id }=await window.SciCoAPI.topicMap(SID);
     await window.SciCoAPI.streamJob(job_id,{});
     const data=await window.SciCoAPI.getSession(SID);
@@ -668,6 +701,7 @@
   window.dgEnsureRes = async function(res){ await ensureTopic(); return await buildDisc(res); };
   async function startDisc(){
     if(!SID){ $('discStatus').textContent='No session specified.'; return; }
+    await ME_READY;
     try{
       $('discStatus').innerHTML=loadBlock('Loading the Gap Graph…');
       await ensureTopic();
@@ -721,6 +755,15 @@
   }
 
   // ---------- Initial load ----------
+  let _meLoaded=false;
+  async function loadMe(){
+    if(_meLoaded) return; _meLoaded=true;
+    let me=null;
+    try{ me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
+    LANDSCAPE = params.get('landscape')!=='0' && (LANDSCAPE_FOR==='all' || !!(me && (me.developer || me.is_admin)));
+    if(LANDSCAPE){ $('tmTabLabel').textContent='Knowledge Landscape'; $('tmHead').style.display='none'; }
+    _meDone();
+  }
   async function hydrate(){
     if(!SID){ $('resSummary').textContent='No session specified.'; return; }
     // While the session loads: the logo loader in place of the papers, and in the summary line.
@@ -728,7 +771,7 @@
     $('paperList').innerHTML=EratostLoader.block('Loading your session…', ERA_LD);
     try{
       const data=await window.SciCoAPI.getSession(SID);
-      try{ const me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
+      await loadMe();
       if(window.dgSetAdmin) window.dgSetAdmin(IS_ADMIN);   // the Gap Graph may already be on screen
       // Query internals (expanded queries + Boolean relaxation) are for admins only.
       if(!IS_ADMIN && $('logsSection')) $('logsSection').style.display='none';
@@ -739,6 +782,7 @@
       $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
       renderQrows(); renderPapers();
     }catch(err){
+      await loadMe();
       $('paperList').innerHTML='';
       $('resSummary').textContent = err.code===401 ? 'Please sign in to view results.' : ('Could not load results ('+(err.message||'error')+').');
     }
