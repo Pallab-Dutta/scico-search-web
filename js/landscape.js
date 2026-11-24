@@ -1,6 +1,6 @@
 /* Knowledge Landscape: the redesigned Topic Map (developer accounts first; results.html decides who sees it).
    Same topic_map data as the Topic Map (points, clusters, gaps, grid, peaks, query), drawn in the owner's
-   reference style (MAZE/hypothesis_landscape_minimal_cutive_static.svg, as in the explainer video's
+   reference style (MAZE/hypothesis_landscape_minimal_cutive_static.svg, in the page's own font; as in the video's
    DensityMap.tsx): grey density on paper, grey iso-lines computed here by marching squares on the bilinear
    field, so the lines sit exactly on the shading. Each closed ring belongs to the one cluster whose peak it
    holds (rings holding several peaks belong to none), which links topics and regions both ways.
@@ -19,25 +19,20 @@
     const s = document.createElement("style");
     s.id = "kl-css";
     s.textContent = `
-.kl{font-family:'Cutive Mono','Courier New',monospace;color:${INK};--kl-paper:${PAPER};--kl-rule:${RULE};--kl-grey:${GREY}}
+.kl{color:${INK};--kl-paper:${PAPER};--kl-rule:${RULE};--kl-grey:${GREY}}
 .kl *{box-sizing:border-box}
 .kl-grid{display:grid;grid-template-columns:minmax(0,640px) minmax(260px,1fr);gap:28px;align-items:start;margin-top:12px}
-.kl-h{font-size:1.35rem;font-weight:400;margin:4px 0 12px;letter-spacing:.01em}
+.kl-h{font-size:1.15rem;margin:16px 0 12px}
 .kl-map{position:relative;width:100%;aspect-ratio:1/1;background:${PAPER};border-radius:8px}
 .kl-map svg{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:manipulation}
 .kl-pt{cursor:pointer;transition:opacity .15s}
-.kl-pt.dim{opacity:.35}
 .kl-reg path{transition:fill-opacity .2s}
-.kl-reg.pulse{animation:klpulse .6s ease-in-out 2}
-@keyframes klpulse{0%,100%{opacity:1}50%{opacity:.35}}
 .kl-outer{transition:stroke-width .2s,stroke-opacity .2s}
 .kl-gap{cursor:pointer}
 .kl-gap .ring{transform-box:fill-box;transform-origin:center}
 .kl-gap.on .ring{animation:klring 1s ease-in-out infinite}
 @keyframes klring{0%,100%{transform:scale(1)}50%{transform:scale(1.22)}}
 .kl-gap.on .dia{fill:${INK}}
-.kl-gap .glabel{opacity:0;transition:opacity .15s;pointer-events:none;paint-order:stroke;stroke:${PAPER};stroke-width:5px;stroke-linejoin:round}
-.kl-gap.on .glabel{opacity:1}
 .kl-cbar{margin-top:14px;font-size:.82rem;color:${GREY};display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px}
 .kl-cbar b{color:${INK};font-weight:400;font-size:.9rem;width:100%}
 .kl-steps{display:flex;align-items:center;gap:6px}
@@ -55,7 +50,8 @@
 .kl-topic:hover,.kl-topic:focus-visible,.kl-topic.on{background:var(--tint);border-left-color:var(--col);outline:none}
 .kl-topic .row{display:flex;align-items:baseline;gap:9px}
 .kl-topic .nm{font-size:.95rem;flex:1}
-.kl-topic .n{font-size:.75rem;color:${GREY};white-space:nowrap}
+.kl-topic .row{flex-wrap:wrap}
+.kl-topic .n{font-size:.75rem;color:${GREY};white-space:nowrap;flex-basis:100%;padding-left:19px;margin-top:1px}
 .kl-topic .bands{font-size:.75rem;color:${GREY};margin:4px 0 0 19px}
 .kl-gaps{margin-top:22px}
 .kl-gapcard{border:1.5px dashed ${GREY};border-radius:6px;padding:10px 12px;margin-bottom:8px;background:${PAPER};cursor:pointer;transition:border-color .15s,background .15s}
@@ -67,7 +63,7 @@
 .kl-gapcard .ex{font-size:.76rem;color:${GREY};margin-top:5px}
 .kl-none{font-size:.85rem;color:${GREY}}
 @media(max-width:760px){.kl-grid{grid-template-columns:1fr;gap:20px}}
-@media(prefers-reduced-motion:reduce){.kl-reg.pulse,.kl-gap.on .ring,.kl-gapcard.flash{animation:none}}`;
+@media(prefers-reduced-motion:reduce){.kl-gap.on .ring,.kl-gapcard.flash{animation:none}}`;
     document.head.appendChild(s);
   }
 
@@ -194,6 +190,51 @@
     const outer = {};                                    // the cluster's outermost own ring (hit-test + dashed edge)
     rings.forEach(r => { if (r.cluster >= 0 && (!outer[r.cluster] || r.level < outer[r.cluster].level)) outer[r.cluster] = r; });
 
+    // ---- topic membership ----
+    // A topic's papers are those INSIDE its outermost own contour. (A topic with no closed contour of its own
+    // keeps the backend's assignment.) Every other paper gets a share of each topic: its likelihood under that
+    // topic's papers (Gaussian kernel, the backend's bandwidth 0.09), normalised; its colour mixes the topic
+    // colours by those shares.
+    const H = 0.09, home = points.map(p => {
+      for (const id in outer) if (inside(outer[id].pts, p.x, p.y)) return +id;
+      return outer[p.cluster] || !known.has(p.cluster) ? null : p.cluster;
+    });
+    const members = {};
+    clusters.forEach(c => { members[c.id] = []; });
+    points.forEach((p, i) => { if (home[i] != null) members[home[i]].push(p); });
+    const share = points.map((p, i) => {
+      if (home[i] != null) return { [home[i]]: 1 };
+      const w = {};
+      let tot = 0;
+      clusters.forEach(c => {
+        let v = 0;
+        members[c.id].forEach(m => { v += Math.exp(-((m.x - p.x) ** 2 + (m.y - p.y) ** 2) / (2 * H * H)); });
+        w[c.id] = v; tot += v;
+      });
+      if (tot < 1e-9) {                                   // far from every topic's papers: by distance to the peaks
+        tot = 0;
+        clusters.forEach(c => { const k = peakOf[c.id]; const v = k ? 1 / (1e-4 + (k[0] - p.x) ** 2 + (k[1] - p.y) ** 2) : 0; w[c.id] = v; tot += v; });
+      }
+      if (!(tot > 0)) return {};
+      for (const k in w) w[k] /= tot;
+      return w;
+    });
+    const rgb = hex => { const n = parseInt(hex.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+    const mixColour = w => {
+      const ks = Object.keys(w).filter(k => w[k] > 0);
+      if (!ks.length) return UNCL;
+      const m = [0, 0, 0];
+      ks.forEach(k => rgb(colorOf(+k, known)).forEach((v, j) => { m[j] += v * w[k]; }));
+      return "#" + m.map(v => Math.round(v).toString(16).padStart(2, "0")).join("");
+    };
+    const nearby = {};                                     // outside papers whose largest share is this topic
+    clusters.forEach(c => { nearby[c.id] = 0; });
+    share.forEach((w, i) => {
+      if (home[i] != null) return;
+      const top = Object.keys(w).sort((a, b) => w[b] - w[a])[0];
+      if (top != null && nearby[top] != null) nearby[top]++;
+    });
+
     // ---- markup ----
     const gridLines = [1, 2, 3, 4].map(i => { const v = (i / 5) * V; return `<line x1="${v}" y1="0" x2="${v}" y2="${V}"/><line x1="0" y1="${v}" x2="${V}" y2="${v}"/>`; }).join("");
     const regions = clusters.map(c => {
@@ -206,35 +247,29 @@
     const outers = Object.keys(outer).map(id => `<path class="kl-outer" data-c="${id}" d="${pathD(outer[id].pts, true)}" fill="none" stroke="${colorOf(+id, known)}" stroke-opacity=".75" stroke-width="2" stroke-dasharray="9 7"/>`).join("");
     const dots = points.map((p, i) => {
       const op = (0.78 + 0.22 * clamp01(p.score || 0)).toFixed(2);
-      return `<circle class="kl-pt" data-i="${i}" data-c="${p.cluster}" cx="${(clamp01(p.x) * V).toFixed(1)}" cy="${(clamp01(p.y) * V).toFixed(1)}" r="5" fill="${colorOf(p.cluster, known)}" fill-opacity="${op}" stroke="${PAPER}" stroke-width="2"><title>${esc(p.title)}</title></circle>`;
+      const fill = home[i] != null ? colorOf(home[i], known) : mixColour(share[i]);
+      return `<circle class="kl-pt" data-i="${i}" data-c="${home[i] != null ? home[i] : -1}" cx="${(clamp01(p.x) * V).toFixed(1)}" cy="${(clamp01(p.y) * V).toFixed(1)}" r="5" fill="${fill}" fill-opacity="${op}" stroke="${PAPER}" stroke-width="2"><title>${esc(p.title)}</title></circle>`;
     }).join("");
     const gapMarks = gaps.map((g, gi) => {
-      const x = clamp01(g.x) * V, y = clamp01(g.y) * V, right = x < V / 2, lab = String(g.label || "Research gap");
-      // Up to 2 lines, sized to the room on the label's side (Cutive Mono ~7.8 units per char at 13).
-      const room = Math.max(10, Math.floor(((right ? V - x : x) - 34) / 7.8)), words = lab.split(/\s+/), ls = [""];
-      for (const w of words) {
-        const cur = ls[ls.length - 1];
-        if (!cur || (cur + " " + w).length <= room) ls[ls.length - 1] = (cur ? cur + " " : "") + w;
-        else if (ls.length < 2) ls.push(w);
-        else { ls[1] = (ls[1] + " " + w); }
-      }
-      const lines = ls.map(l => (l.length > room ? l.slice(0, room - 1).trimEnd() + "…" : l));
+      const x = clamp01(g.x) * V, y = clamp01(g.y) * V, lab = String(g.label || "Research gap");
       return `<g class="kl-gap" data-g="${gi}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})" tabindex="0" role="button" aria-label="${esc("Research gap: " + lab)}">` +
         `<circle class="ring" r="17" fill="none" stroke="${INK}" stroke-width="2" stroke-dasharray="4 7"/>` +
         `<rect class="dia" x="-7" y="-7" width="14" height="14" transform="rotate(45)" fill="${PAPER}" stroke="${INK}" stroke-width="3"/>` +
         `<circle r="20" fill="transparent"/>` +
-        `<text class="glabel" x="${right ? 26 : -26}" y="${lines.length > 1 ? -3 : 5}" text-anchor="${right ? "start" : "end"}" font-size="13" fill="${INK}">` +
-        lines.map((l, k) => `<tspan x="${right ? 26 : -26}" dy="${k ? 16 : 0}">${esc(l)}</tspan>`).join("") + `</text></g>`;
+        `<title>${esc(lab)}</title></g>`;
     }).join("");
     const q = tm.query || {}, qx = clamp01(q.x != null ? q.x : 0.5) * V, qy = clamp01(q.y != null ? q.y : 0.5) * V;
-    const star = `<text x="${qx.toFixed(1)}" y="${qy.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="20" fill="${INK}" pointer-events="none" style="font-family:system-ui,sans-serif">✦<title>your query</title></text>`;
+    const PIN = "M0,0 C-1.5,-5 -9,-10 -9,-18 A9,9 0 1 1 9,-18 C9,-10 1.5,-5 0,0 Z";
+    const star = `<g transform="translate(${qx.toFixed(1)} ${qy.toFixed(1)})" pointer-events="none"><path d="${PIN}" fill="${INK}" stroke="${PAPER}" stroke-width="1.5"/>` +
+      `<circle cy="-18" r="3.6" fill="${PAPER}"/><title>your query</title></g>`;
     const uid = "kl" + Math.random().toString(36).slice(2, 8);
 
     const swatches = Array.from({ length: 7 }, (_, i) => `<i style="background:${tint(GREY, (0.05 + (i / 6) * (MAXA - 0.05)).toFixed(3))}"></i>`).join("");
     const topics = clusters.map(c => {
-      const col = colorOf(c.id, known), bands = (c.bands || []).map(b => `${esc(b.label || b.regime)} (${b.count || 0})`).join(" · ");
+      const col = colorOf(c.id, known), bands = (c.bands || []).map(b => esc(b.label || b.regime)).join(" · ");
+      const n = members[c.id].length, nb = nearby[c.id];
       return `<button type="button" class="kl-topic" data-c="${c.id}" style="--col:${col};--tint:${tint(col, 0.1)}"` + (outer[c.id] ? "" : ` title="This topic has no closed contour of its own on the map"`) + `>` +
-        `<span class="row"><span class="kl-dot" style="background:${col}"></span><span class="nm">${esc(c.theme || ("Topic " + (c.id + 1)))}</span><span class="n">${c.count} paper${c.count === 1 ? "" : "s"}</span></span>` +
+        `<span class="row"><span class="kl-dot" style="background:${col}"></span><span class="nm">${esc(c.theme || ("Topic " + (c.id + 1)))}</span><span class="n">${n} paper${n === 1 ? "" : "s"}${nb ? ` · ${nb} nearby` : ""}</span></span>` +
         (bands ? `<div class="bands">${bands}</div>` : "") + `</button>`;
     }).join("");
     const gapCards = gaps.length
@@ -257,7 +292,7 @@
       `<div class="kl-cbar"><b>Knowledge density</b><span class="kl-steps"><span>low</span>${swatches}<span>high</span></span>` +
       `<span class="kl-steps"><svg width="44" height="12" viewBox="0 0 44 12"><path d="M1 6 q 10.5 -7 21 0 t 21 0" fill="none" stroke="${GREY}" stroke-opacity=".7" stroke-width="1.5"/></svg>line = equal density</span>` +
       `<span class="kl-steps"><svg width="14" height="14" viewBox="-7 -7 14 14"><rect x="-4" y="-4" width="8" height="8" transform="rotate(45)" fill="${PAPER}" stroke="${INK}" stroke-width="2"/></svg>research gap</span>` +
-      `<span class="kl-steps"><span style="color:${INK};font-family:system-ui,sans-serif">✦</span>your query</span></div>` +
+      `<span class="kl-steps"><svg width="12" height="16" viewBox="-10 -28 20 29"><path d="${PIN}" fill="${INK}"/><circle cy="-18" r="3.6" fill="${PAPER}"/></svg>your query</span></div>` +
       `<div class="kl-info" aria-live="polite"></div></div>` +
       `<div class="kl-side"><h3>Topics · ${clusters.length}</h3><div class="kl-topics">${topics}</div>` +
       `<div class="kl-gaps"><h3>Research gaps</h3>${gapCards}</div></div>` +
@@ -265,24 +300,28 @@
 
     // ---- interactions ----
     const root = host.querySelector(".kl"), svg = root.querySelector("svg"), info = root.querySelector(".kl-info");
-    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const st = { hc: null, pc: null, hp: null, pp: null, hg: null };
     const $$ = sel => Array.from(root.querySelectorAll(sel));
     const themeOf = cid => { const c = clusters.find(x => x.id === cid); return c ? (c.theme || ("Topic " + (c.id + 1))) : null; };
-    let lastC = null;
 
     function showInfo(i) {
       if (i == null) { info.innerHTML = `<span class="hint">Hover or click a paper to see its details.</span>`; return; }
       const p = points[i], d = (opts.lookup && opts.lookup(p)) || {};
       const url = d.link || d.url || (d.doi ? "https://doi.org/" + String(d.doi).replace(/^https?:\/\/(dx\.)?doi\.org\//, "") : "");
       const title = esc(d.title || p.title || "Untitled");
-      const au = String(d.authors || "").split(/\s*,\s*/).filter(Boolean);
-      const authors = au.length > 3 ? au.slice(0, 3).join(", ") + " et al." : au.join(", ");
+      const raw = String(d.authors || ""), au = raw.split(/\s*,\s*/).filter(x => x && !/^(\.\.\.|…|et al\.?)$/i.test(x));
+      const more = au.length > 3 || /\.\.\.|…|et al/i.test(raw);           // the stored list may already be shortened
+      const authors = au.slice(0, 3).join(", ") + (more && au.length ? " et al." : "");
       const meta = [authors, d.year, d.publisher || d.venue].filter(x => x != null && String(x).trim()).map(esc).join(" · ");
-      const th = themeOf(p.cluster);
+      const w = share[i], parts = Object.keys(w).filter(k => w[k] >= 0.1).sort((a, b) => w[b] - w[a]);
+      const where = home[i] != null
+        ? `<div class="cl"><span class="kl-dot" style="background:${colorOf(home[i], known)}"></span>${esc(themeOf(home[i]))}</div>`
+        : parts.length
+          ? `<div class="cl" style="flex-wrap:wrap">Between topics:` + parts.map(k => ` <span style="display:inline-flex;align-items:center;gap:5px"><span class="kl-dot" style="background:${colorOf(+k, known)}"></span>${esc(themeOf(+k))} ${Math.round(100 * w[k])}%</span>`).join(" ·") + `</div>`
+          : `<div class="cl"><span class="kl-dot" style="background:${UNCL}"></span>Not in a named topic</div>`;
       info.innerHTML = `<div class="t">${url && /^https?:\/\//i.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener">${title}</a>` : title}</div>` +
         (meta ? `<div class="m">${meta}</div>` : "") +
-        `<div class="cl"><span class="kl-dot" style="background:${colorOf(p.cluster, known)}"></span>${th ? esc(th) : "Not in a named topic"}</div>`;
+        where;
     }
 
     function apply() {
@@ -290,16 +329,13 @@
       $$(".kl-reg").forEach(g => {
         const on = c != null && +g.dataset.c === c;
         g.querySelectorAll("path").forEach(p => p.setAttribute("fill-opacity", on ? ".4" : ".08"));
-        if (on && c !== lastC && !reduce) { g.classList.remove("pulse"); void g.getBBox(); g.classList.add("pulse"); }
-        if (!on) g.classList.remove("pulse");
       });
-      lastC = c;
       $$(".kl-outer").forEach(o => { const on = c != null && +o.dataset.c === c; o.setAttribute("stroke-width", on ? "3.5" : "2"); o.setAttribute("stroke-opacity", on ? "1" : ".75"); });
       $$(".kl-topic").forEach(b => { b.classList.toggle("on", c != null && +b.dataset.c === c); b.setAttribute("aria-pressed", st.pc != null && +b.dataset.c === st.pc ? "true" : "false"); });
       const pi = st.hp != null ? st.hp : st.pp;
       $$(".kl-pt").forEach(el => {
         const i = +el.dataset.i, big = i === st.hp || i === st.pp;
-        el.classList.toggle("dim", c != null && +el.dataset.c !== c && !big);
+        el.style.opacity = c == null || big || +el.dataset.c === c ? "" : (0.3 + 0.7 * (+el.dataset.c < 0 ? (share[i][c] || 0) : 0)).toFixed(2);
         el.setAttribute("r", big ? "7" : "5");
         el.setAttribute("stroke", big ? INK : PAPER);
         el.setAttribute("stroke-width", i === st.pp ? "2.5" : big ? "1.8" : "2");
