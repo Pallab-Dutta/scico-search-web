@@ -21,26 +21,31 @@
     s.textContent = `
 .kl{color:${INK};--kl-paper:${PAPER};--kl-rule:${RULE};--kl-grey:${GREY}}
 .kl *{box-sizing:border-box}
-.kl-h{font-size:1.15rem;margin:16px 0 12px}
-/* Owner's sketch: map | collapsible topic & gap rows + hovered paper | funnel | detail panel; legend box below. */
-.kl-grid{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr) 28px minmax(0,1fr);grid-template-areas:"map list conn panel" "legend legend . .";column-gap:0;row-gap:12px;align-items:stretch}
-.kl-map{grid-area:map;position:relative;width:100%;aspect-ratio:1/1;background:${PAPER};border-radius:8px;margin-right:14px;width:calc(100% - 14px)}
+.kl-h{font-size:1.15rem;margin:16px 0 14px;text-align:center}
+/* Owner's sketch (v2): legend box | map + topic/gap rows | funnel + detail panel; hovered paper below;
+   a clicked group's papers listed under it all. Nothing scrolls inside; nothing shows until it is needed. */
+.kl-grid{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr) 28px minmax(0,1fr);
+  grid-template-areas:"legend legend . ." "map list conn panel" "paper paper . .";column-gap:0;row-gap:12px;align-items:start}
+.kl-map{grid-area:map;position:relative;aspect-ratio:1/1;background:${PAPER};border-radius:8px;width:calc(100% - 14px)}
 .kl-map svg{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:manipulation}
 .kl-pt{cursor:pointer;transition:opacity .15s}
 .kl-reg path{transition:fill-opacity .2s}
 .kl-outer{transition:stroke-width .2s,stroke-opacity .2s}
 .kl-gap{cursor:pointer}
-.kl-gap .ring{transform-box:fill-box;transform-origin:center}
+.kl-gap .ring,.kl-gap .dia{transform-box:fill-box;transform-origin:center;transition:transform .15s}
+.kl-gap:hover .dia{transform:rotate(45deg) scale(1.2)}
 .kl-gap.on .ring{animation:klring 1s ease-in-out infinite}
 @keyframes klring{0%,100%{transform:scale(1)}50%{transform:scale(1.22)}}
 .kl-gap.on .dia{fill:${INK}}
-.kl-list{grid-area:list;position:relative;min-height:0}
-.kl-listin{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px}
-.kl-items{flex:0 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px}
-.kl-row{flex:0 0 auto;border:1.5px solid ${RULE};border-radius:8px;background:#fff;transition:border-color .15s,background .15s}
+.kl-q{cursor:pointer}
+.kl-q .pinb{transition:transform .15s}
+.kl-q.on .pinb{transform:scale(1.3)}
+.kl-list{grid-area:list;display:flex;flex-direction:column;gap:6px;align-self:stretch}
+.kl-row{flex:0 0 auto;border:1.5px solid ${RULE};border-radius:8px;background:#fff;transition:border-color .15s,background .15s,transform .15s}
+.kl-row:hover,.kl-row.on{transform:scale(1.02)}
 .kl-row>button{display:flex;align-items:center;gap:9px;width:100%;font:inherit;color:inherit;background:transparent;border:0;padding:8px 10px;cursor:pointer;text-align:left;border-radius:8px}
 .kl-row>button:focus-visible{outline:2px solid ${INK};outline-offset:1px}
-.kl-row .nm{flex:1;min-width:0;font-size:.9rem;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kl-row .nm{flex:1;min-width:0;font-size:.9rem;line-height:1.25}
 .kl-row .chev{font-family:'Material Symbols Outlined';font-size:20px;color:${GREY};transition:transform .2s;flex:0 0 auto}
 .kl-row.on{border-color:var(--col);background:var(--tint)}
 .kl-row.on .chev{transform:rotate(-90deg)}
@@ -49,45 +54,53 @@
 .kl-ring{width:14px;height:14px;border-radius:50%;flex:0 0 14px;border:2.5px solid var(--col);background:var(--tint)}
 .kl-body{display:none;padding:2px 12px 10px;font-size:.84rem;line-height:1.45}
 .kl-body h4{display:none}
-.kl-paper{flex:1 1 118px;min-height:118px;border:1.5px solid ${RULE};border-radius:8px;background:${PAPER};padding:9px 11px;font-size:.8rem;line-height:1.4;overflow-y:auto}
-.kl-paper .hint{color:${GREY}}
-.kl-paper .t{font-size:.85rem;color:${INK}}
-.kl-paper .t a,.kl-panel a,.kl-body a{color:${INK};text-decoration:underline;text-decoration-color:${RULE};text-underline-offset:3px}
-.kl-paper .t a:hover,.kl-panel a:hover,.kl-body a:hover{text-decoration-color:${INK}}
-.kl-paper .m{color:${GREY};margin-top:3px}
-.kl-paper .cl{display:flex;align-items:flex-start;gap:6px;margin-top:4px;color:${GREY}}
-.kl-paper .cl .kl-dot{margin-top:.38em}
+.kl-none{font-size:.8rem;color:${GREY};padding:4px 2px}
+.kl-paper{grid-area:paper;border:1.5px solid ${RULE};border-radius:8px;background:${PAPER};padding:9px 12px;font-size:.82rem;line-height:1.4;min-height:78px;visibility:hidden}
+.kl-paper.show{visibility:visible}
+.kl-paper .t{font-size:.88rem;color:${INK}}
+.kl-paper .t a,.kl-panel a,.kl-body a,.kl-plist a{color:${INK};text-decoration:underline;text-decoration-color:${RULE};text-underline-offset:3px}
+.kl-paper .t a:hover,.kl-panel a:hover,.kl-body a:hover,.kl-plist a:hover{text-decoration-color:${INK}}
+.kl-paper .m,.kl-plist .m{color:${GREY};margin-top:2px}
+.kl-cl{display:flex;flex-wrap:wrap;align-items:center;gap:3px 12px;margin-top:3px;color:${GREY}}
+.kl-cl>span{display:inline-flex;align-items:center;gap:5px}
 .kl-dot{width:9px;height:9px;border-radius:50%;flex:0 0 9px;display:inline-block}
-.kl-conn{grid-area:conn;position:relative}
+.kl-conn{grid-area:conn;position:relative;align-self:stretch}
 .kl-conn svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-.kl-side{grid-area:panel;position:relative;min-height:0}
-.kl-panel{position:absolute;inset:0;overflow-y:auto;border:1.5px solid ${INK};border-radius:8px;background:#fff;padding:12px 14px;font-size:.84rem;line-height:1.45}
-.kl-panel.idle{border:1.5px dashed ${RULE};color:${GREY};display:flex;align-items:center;justify-content:center;text-align:center}
+.kl-side{grid-area:panel;min-height:0}
+.kl-panel{border:1.5px solid ${INK};border-radius:8px;background:#fff;padding:12px 14px;font-size:.84rem;line-height:1.45;visibility:hidden}
+.kl-panel.show{visibility:visible}
 .kl-panel h4,.kl-body h4{font-size:1rem;margin:0 0 6px;padding-bottom:6px;border-bottom:1.5px solid ${INK};line-height:1.3}
 .kl-panel .kl-sub,.kl-body .kl-sub{color:${GREY};margin:0 0 8px}
 .kl-panel .kl-lab,.kl-body .kl-lab{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:${GREY};margin:10px 0 4px}
-.kl-panel ul,.kl-body ul{margin:0;padding:0;list-style:none}
-.kl-panel li,.kl-body li{padding:3px 0;border-bottom:1px dashed ${RULE}}
-.kl-panel li.pp,.kl-body li.pp{cursor:pointer}
-.kl-panel li.pp:hover,.kl-body li.pp:hover{color:#000;background:#f6f3ec}
-.kl-legend{grid-area:legend;display:flex;align-items:stretch;border:1.5px solid ${RULE};border-radius:8px;background:#fff;font-size:.8rem;color:${GREY}}
+.kl-grp{display:flex;align-items:baseline;gap:8px;width:100%;font:inherit;color:inherit;text-align:left;background:transparent;border:0;border-bottom:1px dashed ${RULE};padding:5px 4px;cursor:pointer;border-radius:4px;transition:background .15s,transform .15s}
+.kl-grp:hover,.kl-grp.on{background:#f3efe6;transform:scale(1.02)}
+.kl-grp.on{box-shadow:inset 3px 0 0 var(--col)}
+.kl-grp .nm{flex:1}
+.kl-grp .n{font-size:.75rem;color:${GREY};white-space:nowrap}
+.kl-grp[disabled]{cursor:default;opacity:.55}
+.kl-legend{grid-area:legend;display:flex;align-items:stretch;border:1.5px solid ${RULE};border-radius:8px;background:#fff;font-size:.8rem;color:${GREY};width:100%}
 .kl-legend>div{padding:8px 12px}
 .kl-legend .den{flex:1.75;border-right:1.5px solid ${RULE}}
-.kl-legend .qry{flex:1;min-width:0}
+.kl-legend .qry{flex:1;min-width:0;cursor:default;border-radius:0 7px 7px 0;transition:background .15s}
+.kl-legend .qry.on{background:#f1ece1;box-shadow:inset 0 0 0 1.5px ${INK}}
 .kl-legend b{display:block;font-weight:600;color:${INK};font-size:.82rem;margin-bottom:5px}
 .kl-steps{display:flex;align-items:center;gap:4px}
 .kl-steps i{display:inline-block;flex:1;height:11px;border:1px solid ${RULE}}
 .kl-legend .ends{display:flex;justify-content:space-between;margin-top:2px}
-.kl-legend .q{color:${INK};overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-style:italic}
-.kl-none{font-size:.8rem;color:${GREY};padding:4px 2px}
+.kl-legend .q{color:${INK};font-style:italic}
+.kl-plist{margin-top:22px;border-top:1.5px solid ${RULE};padding-top:12px}
+.kl-plist h3{font-size:1rem;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.kl-plist h3 .x{margin-left:auto;font:inherit;font-size:.8rem;color:${GREY};background:none;border:1px solid ${RULE};border-radius:6px;padding:2px 9px;cursor:pointer}
+.kl-plist .it{padding:9px 2px;border-bottom:1px dashed ${RULE};font-size:.85rem;line-height:1.4}
+.kl-plist .it .t{font-size:.92rem}
+.kl-plist .it.on{background:#f6f3ec}
 @media(max-width:760px){
-  .kl-grid{grid-template-columns:1fr;grid-template-areas:"map" "paper" "legend" "items";row-gap:12px}
-  .kl-list,.kl-listin{display:contents}.kl-items{grid-area:items}.kl-paper{grid-area:paper}
-  .kl-map{margin-right:0;width:100%}
+  .kl-grid{grid-template-columns:1fr;grid-template-areas:"legend" "map" "paper" "list";row-gap:12px}
+  .kl-map{width:100%}
   .kl-conn,.kl-side{display:none}
-  .kl-items{overflow:visible}
+  .kl-paper{display:none}.kl-paper.show{display:block}
+  .kl-row:hover,.kl-row.on{transform:none}
   .kl-row.on .kl-body{display:block}.kl-row.on .chev{transform:rotate(180deg)}
-  .kl-paper{flex:none;min-height:96px}
 }
 @media(prefers-reduced-motion:reduce){.kl-gap.on .ring,.kl-row.flash{animation:none}}`;
     document.head.appendChild(s);
@@ -286,13 +299,36 @@
     }).join("");
     const q = tm.query || {}, qx = clamp01(q.x != null ? q.x : 0.5) * V, qy = clamp01(q.y != null ? q.y : 0.5) * V;
     const PIN = "M0,0 C-1.5,-5 -9,-10 -9,-18 A9,9 0 1 1 9,-18 C9,-10 1.5,-5 0,0 Z";
-    const star = `<g transform="translate(${qx.toFixed(1)} ${qy.toFixed(1)})" pointer-events="none"><path d="${PIN}" fill="${INK}" stroke="${PAPER}" stroke-width="1.5"/>` +
-      `<circle cy="-18" r="3.6" fill="${PAPER}"/><title>your query</title></g>`;
+    const star = `<g class="kl-q" transform="translate(${qx.toFixed(1)} ${qy.toFixed(1)})"><g class="pinb"><path d="${PIN}" fill="${INK}" stroke="${PAPER}" stroke-width="1.5"/>` +
+      `<circle cy="-18" r="3.6" fill="${PAPER}"/></g><title>your query</title></g>`;
     const uid = "kl" + Math.random().toString(36).slice(2, 8);
 
     const swatches = Array.from({ length: 7 }, (_, i) => `<i style="background:${tint(GREY, (0.05 + (i / 6) * (MAXA - 0.05)).toFixed(3))}"></i>`).join("");
     const themeOf = cid => { const c = clusters.find(x => x.id === cid); return c ? (c.theme || ("Topic " + (c.id + 1))) : "a topic"; };
     const GAPC = GREY;                                       // gaps use grey where topics use their colour
+    // Sub-area of each paper, by the backend's own rule (engine._threshold_bands): the paper's density among all
+    // papers (Gaussian, bandwidth 0.09, normalised to the densest paper): core >= 0.60, emerging >= 0.30, else frontier.
+    const pden = points.map(p => points.reduce((s, q) => s + Math.exp(-((q.x - p.x) ** 2 + (q.y - p.y) ** 2) / (2 * H * H)), 0));
+    const pmax = Math.max(1e-12, ...pden), regimeOf = i => (pden[i] / pmax >= 0.6 ? "core" : pden[i] / pmax >= 0.3 ? "emerging" : "frontier");
+    const byScore = idx => idx.slice().sort((a, b) => (points[b].score || 0) - (points[a].score || 0));
+    const topicIdx = cid => byScore(points.map((_, i) => i).filter(i => home[i] === cid));
+    const gapIdx = gi => byScore((gaps[gi].examples || []).filter(t => idxByTitle.has(t)).map(t => idxByTitle.get(t)));
+    const idxByTitle = new Map(points.map((p, i) => [p.title || "", i]));
+    // Groups of papers a viewer can highlight (hover) or pin (click): a topic, one of its sub-areas, a gap's nearby work.
+    const groups = {};
+    clusters.forEach(c => {
+      groups["t:" + c.id] = { key: "t:" + c.id, row: "t:" + c.id, col: colorOf(c.id, known), label: themeOf(c.id), idx: null };
+      (c.bands || []).forEach((b, bi) => {
+        groups[`b:${c.id}:${bi}`] = { key: `b:${c.id}:${bi}`, row: "t:" + c.id, col: colorOf(c.id, known), label: `${themeOf(c.id)} · ${b.label || b.regime}`, regime: b.regime, cid: c.id, idx: null };
+      });
+    });
+    gaps.forEach((g, gi) => { groups["g:" + gi] = { key: "g:" + gi, row: "g:" + gi, col: GAPC, label: `Near the gap: ${g.label || "research gap"}`, idx: null }; });
+    const groupIdx = k => {
+      const G = groups[k];
+      if (!G) return [];
+      if (!G.idx) G.idx = k[0] === "t" ? topicIdx(+k.slice(2)) : k[0] === "g" ? gapIdx(+k.slice(2)) : topicIdx(G.cid).filter(i => regimeOf(i) === G.regime);
+      return G.idx;
+    };
     // One row per topic, then one per gap ("t:<id>" / "g:<i>").
     const items = clusters.map(c => ({ key: "t:" + c.id, kind: "t", id: c.id, col: colorOf(c.id, known), name: themeOf(c.id) }))
       .concat(gaps.map((g, gi) => ({ key: "g:" + gi, kind: "g", id: gi, col: GAPC, name: String(g.label || "Research gap") })));
@@ -306,6 +342,9 @@
     const qText = String(opts.queryText || "").trim();
 
     host.innerHTML = `<div class="kl"><h2 class="kl-h">Knowledge Landscape</h2><div class="kl-grid">` +
+      `<div class="kl-legend"><div class="den"><b>Knowledge density</b><span class="kl-steps">${swatches}</span><div class="ends"><span>low</span><span>high</span></div></div>` +
+      `<div class="qry"><b style="display:flex;align-items:center;gap:6px"><svg width="11" height="15" viewBox="-10 -28 20 29"><path d="${PIN}" fill="${INK}"/><circle cy="-18" r="3.6" fill="${PAPER}"/></svg>your query</b>` +
+      `<div class="q">${qText ? esc(qText) : "the pin on the map"}</div></div></div>` +
       `<div class="kl-map"><svg viewBox="-2 -2 ${V + 4} ${V + 4}" role="img" aria-label="Knowledge landscape: ${points.length} papers in ${clusters.length} topics">` +
       `<defs><clipPath id="${uid}"><rect x="0" y="0" width="${V}" height="${V}" rx="6"/></clipPath></defs>` +
       `<g clip-path="url(#${uid})"><rect class="kl-bg" width="${V}" height="${V}" fill="${PAPER}"/>` +
@@ -313,28 +352,25 @@
       `<g stroke="${RULE}" stroke-width="1" pointer-events="none">${gridLines}</g>` +
       `<g pointer-events="none">${regions}${lines}${outers}</g>${dots}${gapMarks}${star}</g>` +
       `<rect width="${V}" height="${V}" rx="6" fill="none" stroke="${RULE}" stroke-width="1.5" pointer-events="none"/></svg></div>` +
-      `<div class="kl-list"><div class="kl-listin"><div class="kl-items">${rowsHTML}` +
-      (gaps.length ? "" : `<div class="kl-none">No prominent gap between topics: coverage is fairly uniform.</div>`) + `</div>` +
-      `<div class="kl-paper" aria-live="polite"></div></div></div>` +
+      `<div class="kl-list">${rowsHTML}` + (gaps.length ? "" : `<div class="kl-none">No prominent gap between topics: coverage is fairly uniform.</div>`) + `</div>` +
       `<div class="kl-conn"><svg preserveAspectRatio="none"><path/></svg></div>` +
-      `<div class="kl-side"><div class="kl-panel idle">Hover or click a topic or gap to see its details.</div></div>` +
-      `<div class="kl-legend"><div class="den"><b>Knowledge density</b><span class="kl-steps">${swatches}</span><div class="ends"><span>low</span><span>high</span></div></div>` +
-      `<div class="qry"><b style="display:flex;align-items:center;gap:6px"><svg width="11" height="15" viewBox="-10 -28 20 29"><path d="${PIN}" fill="${INK}"/><circle cy="-18" r="3.6" fill="${PAPER}"/></svg>your query</b>` +
-      `<div class="q">${qText ? esc(qText) : "the pin on the map"}</div></div></div>` +
-      `</div></div>`;
+      `<div class="kl-side"><div class="kl-panel"></div></div>` +
+      `<div class="kl-paper" aria-live="polite"></div>` +
+      `</div><div class="kl-plist" hidden></div></div>`;
 
     // ---- interactions ----
     const root = host.querySelector(".kl"), svg = root.querySelector(".kl-map svg"), paperBox = root.querySelector(".kl-paper");
-    const panel = root.querySelector(".kl-panel"), conn = root.querySelector(".kl-conn"), connPath = conn.querySelector("path"), list = root.querySelector(".kl-items");
+    const panel = root.querySelector(".kl-panel"), conn = root.querySelector(".kl-conn"), connPath = conn.querySelector("path");
+    const plist = root.querySelector(".kl-plist"), qBox = root.querySelector(".kl-legend .qry"), qPin = svg.querySelector(".kl-q");
     const mobile = () => window.matchMedia && window.matchMedia("(max-width:760px)").matches;
-    // hk: hovered row/region/marker, pk: pinned one ("t:<id>" or "g:<i>"); hp / pp: hovered / pinned paper.
-    const st = { hk: null, pk: null, hp: null, pp: null };
+    // hk / pk: hovered / pinned row ("t:<id>" or "g:<i>"); hg / pg: hovered / pinned paper group (a topic,
+    // a sub-area "b:<topic>:<band>", or a gap's nearby work); hp / pp: hovered / pinned paper.
+    const st = { hk: null, pk: null, hg: null, pg: null, hp: null, pp: null };
     const $$ = sel => Array.from(root.querySelectorAll(sel));
     const active = () => (st.hk != null ? st.hk : st.pk);
     const parse = k => (k == null ? [null, null] : [k[0], +k.slice(2)]);
-    const idxByTitle = new Map(points.map((p, i) => [p.title || "", i]));
 
-    function paperHTML(i) {
+    function metaOf(i) {
       const p = points[i], d = (opts.lookup && opts.lookup(p)) || {};
       const url = d.link || d.url || (d.doi ? "https://doi.org/" + String(d.doi).replace(/^https?:\/\/(dx\.)?doi\.org\//, "") : "");
       const title = esc(d.title || p.title || "Untitled");
@@ -344,32 +380,33 @@
       const meta = [authors, d.year, d.publisher || d.venue].filter(x => x != null && String(x).trim()).map(esc).join(" · ");
       const w = share[i], parts = Object.keys(w).filter(k => w[k] >= 0.1).sort((a, b) => w[b] - w[a]);
       const where = home[i] != null
-        ? `<div class="cl"><span class="kl-dot" style="background:${colorOf(home[i], known)}"></span>${esc(themeOf(home[i]))}</div>`
+        ? `<div class="kl-cl"><span><span class="kl-dot" style="background:${colorOf(home[i], known)}"></span>${esc(themeOf(home[i]))} · ${regimeOf(i)}</span></div>`
+        : parts.length === 1
+          ? `<div class="kl-cl">Just outside:<span><span class="kl-dot" style="background:${colorOf(+parts[0], known)}"></span>${esc(themeOf(+parts[0]))}</span></div>`
         : parts.length
-          ? `<div class="cl">Between topics:</div>` + parts.map(k => `<div class="cl" style="margin-top:1px"><span class="kl-dot" style="background:${colorOf(+k, known)}"></span>${esc(themeOf(+k))} · ${Math.round(100 * w[k])}%</div>`).join("")
-          : `<div class="cl"><span class="kl-dot" style="background:${UNCL}"></span>Not in a named topic</div>`;
+          ? `<div class="kl-cl">Between topics:` + parts.map(k => `<span><span class="kl-dot" style="background:${colorOf(+k, known)}"></span>${esc(themeOf(+k))} ${Math.round(100 * w[k])}%</span>`).join("") + `</div>`
+          : `<div class="kl-cl"><span><span class="kl-dot" style="background:${UNCL}"></span>Not in a named topic</span></div>`;
       return `<div class="t">${url && /^https?:\/\//i.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener">${title}</a>` : title}</div>` +
         (meta ? `<div class="m">${meta}</div>` : "") + where;
     }
-    const li = i => `<li class="pp" data-i="${i}">${esc(points[i].title || "Untitled")}</li>`;
+    const grpBtn = (k, name) => {
+      const n = groupIdx(k).length, G = groups[k];
+      return `<button type="button" class="kl-grp" data-g="${k}" style="--col:${G.col}"${n ? "" : " disabled"}><span class="nm">${esc(name)}</span><span class="n">${n} paper${n === 1 ? "" : "s"}</span></button>`;
+    };
     function detailHTML(k) {
       const [kind, id] = parse(k);
       if (kind === "t") {
-        const c = clusters.find(x => x.id === id), n = members[id].length, nb = nearby[id];
-        const mine = points.map((p, i) => i).filter(i => home[i] === id).sort((a, b) => (points[b].score || 0) - (points[a].score || 0));
-        const bands = (c.bands || []).map(b => `<li>${esc(b.label || b.regime)} <span style="color:${GREY}">(${esc(b.regime)})</span></li>`).join("");
+        const c = clusters.find(x => x.id === id), n = groupIdx(k).length, nb = nearby[id];
+        const subs = (c.bands || []).map((b, bi) => grpBtn(`b:${id}:${bi}`, `${b.label || b.regime} (${b.regime})`)).join("");
         return `<h4>${esc(themeOf(id))}</h4><div class="kl-sub">${n} paper${n === 1 ? "" : "s"} inside its contour${nb ? ` · ${nb} nearby` : ""}` +
           (outer[id] ? "" : " · no closed contour of its own") + `</div>` +
-          (bands ? `<div class="kl-lab">Sub-areas</div><ul>${bands}</ul>` : "") +
-          (mine.length ? `<div class="kl-lab">Papers (closest to your query first)</div><ul>${mine.slice(0, 12).map(li).join("")}</ul>` +
-            (mine.length > 12 ? `<div class="kl-sub" style="margin-top:4px">and ${mine.length - 12} more on the map</div>` : "") : "");
+          (subs ? `<div class="kl-lab">Sub-areas</div>${subs}` : "");
       }
       if (kind === "g") {
         const g = gaps[id], bt = (g.between || []).filter(x => known.has(x));
-        const near = (g.examples || []).filter(Boolean).map(t => idxByTitle.has(t) ? li(idxByTitle.get(t)) : `<li>${esc(t)}</li>`).join("");
         return `<h4>${esc(g.label || "Research gap")}</h4>` +
           (bt.length === 2 ? `<div class="kl-sub">A low-density valley between <span class="kl-dot" style="background:${colorOf(bt[0], known)}"></span> ${esc(themeOf(bt[0]))} and <span class="kl-dot" style="background:${colorOf(bt[1], known)}"></span> ${esc(themeOf(bt[1]))}.</div>` : `<div class="kl-sub">A low-density valley between studied topics.</div>`) +
-          (near ? `<div class="kl-lab">Nearby work</div><ul>${near}</ul>` : "");
+          (groupIdx(k).length ? `<div class="kl-lab">Nearby work</div>${grpBtn(k, "Papers nearest the gap")}` : "");
       }
       return "";
     }
@@ -377,61 +414,72 @@
     function drawConn(k) {
       const row = k && root.querySelector(`.kl-row[data-k="${k}"]`);
       if (!row || mobile()) { connPath.setAttribute("d", ""); return; }
-      const cb = conn.getBoundingClientRect(), rb = row.getBoundingClientRect(), lb = list.getBoundingClientRect();
-      const W = cb.width, H = cb.height;
-      const y0 = Math.max(lb.top, rb.top) - cb.top + 2, y1 = Math.min(lb.bottom, rb.bottom) - cb.top - 2;
-      if (y1 <= y0) { connPath.setAttribute("d", ""); return; }
+      const cb = conn.getBoundingClientRect(), rb = row.getBoundingClientRect(), pb = panel.getBoundingClientRect();
+      const W = cb.width, H = cb.height, y0 = rb.top - cb.top + 2, y1 = rb.bottom - cb.top - 2, p0 = pb.top - cb.top + 2, p1 = pb.bottom - cb.top - 2;
       conn.querySelector("svg").setAttribute("viewBox", `0 0 ${W} ${H}`);
-      connPath.setAttribute("d", `M0,${y0} C${W * 0.6},${y0} ${W * 0.4},2 ${W},2 L${W},${H - 2} C${W * 0.4},${H - 2} ${W * 0.6},${y1} 0,${y1} Z`);
-      const [kind] = parse(k), col = kind === "g" ? GAPC : row.style.getPropertyValue("--col");
-      connPath.setAttribute("fill", tint(col.trim(), 0.28));
-      connPath.setAttribute("stroke", "none");
+      connPath.setAttribute("d", `M0,${y0} C${W * 0.6},${y0} ${W * 0.4},${p0} ${W},${p0} L${W},${p1} C${W * 0.4},${p1} ${W * 0.6},${y1} 0,${y1} Z`);
+      connPath.setAttribute("fill", tint(parse(k)[0] === "g" ? GAPC : row.style.getPropertyValue("--col").trim(), 0.28));
+    }
+    function listHTML(k) {                                  // a pinned group's papers, under the whole UI
+      const idx = groupIdx(k), G = groups[k];
+      return `<h3><span class="kl-dot" style="background:${G.col}"></span>${esc(G.label)} · ${idx.length} paper${idx.length === 1 ? "" : "s"}` +
+        `<button type="button" class="x">Clear</button></h3>` + idx.map(i => `<div class="it" data-i="${i}">${metaOf(i)}</div>`).join("");
     }
 
-    let shownKey;
+    let shownKey, shownList;
     function apply() {
       const k = active(), [kind, id] = parse(k), c = kind === "t" ? id : null, g = kind === "g" ? id : null;
+      const gk = st.hg != null ? st.hg : st.pg, gset = gk ? new Set(groupIdx(gk)) : null;
       $$(".kl-reg").forEach(r => {
         const on = c != null && +r.dataset.c === c;
-        r.querySelectorAll("path").forEach(p => p.setAttribute("fill-opacity", on ? ".4" : ".08"));
+        r.querySelectorAll("path").forEach(p => p.setAttribute("fill-opacity", on ? (gk && gk[0] === "b" ? ".22" : ".4") : ".08"));
       });
       $$(".kl-outer").forEach(o => { const on = c != null && +o.dataset.c === c; o.setAttribute("stroke-width", on ? "3.5" : "2"); o.setAttribute("stroke-opacity", on ? "1" : ".75"); });
       $$(".kl-gap").forEach(m => m.classList.toggle("on", g != null && +m.dataset.g === g));
-      $$(".kl-row").forEach(r => {
-        const on = r.dataset.k === k;
-        r.classList.toggle("on", on);
-        r.querySelector("button").setAttribute("aria-expanded", on ? "true" : "false");
-      });
+      $$(".kl-row").forEach(r => { const on = r.dataset.k === k; r.classList.toggle("on", on); r.querySelector("button").setAttribute("aria-expanded", on ? "true" : "false"); });
       const pi = st.hp != null ? st.hp : st.pp;
       $$(".kl-pt").forEach(el => {
         const i = +el.dataset.i, big = i === st.hp || i === st.pp;
-        el.style.opacity = c == null || big || +el.dataset.c === c ? "" : (0.3 + 0.7 * (+el.dataset.c < 0 ? (share[i][c] || 0) : 0)).toFixed(2);
-        el.setAttribute("r", big ? "7" : "5");
-        el.setAttribute("stroke", big ? INK : PAPER);
-        el.setAttribute("stroke-width", i === st.pp ? "2.5" : big ? "1.8" : "2");
+        let op = "";
+        if (gset && gk[0] !== "t") op = gset.has(i) || big ? "" : "0.22";          // a sub-area or a gap's papers
+        else if (c != null && !big && +el.dataset.c !== c) op = (0.3 + 0.7 * (+el.dataset.c < 0 ? (share[i][c] || 0) : 0)).toFixed(2);
+        el.style.opacity = op;
+        const ring = gset && gk[0] !== "t" && gset.has(i);
+        el.setAttribute("r", big ? "7" : ring ? "6" : "5");
+        el.setAttribute("stroke", big || ring ? INK : PAPER);
+        el.setAttribute("stroke-width", i === st.pp ? "2.5" : big ? "1.8" : ring ? "1.4" : "2");
       });
-      if (st.pp != null) { const el = svg.querySelector(`.kl-pt[data-i="${st.pp}"]`); if (el) el.parentNode.appendChild(el); }
-      if (st.hp != null) { const el = svg.querySelector(`.kl-pt[data-i="${st.hp}"]`); if (el) el.parentNode.appendChild(el); }
-      paperBox.innerHTML = pi == null ? `<span class="hint">Hover or click a paper on the map to see its details.</span>` : paperHTML(pi);
-      if (k !== shownKey) {                                // rebuild the detail only when the row changes
+      [st.pp, st.hp].forEach(x => { if (x != null) { const el = svg.querySelector(`.kl-pt[data-i="${x}"]`); if (el) el.parentNode.appendChild(el); } });
+      // The hovered (or pinned) paper, only while there is one.
+      paperBox.classList.toggle("show", pi != null);
+      paperBox.innerHTML = pi == null ? "" : metaOf(pi);
+      // The detail panel, only while a row is extended.
+      if (k !== shownKey) {
         shownKey = k;
         $$(".kl-body").forEach(b => { b.innerHTML = ""; });
-        if (k == null) { panel.className = "kl-panel idle"; panel.style.borderColor = ""; panel.innerHTML = "Hover or click a topic or gap to see its details."; }
-        else {
+        panel.classList.toggle("show", k != null);
+        panel.innerHTML = "";
+        if (k != null) {
           const html = detailHTML(k), row = root.querySelector(`.kl-row[data-k="${k}"]`);
           if (mobile()) { if (row) row.querySelector(".kl-body").innerHTML = html; }
-          else { panel.className = "kl-panel"; panel.style.borderColor = kind === "g" ? INK : row.style.getPropertyValue("--col"); panel.innerHTML = html; panel.scrollTop = 0; }
+          else { panel.style.borderColor = kind === "g" ? INK : row.style.getPropertyValue("--col"); panel.innerHTML = html; }
         }
       }
+      $$(".kl-grp").forEach(b => b.classList.toggle("on", b.dataset.g === gk));
       drawConn(k);
+      // A pinned group (a clicked topic, sub-area or gap) lists its papers below.
+      const lk = st.pg || (st.pk && groups[st.pk] ? st.pk : null);
+      if (lk !== shownList) { shownList = lk; plist.hidden = !lk || !groupIdx(lk).length; plist.innerHTML = plist.hidden ? "" : listHTML(lk); }
+      plist.querySelectorAll(".it").forEach(e => e.classList.toggle("on", +e.dataset.i === pi));
     }
 
     // Leaving a row, region or marker clears the hover a moment later, so the pointer can cross the funnel
-    // into the panel (to use its links) without the panel closing.
+    // into the panel (to use its sub-areas) without the panel closing.
     let leaveT = null;
     const hoverKey = k => { clearTimeout(leaveT); if (st.hk !== k) { st.hk = k; apply(); } };
-    const leaveKey = () => { clearTimeout(leaveT); leaveT = setTimeout(() => { if (st.hk != null) { st.hk = null; apply(); } }, 220); };
-    const pinKey = k => { st.pk = st.pk === k ? null : k; st.hk = st.pk; apply(); };
+    const leaveKey = () => { clearTimeout(leaveT); leaveT = setTimeout(() => { if (st.hk != null || st.hg != null) { st.hk = null; st.hg = null; apply(); } }, 220); };
+    const pinKey = k => { const off = st.pk === k; st.pk = off ? null : k; st.pg = null; st.hk = st.pk; apply(); };
+    const clearAll = () => { st.pk = null; st.pg = null; st.pp = null; st.hk = null; st.hg = null; apply(); };
 
     const toMap = e => {
       const r = svg.getBoundingClientRect(), s = (V + 4) / r.width;
@@ -439,13 +487,15 @@
     };
     const regionAt = (x, y) => { for (const id in outer) if (inside(outer[id].pts, x, y)) return +id; return null; };
     let mapKey = null;                                     // the region/marker the pointer is over on the map
+    const qOn = on => { qPin.classList.toggle("on", on); qBox.classList.toggle("on", on); };
 
     // Papers
     svg.addEventListener("mouseover", e => { const pt = e.target.closest(".kl-pt"); if (pt) { st.hp = +pt.dataset.i; apply(); } });
     svg.addEventListener("mouseout", e => { const pt = e.target.closest(".kl-pt"); if (pt && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(".kl-pt") === pt)) { st.hp = null; apply(); } });
-    // Regions (hit-test on each topic's outermost own ring) and gap markers
+    // Regions (hit-test on each topic's outermost own ring), gap markers and the query pin
     svg.addEventListener("mousemove", e => {
-      if (e.target.closest(".kl-pt")) return;
+      qOn(!!e.target.closest(".kl-q"));
+      if (e.target.closest(".kl-pt,.kl-q")) return;
       const m = e.target.closest(".kl-gap");
       let k = null;
       if (m) k = "g:" + m.dataset.g;
@@ -453,15 +503,17 @@
       svg.style.cursor = k ? "pointer" : "";
       if (k !== mapKey) { mapKey = k; if (k) hoverKey(k); else leaveKey(); }
     });
-    svg.addEventListener("mouseleave", () => { mapKey = null; st.hp = null; svg.style.cursor = ""; leaveKey(); apply(); });
+    svg.addEventListener("mouseleave", () => { mapKey = null; st.hp = null; svg.style.cursor = ""; qOn(false); leaveKey(); apply(); });
     svg.addEventListener("click", e => {
       const pt = e.target.closest(".kl-pt"), m = e.target.closest(".kl-gap");
       if (pt) { const i = +pt.dataset.i; st.pp = st.pp === i ? null : i; st.hp = null; apply(); return; }
       if (m) { pinKey("g:" + m.dataset.g); return; }
+      if (e.target.closest(".kl-q")) return;
       const [x, y] = toMap(e), c = regionAt(x, y);
-      if (c != null) pinKey("t:" + c);
-      else { st.pk = null; st.pp = null; st.hk = null; apply(); }
+      if (c != null) pinKey("t:" + c); else clearAll();
     });
+    qBox.addEventListener("mouseenter", () => qOn(true));
+    qBox.addEventListener("mouseleave", () => qOn(false));
     $$(".kl-gap").forEach(m => {
       const k = "g:" + m.dataset.g;
       m.addEventListener("focus", () => hoverKey(k));
@@ -477,24 +529,42 @@
       b.addEventListener("blur", leaveKey);
       b.addEventListener("click", () => pinKey(k));
     });
-    // The panel keeps the row extended while the pointer is on it; its paper titles highlight on the map.
+    // The panel keeps the row extended while the pointer is on it; its sub-areas highlight their papers.
     const side = root.querySelector(".kl-side");
     [side, conn].forEach(el => { el.addEventListener("mouseenter", () => clearTimeout(leaveT)); el.addEventListener("mouseleave", leaveKey); });
-    root.addEventListener("mouseover", e => { const l = e.target.closest && e.target.closest("li.pp"); if (l && !svg.contains(l)) { st.hp = +l.dataset.i; apply(); } });
-    root.addEventListener("mouseout", e => { const l = e.target.closest && e.target.closest("li.pp"); if (l) { st.hp = null; apply(); } });
-    root.addEventListener("click", e => { const l = e.target.closest && e.target.closest("li.pp"); if (l) { const i = +l.dataset.i; st.pp = st.pp === i ? null : i; apply(); } });
-    list.addEventListener("scroll", () => drawConn(active()));
+    root.addEventListener("mouseover", e => {
+      const b = e.target.closest && e.target.closest(".kl-grp"); if (b && st.hg !== b.dataset.g) { st.hg = b.dataset.g; apply(); }
+      const it = e.target.closest && e.target.closest(".kl-plist .it"); if (it && st.hp !== +it.dataset.i) { st.hp = +it.dataset.i; apply(); }
+    });
+    root.addEventListener("mouseout", e => {
+      const b = e.target.closest && e.target.closest(".kl-grp");
+      if (b && !(e.relatedTarget && b.contains(e.relatedTarget))) { st.hg = null; apply(); }
+      const it = e.target.closest && e.target.closest(".kl-plist .it");
+      if (it && !(e.relatedTarget && it.contains(e.relatedTarget))) { st.hp = null; apply(); }
+    });
+    root.addEventListener("click", e => {
+      const b = e.target.closest && e.target.closest(".kl-grp");
+      if (b) {                                              // pin a sub-area (or a gap's nearby work) with its topic/gap row
+        const gk = b.dataset.g, row = groups[gk].row;
+        st.pg = st.pg === gk ? null : gk; st.pk = row; st.hk = row; apply(); return;
+      }
+      if (e.target.closest && e.target.closest(".kl-plist .x")) { clearAll(); return; }
+    });
+    // A click anywhere outside the landscape releases what is pinned.
+    if (host.__klDoc) document.removeEventListener("click", host.__klDoc);
+    host.__klDoc = e => { if (root.isConnected && !root.contains(e.target) && (st.pk != null || st.pg != null || st.pp != null)) clearAll(); };
+    document.addEventListener("click", host.__klDoc);
     if (host.__klResize) window.removeEventListener("resize", host.__klResize);
     host.__klResize = () => { if (root.isConnected) { shownKey = undefined; apply(); } };
     window.addEventListener("resize", host.__klResize);
-    // Esc unpins everything; the handler goes away with the host's contents.
+    // Esc releases everything too.
     if (host.__klKey) document.removeEventListener("keydown", host.__klKey);
-    host.__klKey = e => { if (e.key === "Escape" && root.isConnected && (st.pk != null || st.pp != null)) { st.pk = null; st.pp = null; st.hk = null; apply(); } };
+    host.__klKey = e => { if (e.key === "Escape" && root.isConnected) clearAll(); };
     document.addEventListener("keydown", host.__klKey);
     apply();
   }
 
-  // A click on a gap elsewhere (or results.html's onGap) extends that gap's row.
+  // A click on a gap elsewhere extends that gap's row.
   function flashGap(i) {
     const el = document.getElementById("gapcard-" + i);
     if (!el) return;

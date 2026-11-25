@@ -269,7 +269,7 @@
 <script src="js/shell.js?v=20261031b"></script>
 <script src="js/drone.js?v=20261124a"></script>
 <script src="js/disconnectivity.js?v=20261124a"></script>
-<script src="js/landscape.js?v=20261125b"></script>
+<script src="js/landscape.js?v=20261125c"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -290,6 +290,9 @@
   let LANDSCAPE=false, _meDone;
   const ME_READY=new Promise(r=>{ _meDone=r; });   // resolved by hydrate() once /me has answered (or failed)
   const tmName=()=>LANDSCAPE?'Knowledge Landscape':'Topic Map';
+  // Label the tab from this browser's last answer, so it doesn't flash "Topic Map" while /me is on its way.
+  try{ if(params.get('landscape')!=='0' && (LANDSCAPE_FOR==='all' || localStorage.getItem('eratost_kl')==='1')){
+    LANDSCAPE=true; $('tmTabLabel').textContent='Knowledge Landscape'; $('tmHead').style.display='none'; } }catch(_){}
   function setTab(name){
     if(name==='landscape') name='topicmap';
     document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
@@ -761,7 +764,8 @@
     let me=null;
     try{ me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
     LANDSCAPE = params.get('landscape')!=='0' && (LANDSCAPE_FOR==='all' || !!(me && (me.developer || me.is_admin)));
-    if(LANDSCAPE){ $('tmTabLabel').textContent='Knowledge Landscape'; $('tmHead').style.display='none'; }
+    $('tmTabLabel').textContent=tmName(); $('tmHead').style.display=LANDSCAPE?'none':'';
+    try{ localStorage.setItem('eratost_kl', LANDSCAPE && LANDSCAPE_FOR!=='all' ? '1' : '0'); }catch(_){}
     _meDone();
   }
   async function hydrate(){
