@@ -269,7 +269,7 @@
 <script src="js/shell.js?v=20261031b"></script>
 <script src="js/drone.js?v=20261124a"></script>
 <script src="js/disconnectivity.js?v=20261124a"></script>
-<script src="js/landscape.js?v=20261125g"></script>
+<script src="js/landscape.js?v=20261126a"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -287,7 +287,7 @@
   // Knowledge Landscape rollout: "dev" = developer and admin accounts only; "all" = everyone (one-line go-live).
   // A developer can compare with ?landscape=0 (the old Topic Map).
   const LANDSCAPE_FOR="dev";
-  let LANDSCAPE=false, _meDone;
+  let LANDSCAPE=false, IS_DEV=false, _meDone;   // IS_DEV: developer or admin (sees developer-only tools)
   const ME_READY=new Promise(r=>{ _meDone=r; });   // resolved by hydrate() once /me has answered (or failed)
   const tmName=()=>LANDSCAPE?'Knowledge Landscape':'Topic Map';
   // Label the tab from this browser's last answer, so it doesn't flash "Topic Map" while /me is on its way.
@@ -649,7 +649,7 @@
       return;
     }
     status.textContent='';
-    window.KnowledgeLandscape.render(host, tm, { lookup: paperFor, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
+    window.KnowledgeLandscape.render(host, tm, { lookup: paperFor, devToggle: IS_DEV, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
   }
   const drawTopic = tm => LANDSCAPE ? renderLandscape(tm) : renderTopic(tm);
   async function startTopic(){
@@ -766,6 +766,7 @@
     if(_meLoaded) return; _meLoaded=true;
     let me=null;
     try{ me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
+    IS_DEV = !!(me && (me.developer || me.is_admin));
     LANDSCAPE = params.get('landscape')!=='0' && (LANDSCAPE_FOR==='all' || !!(me && (me.developer || me.is_admin)));
     $('tmTabLabel').textContent=tmName(); $('tmHead').style.display=LANDSCAPE?'none':'';
     try{ localStorage.setItem('eratost_kl', LANDSCAPE && LANDSCAPE_FOR!=='all' ? '1' : '0'); }catch(_){}

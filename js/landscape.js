@@ -22,6 +22,11 @@
 .kl{color:${INK};--kl-paper:${PAPER};--kl-rule:${RULE};--kl-grey:${GREY}}
 .kl *{box-sizing:border-box}
 .kl-h{font-size:1.15rem;margin:16px 0 14px;text-align:center}
+.kl-mode{display:flex;justify-content:center;align-items:center;gap:0;margin:-6px 0 12px;font-size:.78rem;color:${GREY}}
+.kl-mode span{margin-right:8px}
+.kl-mode button{font:inherit;color:${GREY};background:#fff;border:1.5px solid ${RULE};padding:3px 12px;cursor:pointer}
+.kl-mode button:first-of-type{border-radius:6px 0 0 6px}.kl-mode button:last-of-type{border-radius:0 6px 6px 0;border-left:0}
+.kl-mode button[aria-pressed="true"]{background:${INK};border-color:${INK};color:#fff}
 /* Owner's sketch (v2): legend box | map + topic/gap rows | funnel + detail panel; hovered paper below;
    a clicked group's papers listed under it all. Nothing scrolls inside; nothing shows until it is needed. */
 .kl-grid{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr) 28px minmax(0,1fr);
@@ -205,6 +210,12 @@
   function render(host, tm, opts) {
     opts = opts || {};
     injectCSS();
+    // Developer toggle: "new" = topics by contour + sub-areas as the topic's smaller hills (backend subareas);
+    // "old" = the Topic Map's own mechanism (topic = nearest density peak; sub-areas = the backend's core /
+    // emerging / frontier bands). The UI is the same either way.
+    let mode = opts.mode;
+    if (!mode) { try { mode = localStorage.getItem("eratost_kl_mode"); } catch (_) {} }
+    const OLD = opts.devToggle && mode === "old";
     const clusters = tm.clusters || [], gaps = tm.gaps || [], points = tm.points || [];
     const known = new Set(clusters.map(c => c.id));
     const grid = tm.grid && tm.grid.length > 1 ? tm.grid : null;
@@ -235,6 +246,7 @@
     // topic's papers (Gaussian kernel, the backend's bandwidth 0.09), normalised; its colour mixes the topic
     // colours by those shares.
     const H = 0.09, home = points.map(p => {
+      if (OLD) return known.has(p.cluster) ? p.cluster : null;   // old: every paper in its nearest peak's topic
       for (const id in outer) if (inside(outer[id].pts, p.x, p.y)) return +id;
       return outer[p.cluster] || !known.has(p.cluster) ? null : p.cluster;
     });
@@ -314,7 +326,22 @@
     // Sub-areas come from the backend (engine._sub_areas): each topic's smaller density hills, every paper joined
     // to the hill it shares the most likelihood with, named by the LLM. A paper's "sub" is its sub-area's index in
     // its topic ("cluster"); a topic with one coherent group (or an older map) has none.
-    const subName = i => { const p = points[i], c = clusters.find(x => x.id === p.cluster), sa = c && p.sub != null && (c.subareas || [])[p.sub]; return sa ? sa.label : null; };
+    // In "old" mode they are the backend's density bands (engine._threshold_bands): each paper's density among
+    // ALL papers (Gaussian, bandwidth 0.09, relative to the densest paper anywhere): core >= 0.60, emerging
+    // >= 0.30, else frontier, named by the LLM. subDefs / subOf hide which mechanism is in use.
+    const REGNAME = { core: "most-studied", emerging: "emerging", frontier: "least-studied" };
+    const pden = OLD ? points.map(p => points.reduce((s, q) => s + Math.exp(-((q.x - p.x) ** 2 + (q.y - p.y) ** 2) / (2 * H * H)), 0)) : [];
+    const pmax = Math.max(1e-12, ...pden);
+    const regime = i => (pden[i] / pmax >= 0.6 ? "core" : pden[i] / pmax >= 0.3 ? "emerging" : "frontier");
+    const subDefs = c => OLD ? (c.bands || []).map(b => ({ label: b.label || b.regime, maturity: REGNAME[b.regime] || "", regime: b.regime }))
+                             : (c.subareas || []).map(sa => ({ label: sa.label, maturity: sa.maturity || "" }));
+    const subOf = i => {
+      const p = points[i];
+      if (!OLD) return p.sub != null ? p.sub : null;
+      const c = clusters.find(x => x.id === p.cluster), j = c ? (c.bands || []).findIndex(b => b.regime === regime(i)) : -1;
+      return j >= 0 ? j : null;
+    };
+    const subName = i => { const p = points[i], c = clusters.find(x => x.id === p.cluster), j = subOf(i), sa = c && j != null && subDefs(c)[j]; return sa ? sa.label : null; };
     const byScore = idx => idx.slice().sort((a, b) => (points[b].score || 0) - (points[a].score || 0));
     const topicIdx = cid => byScore(points.map((_, i) => i).filter(i => affil[i] === cid));   // inside + just outside
     const gapIdx = gi => byScore((gaps[gi].examples || []).filter(t => idxByTitle.has(t)).map(t => idxByTitle.get(t)));
@@ -323,7 +350,7 @@
     const groups = {};
     clusters.forEach(c => {
       groups["t:" + c.id] = { key: "t:" + c.id, row: "t:" + c.id, col: colorOf(c.id, known), label: themeOf(c.id), idx: null };
-      (c.subareas || []).forEach((sa, si) => {
+      subDefs(c).forEach((sa, si) => {
         groups[`b:${c.id}:${si}`] = { key: `b:${c.id}:${si}`, row: "t:" + c.id, col: colorOf(c.id, known), label: `${themeOf(c.id)} · ${sa.label}`, name: sa.label, maturity: sa.maturity || "", cid: c.id, sub: si, idx: null };
       });
     });
@@ -331,7 +358,7 @@
     const groupIdx = k => {
       const G = groups[k];
       if (!G) return [];
-      if (!G.idx) G.idx = k[0] === "t" ? topicIdx(+k.slice(2)) : k[0] === "g" ? gapIdx(+k.slice(2)) : byScore(points.map((_, i) => i).filter(i => points[i].cluster === G.cid && points[i].sub === G.sub));
+      if (!G.idx) G.idx = k[0] === "t" ? topicIdx(+k.slice(2)) : k[0] === "g" ? gapIdx(+k.slice(2)) : byScore(points.map((_, i) => i).filter(i => points[i].cluster === G.cid && subOf(i) === G.sub));
       return G.idx;
     };
     // One row per topic, then one per gap ("t:<id>" / "g:<i>").
@@ -346,7 +373,10 @@
       `<div class="kl-body"></div></div>`).join("");
     const qText = String(opts.queryText || "").trim();
 
-    host.innerHTML = `<div class="kl"><h2 class="kl-h">Knowledge Landscape</h2><div class="kl-grid">` +
+    const toggle = opts.devToggle ? `<div class="kl-mode" role="group" aria-label="How topics and sub-areas are found (developer)"><span>Sub-areas</span>` +
+      `<button type="button" data-m="new" aria-pressed="${!OLD}" title="Topics by contour; sub-areas = each topic's smaller hills">New</button>` +
+      `<button type="button" data-m="old" aria-pressed="${OLD}" title="As the Topic Map: topics by nearest peak; sub-areas = core / emerging / frontier density bands">Old</button></div>` : "";
+    host.innerHTML = `<div class="kl"><h2 class="kl-h">Knowledge Landscape</h2>${toggle}<div class="kl-grid">` +
       `<div class="kl-legend"><div class="den"><b>Knowledge density</b><span class="kl-steps">${swatches}</span><div class="ends"><span>low</span><span>high</span></div></div>` +
       `<div class="qry"><b style="display:flex;align-items:center;gap:6px"><svg width="11" height="15" viewBox="-10 -28 20 29"><path d="${PIN}" fill="${INK}"/><circle cy="-18" r="3.6" fill="${PAPER}"/></svg>your query</b>` +
       `<div class="q">${qText ? esc(qText) : "the pin on the map"}</div></div></div>` +
@@ -402,10 +432,10 @@
       const [kind, id] = parse(k);
       if (kind === "t") {
         const c = clusters.find(x => x.id === id), n = members[id].length, nb = nearby[id];
-        const subs = (c.subareas || []).map((sa, si) => grpBtn(`b:${id}:${si}`, sa.label + (sa.maturity ? ` (${sa.maturity})` : ""))).join("");
-        return `<h4>${esc(themeOf(id))}</h4><div class="kl-sub">${n} paper${n === 1 ? "" : "s"} inside its contour${nb ? ` · ${nb} nearby` : ""}` +
+        const subs = subDefs(c).map((sa, si) => grpBtn(`b:${id}:${si}`, sa.label + (sa.maturity ? ` (${sa.maturity})` : ""))).join("");
+        return `<h4>${esc(themeOf(id))}</h4><div class="kl-sub">${n} paper${n === 1 ? "" : "s"}${OLD ? " (nearest topic peak)" : " inside its contour"}${nb ? ` · ${nb} nearby` : ""}` +
           (outer[id] ? "" : " · no closed contour of its own") + `</div>` +
-          (subs ? `<div class="kl-lab">Sub-areas</div>${subs}` : ("subareas" in c ? `<div class="kl-sub" style="margin-top:8px">One coherent group: no distinct sub-areas.</div>` : ""));
+          (subs ? `<div class="kl-lab">Sub-areas</div>${subs}` : (!OLD && "subareas" in c ? `<div class="kl-sub" style="margin-top:8px">One coherent group: no distinct sub-areas.</div>` : ""));
       }
       if (kind === "g") {
         const g = gaps[id], bt = (g.between || []).filter(x => known.has(x));
@@ -555,6 +585,11 @@
       }
       if (e.target.closest && e.target.closest(".kl-plist .x")) { clearAll(); return; }
     });
+    root.querySelectorAll(".kl-mode button").forEach(b => b.addEventListener("click", () => {
+      const m = b.dataset.m;
+      try { localStorage.setItem("eratost_kl_mode", m); } catch (_) {}
+      render(host, tm, Object.assign({}, opts, { mode: m }));
+    }));
     // A click anywhere outside the landscape releases what is pinned.
     if (host.__klDoc) document.removeEventListener("click", host.__klDoc);
     host.__klDoc = e => { if (root.isConnected && !root.contains(e.target) && (st.pk != null || st.pg != null || st.pp != null)) clearAll(); };
