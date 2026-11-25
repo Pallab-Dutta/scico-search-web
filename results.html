@@ -269,7 +269,7 @@
 <script src="js/shell.js?v=20261031b"></script>
 <script src="js/drone.js?v=20261124a"></script>
 <script src="js/disconnectivity.js?v=20261124a"></script>
-<script src="js/landscape.js?v=20261125e"></script>
+<script src="js/landscape.js?v=20261125g"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -656,8 +656,11 @@
     if(!SID){ $('topicStatus').textContent='No session specified.'; return; }
     await ME_READY;
     try{
-      if(TOPIC){ drawTopic(TOPIC); return; }          // already computed / cached on the session
-      $('topicStatus').innerHTML=loadBlock(LANDSCAPE?'Building the knowledge landscape & research gaps…':'Building the topic map & research gaps…');
+      // Knowledge Landscape needs the map's sub-areas; a map saved before they existed is rebuilt once (free).
+      const stale = LANDSCAPE && TOPIC && (TOPIC.points||[]).length && (TOPIC.clusters||[]).length && !TOPIC.clusters.some(c=>'subareas' in c);
+      if(TOPIC && !stale){ drawTopic(TOPIC); return; }
+      if(stale){ $('landscapeHost').innerHTML=''; }
+      $('topicStatus').innerHTML=loadBlock(stale?'Updating the knowledge landscape with its sub-areas…':LANDSCAPE?'Building the knowledge landscape & research gaps…':'Building the topic map & research gaps…');
       const { job_id }=await window.SciCoAPI.topicMap(SID);
       await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') $('topicStatus').innerHTML=loadBlock(d.message); } });
       const data=await window.SciCoAPI.getSession(SID);

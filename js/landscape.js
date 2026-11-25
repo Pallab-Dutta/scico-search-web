@@ -266,13 +266,14 @@
       ks.forEach(k => rgb(colorOf(+k, known)).forEach((v, j) => { m[j] += v * w[k]; }));
       return "#" + m.map(v => Math.round(v).toString(16).padStart(2, "0")).join("");
     };
-    // affil: the topic a paper counts for. Inside a contour: that topic. Outside: the topic it most likely belongs
-    // to (its largest share), so the papers just beyond a contour are part of that topic's frontier.
+    // affil: the topic a paper counts for. Inside a contour: that topic. Outside every contour: the backend's topic
+    // for it (nearest topic peak), the same one its sub-area was built in, so topic and sub-area always agree.
+    // (Its colour still mixes the topics by likelihood share.)
     const nearby = {};                                     // outside papers whose largest share is this topic
     clusters.forEach(c => { nearby[c.id] = 0; });
     const affil = share.map((w, i) => {
       if (home[i] != null) return home[i];
-      const top = Object.keys(w).sort((a, b) => w[b] - w[a])[0];
+      const top = known.has(points[i].cluster) ? String(points[i].cluster) : Object.keys(w).sort((a, b) => w[b] - w[a])[0];
       if (top == null || nearby[top] == null) return null;
       nearby[top]++;
       return +top;
@@ -310,25 +311,10 @@
     const swatches = Array.from({ length: 7 }, (_, i) => `<i style="background:${tint(GREY, (0.05 + (i / 6) * (MAXA - 0.05)).toFixed(3))}"></i>`).join("");
     const themeOf = cid => { const c = clusters.find(x => x.id === cid); return c ? (c.theme || ("Topic " + (c.id + 1))) : "a topic"; };
     const GAPC = GREY;                                       // gaps use grey where topics use their colour
-    // Sub-areas WITHIN each topic: a paper's density on the drawn field, measured from the topic's outer contour
-    // (0) up to the topic's own peak (1). Top third = core, middle = emerging, the band nearest the contour edge =
-    // frontier. (The backend's global cutoffs, 0.60 / 0.30 of the whole map's densest spot, can't be used here: a
-    // paper inside a contour always sits above 0.30, so frontier never appeared, and a less dense topic read as
-    // all "emerging".)
-    const REG = ["core", "emerging", "frontier"], REGNAME = { core: "most-studied", emerging: "emerging", frontier: "least-studied" };
-    const topTop = {};
-    clusters.forEach(c => {
-      const pk = peakOf[c.id];
-      const inPts = points.filter((p, i) => home[i] === c.id).map(p => f(p.x, p.y));
-      topTop[c.id] = Math.max(pk ? f(pk[0], pk[1]) : 0, ...(inPts.length ? inPts : [0]));
-    });
-    const regimeOf = i => {
-      const c = home[i];
-      if (c == null) return affil[i] != null ? "frontier" : null;   // beyond the contour: below its density, so frontier
-      const lo = outer[c] ? outer[c].level / LEVELS : Math.min(...points.filter((_, j) => home[j] === c).map(p => f(p.x, p.y)));
-      const t = (f(points[i].x, points[i].y) - lo) / Math.max(1e-9, topTop[c] - lo);
-      return t >= 2 / 3 ? "core" : t >= 1 / 3 ? "emerging" : "frontier";
-    };
+    // Sub-areas come from the backend (engine._sub_areas): each topic's smaller density hills, every paper joined
+    // to the hill it shares the most likelihood with, named by the LLM. A paper's "sub" is its sub-area's index in
+    // its topic ("cluster"); a topic with one coherent group (or an older map) has none.
+    const subName = i => { const p = points[i], c = clusters.find(x => x.id === p.cluster), sa = c && p.sub != null && (c.subareas || [])[p.sub]; return sa ? sa.label : null; };
     const byScore = idx => idx.slice().sort((a, b) => (points[b].score || 0) - (points[a].score || 0));
     const topicIdx = cid => byScore(points.map((_, i) => i).filter(i => affil[i] === cid));   // inside + just outside
     const gapIdx = gi => byScore((gaps[gi].examples || []).filter(t => idxByTitle.has(t)).map(t => idxByTitle.get(t)));
@@ -337,16 +323,15 @@
     const groups = {};
     clusters.forEach(c => {
       groups["t:" + c.id] = { key: "t:" + c.id, row: "t:" + c.id, col: colorOf(c.id, known), label: themeOf(c.id), idx: null };
-      REG.forEach(r => {                                  // the backend's name for the sub-area, when it has one
-        const b = (c.bands || []).find(x => x.regime === r), name = (b && b.label) || (r[0].toUpperCase() + r.slice(1));
-        groups[`b:${c.id}:${r}`] = { key: `b:${c.id}:${r}`, row: "t:" + c.id, col: colorOf(c.id, known), label: `${themeOf(c.id)} · ${name}`, name, regime: r, cid: c.id, idx: null };
+      (c.subareas || []).forEach((sa, si) => {
+        groups[`b:${c.id}:${si}`] = { key: `b:${c.id}:${si}`, row: "t:" + c.id, col: colorOf(c.id, known), label: `${themeOf(c.id)} · ${sa.label}`, name: sa.label, maturity: sa.maturity || "", cid: c.id, sub: si, idx: null };
       });
     });
     gaps.forEach((g, gi) => { groups["g:" + gi] = { key: "g:" + gi, row: "g:" + gi, col: GAPC, label: `Near the gap: ${g.label || "research gap"}`, idx: null }; });
     const groupIdx = k => {
       const G = groups[k];
       if (!G) return [];
-      if (!G.idx) G.idx = k[0] === "t" ? topicIdx(+k.slice(2)) : k[0] === "g" ? gapIdx(+k.slice(2)) : topicIdx(G.cid).filter(i => regimeOf(i) === G.regime);
+      if (!G.idx) G.idx = k[0] === "t" ? topicIdx(+k.slice(2)) : k[0] === "g" ? gapIdx(+k.slice(2)) : byScore(points.map((_, i) => i).filter(i => points[i].cluster === G.cid && points[i].sub === G.sub));
       return G.idx;
     };
     // One row per topic, then one per gap ("t:<id>" / "g:<i>").
@@ -399,12 +384,12 @@
       const authors = au.slice(0, 3).join(", ") + (more && au.length ? " et al." : "");
       const meta = [authors, d.year, d.publisher || d.venue].filter(x => x != null && String(x).trim()).map(esc).join(" · ");
       const w = share[i], parts = Object.keys(w).filter(k => w[k] >= 0.1).sort((a, b) => w[b] - w[a]);
+      const sn = subName(i) ? " · " + esc(subName(i)) : "";
+      const sharesTxt = parts.length > 1 ? `<span>shares: ` + parts.map(k => `<span class="kl-dot" style="background:${colorOf(+k, known)}"></span> ${Math.round(100 * w[k])}%`).join(" · ") + `</span>` : "";
       const where = home[i] != null
-        ? `<div class="kl-cl"><span><span class="kl-dot" style="background:${colorOf(home[i], known)}"></span>${esc(themeOf(home[i]))} · ${regimeOf(i)}</span></div>`
-        : parts.length === 1
-          ? `<div class="kl-cl">Just outside:<span><span class="kl-dot" style="background:${colorOf(+parts[0], known)}"></span>${esc(themeOf(+parts[0]))}</span></div>`
-        : parts.length
-          ? `<div class="kl-cl">Between topics:` + parts.map(k => `<span><span class="kl-dot" style="background:${colorOf(+k, known)}"></span>${esc(themeOf(+k))} ${Math.round(100 * w[k])}%</span>`).join("") + `</div>`
+        ? `<div class="kl-cl"><span><span class="kl-dot" style="background:${colorOf(home[i], known)}"></span>${esc(themeOf(home[i]))}${sn}</span></div>`
+        : affil[i] != null
+          ? `<div class="kl-cl"><span>Outside the contour of</span><span><span class="kl-dot" style="background:${colorOf(affil[i], known)}"></span>${esc(themeOf(affil[i]))}${sn}</span>${sharesTxt}</div>`
           : `<div class="kl-cl"><span><span class="kl-dot" style="background:${UNCL}"></span>Not in a named topic</span></div>`;
       return `<div class="t">${url && /^https?:\/\//i.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener">${title}</a>` : title}</div>` +
         (meta ? `<div class="m">${meta}</div>` : "") + where;
@@ -417,10 +402,10 @@
       const [kind, id] = parse(k);
       if (kind === "t") {
         const c = clusters.find(x => x.id === id), n = members[id].length, nb = nearby[id];
-        const subs = REG.map(r => grpBtn(`b:${id}:${r}`, `${groups[`b:${id}:${r}`].name} (${REGNAME[r]})`)).join("");
+        const subs = (c.subareas || []).map((sa, si) => grpBtn(`b:${id}:${si}`, sa.label + (sa.maturity ? ` (${sa.maturity})` : ""))).join("");
         return `<h4>${esc(themeOf(id))}</h4><div class="kl-sub">${n} paper${n === 1 ? "" : "s"} inside its contour${nb ? ` · ${nb} nearby` : ""}` +
           (outer[id] ? "" : " · no closed contour of its own") + `</div>` +
-          (subs ? `<div class="kl-lab">Sub-areas</div>${subs}` : "");
+          (subs ? `<div class="kl-lab">Sub-areas</div>${subs}` : ("subareas" in c ? `<div class="kl-sub" style="margin-top:8px">One coherent group: no distinct sub-areas.</div>` : ""));
       }
       if (kind === "g") {
         const g = gaps[id], bt = (g.between || []).filter(x => known.has(x));
