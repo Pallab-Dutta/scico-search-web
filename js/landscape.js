@@ -306,10 +306,25 @@
     const swatches = Array.from({ length: 7 }, (_, i) => `<i style="background:${tint(GREY, (0.05 + (i / 6) * (MAXA - 0.05)).toFixed(3))}"></i>`).join("");
     const themeOf = cid => { const c = clusters.find(x => x.id === cid); return c ? (c.theme || ("Topic " + (c.id + 1))) : "a topic"; };
     const GAPC = GREY;                                       // gaps use grey where topics use their colour
-    // Sub-area of each paper, by the backend's own rule (engine._threshold_bands): the paper's density among all
-    // papers (Gaussian, bandwidth 0.09, normalised to the densest paper): core >= 0.60, emerging >= 0.30, else frontier.
-    const pden = points.map(p => points.reduce((s, q) => s + Math.exp(-((q.x - p.x) ** 2 + (q.y - p.y) ** 2) / (2 * H * H)), 0));
-    const pmax = Math.max(1e-12, ...pden), regimeOf = i => (pden[i] / pmax >= 0.6 ? "core" : pden[i] / pmax >= 0.3 ? "emerging" : "frontier");
+    // Sub-areas WITHIN each topic: a paper's density on the drawn field, measured from the topic's outer contour
+    // (0) up to the topic's own peak (1). Top third = core, middle = emerging, the band nearest the contour edge =
+    // frontier. (The backend's global cutoffs, 0.60 / 0.30 of the whole map's densest spot, can't be used here: a
+    // paper inside a contour always sits above 0.30, so frontier never appeared, and a less dense topic read as
+    // all "emerging".)
+    const REG = ["core", "emerging", "frontier"], REGNAME = { core: "most-studied", emerging: "emerging", frontier: "least-studied" };
+    const topTop = {};
+    clusters.forEach(c => {
+      const pk = peakOf[c.id];
+      const inPts = points.filter((p, i) => home[i] === c.id).map(p => f(p.x, p.y));
+      topTop[c.id] = Math.max(pk ? f(pk[0], pk[1]) : 0, ...(inPts.length ? inPts : [0]));
+    });
+    const regimeOf = i => {
+      const c = home[i];
+      if (c == null) return null;
+      const lo = outer[c] ? outer[c].level / LEVELS : Math.min(...points.filter((_, j) => home[j] === c).map(p => f(p.x, p.y)));
+      const t = (f(points[i].x, points[i].y) - lo) / Math.max(1e-9, topTop[c] - lo);
+      return t >= 2 / 3 ? "core" : t >= 1 / 3 ? "emerging" : "frontier";
+    };
     const byScore = idx => idx.slice().sort((a, b) => (points[b].score || 0) - (points[a].score || 0));
     const topicIdx = cid => byScore(points.map((_, i) => i).filter(i => home[i] === cid));
     const gapIdx = gi => byScore((gaps[gi].examples || []).filter(t => idxByTitle.has(t)).map(t => idxByTitle.get(t)));
@@ -318,8 +333,9 @@
     const groups = {};
     clusters.forEach(c => {
       groups["t:" + c.id] = { key: "t:" + c.id, row: "t:" + c.id, col: colorOf(c.id, known), label: themeOf(c.id), idx: null };
-      (c.bands || []).forEach((b, bi) => {
-        groups[`b:${c.id}:${bi}`] = { key: `b:${c.id}:${bi}`, row: "t:" + c.id, col: colorOf(c.id, known), label: `${themeOf(c.id)} · ${b.label || b.regime}`, regime: b.regime, cid: c.id, idx: null };
+      REG.forEach(r => {                                  // the backend's name for the sub-area, when it has one
+        const b = (c.bands || []).find(x => x.regime === r), name = (b && b.label) || (r[0].toUpperCase() + r.slice(1));
+        groups[`b:${c.id}:${r}`] = { key: `b:${c.id}:${r}`, row: "t:" + c.id, col: colorOf(c.id, known), label: `${themeOf(c.id)} · ${name}`, name, regime: r, cid: c.id, idx: null };
       });
     });
     gaps.forEach((g, gi) => { groups["g:" + gi] = { key: "g:" + gi, row: "g:" + gi, col: GAPC, label: `Near the gap: ${g.label || "research gap"}`, idx: null }; });
@@ -397,7 +413,7 @@
       const [kind, id] = parse(k);
       if (kind === "t") {
         const c = clusters.find(x => x.id === id), n = groupIdx(k).length, nb = nearby[id];
-        const subs = (c.bands || []).map((b, bi) => grpBtn(`b:${id}:${bi}`, `${b.label || b.regime} (${b.regime})`)).join("");
+        const subs = REG.map(r => grpBtn(`b:${id}:${r}`, `${groups[`b:${id}:${r}`].name} (${REGNAME[r]})`)).join("");
         return `<h4>${esc(themeOf(id))}</h4><div class="kl-sub">${n} paper${n === 1 ? "" : "s"} inside its contour${nb ? ` · ${nb} nearby` : ""}` +
           (outer[id] ? "" : " · no closed contour of its own") + `</div>` +
           (subs ? `<div class="kl-lab">Sub-areas</div>${subs}` : "");
