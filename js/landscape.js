@@ -245,16 +245,19 @@
     // keeps the backend's assignment.) Every other paper gets a share of each topic: its likelihood under that
     // topic's papers (Gaussian kernel, the backend's bandwidth 0.09), normalised; its colour mixes the topic
     // colours by those shares.
-    const H = 0.09, home = points.map(p => {
-      if (OLD) return known.has(p.cluster) ? p.cluster : null;   // old: every paper in its nearest peak's topic
+    // inC: the topic whose contour a paper is inside (where it sits on the map). It sets the dot colours and the
+    // likelihood shares in both modes; in "new" mode it is also the paper's topic, in "old" the topic is its
+    // nearest peak (the Topic Map's rule), so only membership changes between the modes, not the picture.
+    const H = 0.09, inC = points.map(p => {
       for (const id in outer) if (inside(outer[id].pts, p.x, p.y)) return +id;
       return outer[p.cluster] || !known.has(p.cluster) ? null : p.cluster;
     });
+    const home = OLD ? points.map(p => (known.has(p.cluster) ? p.cluster : null)) : inC;
     const members = {};
     clusters.forEach(c => { members[c.id] = []; });
-    points.forEach((p, i) => { if (home[i] != null) members[home[i]].push(p); });
+    points.forEach((p, i) => { if (inC[i] != null) members[inC[i]].push(p); });
     const share = points.map((p, i) => {
-      if (home[i] != null) return { [home[i]]: 1 };
+      if (inC[i] != null) return { [inC[i]]: 1 };
       const w = {};
       let tot = 0;
       clusters.forEach(c => {
@@ -303,7 +306,7 @@
     const outers = Object.keys(outer).map(id => `<path class="kl-outer" data-c="${id}" d="${pathD(outer[id].pts, true)}" fill="none" stroke="${colorOf(+id, known)}" stroke-opacity=".75" stroke-width="2" stroke-dasharray="9 7"/>`).join("");
     const dots = points.map((p, i) => {
       const op = (0.78 + 0.22 * clamp01(p.score || 0)).toFixed(2);
-      const fill = home[i] != null ? colorOf(home[i], known) : mixColour(share[i]);
+      const fill = inC[i] != null ? colorOf(home[i] != null ? home[i] : inC[i], known) : mixColour(share[i]);
       return `<circle class="kl-pt" data-i="${i}" data-c="${home[i] != null ? home[i] : -1}" cx="${(clamp01(p.x) * V).toFixed(1)}" cy="${(clamp01(p.y) * V).toFixed(1)}" r="5" fill="${fill}" fill-opacity="${op}" stroke="${PAPER}" stroke-width="2"><title>${esc(p.title)}</title></circle>`;
     }).join("");
     const gapMarks = gaps.map((g, gi) => {
@@ -417,7 +420,8 @@
       const sn = subName(i) ? " · " + esc(subName(i)) : "";
       const sharesTxt = parts.length > 1 ? `<span>shares: ` + parts.map(k => `<span class="kl-dot" style="background:${colorOf(+k, known)}"></span> ${Math.round(100 * w[k])}%`).join(" · ") + `</span>` : "";
       const where = home[i] != null
-        ? `<div class="kl-cl"><span><span class="kl-dot" style="background:${colorOf(home[i], known)}"></span>${esc(themeOf(home[i]))}${sn}</span></div>`
+        ? `<div class="kl-cl"><span><span class="kl-dot" style="background:${colorOf(home[i], known)}"></span>${esc(themeOf(home[i]))}${sn}</span>` +
+          (OLD && inC[i] == null ? `<span>outside the contours</span>${sharesTxt}` : "") + `</div>`
         : affil[i] != null
           ? `<div class="kl-cl"><span>Outside the contour of</span><span><span class="kl-dot" style="background:${colorOf(affil[i], known)}"></span>${esc(themeOf(affil[i]))}${sn}</span>${sharesTxt}</div>`
           : `<div class="kl-cl"><span><span class="kl-dot" style="background:${UNCL}"></span>Not in a named topic</span></div>`;
