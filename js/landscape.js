@@ -266,12 +266,16 @@
       ks.forEach(k => rgb(colorOf(+k, known)).forEach((v, j) => { m[j] += v * w[k]; }));
       return "#" + m.map(v => Math.round(v).toString(16).padStart(2, "0")).join("");
     };
+    // affil: the topic a paper counts for. Inside a contour: that topic. Outside: the topic it most likely belongs
+    // to (its largest share), so the papers just beyond a contour are part of that topic's frontier.
     const nearby = {};                                     // outside papers whose largest share is this topic
     clusters.forEach(c => { nearby[c.id] = 0; });
-    share.forEach((w, i) => {
-      if (home[i] != null) return;
+    const affil = share.map((w, i) => {
+      if (home[i] != null) return home[i];
       const top = Object.keys(w).sort((a, b) => w[b] - w[a])[0];
-      if (top != null && nearby[top] != null) nearby[top]++;
+      if (top == null || nearby[top] == null) return null;
+      nearby[top]++;
+      return +top;
     });
 
     // ---- markup ----
@@ -320,13 +324,13 @@
     });
     const regimeOf = i => {
       const c = home[i];
-      if (c == null) return null;
+      if (c == null) return affil[i] != null ? "frontier" : null;   // beyond the contour: below its density, so frontier
       const lo = outer[c] ? outer[c].level / LEVELS : Math.min(...points.filter((_, j) => home[j] === c).map(p => f(p.x, p.y)));
       const t = (f(points[i].x, points[i].y) - lo) / Math.max(1e-9, topTop[c] - lo);
       return t >= 2 / 3 ? "core" : t >= 1 / 3 ? "emerging" : "frontier";
     };
     const byScore = idx => idx.slice().sort((a, b) => (points[b].score || 0) - (points[a].score || 0));
-    const topicIdx = cid => byScore(points.map((_, i) => i).filter(i => home[i] === cid));
+    const topicIdx = cid => byScore(points.map((_, i) => i).filter(i => affil[i] === cid));   // inside + just outside
     const gapIdx = gi => byScore((gaps[gi].examples || []).filter(t => idxByTitle.has(t)).map(t => idxByTitle.get(t)));
     const idxByTitle = new Map(points.map((p, i) => [p.title || "", i]));
     // Groups of papers a viewer can highlight (hover) or pin (click): a topic, one of its sub-areas, a gap's nearby work.
@@ -412,7 +416,7 @@
     function detailHTML(k) {
       const [kind, id] = parse(k);
       if (kind === "t") {
-        const c = clusters.find(x => x.id === id), n = groupIdx(k).length, nb = nearby[id];
+        const c = clusters.find(x => x.id === id), n = members[id].length, nb = nearby[id];
         const subs = REG.map(r => grpBtn(`b:${id}:${r}`, `${groups[`b:${id}:${r}`].name} (${REGNAME[r]})`)).join("");
         return `<h4>${esc(themeOf(id))}</h4><div class="kl-sub">${n} paper${n === 1 ? "" : "s"} inside its contour${nb ? ` · ${nb} nearby` : ""}` +
           (outer[id] ? "" : " · no closed contour of its own") + `</div>` +
