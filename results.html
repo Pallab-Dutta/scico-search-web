@@ -183,7 +183,7 @@
         <div class="tab active" data-tab="publications"><span class="mi">description</span> Publications</div>
         <div class="tab" data-tab="authors"><span class="mi">science</span> Authors</div>
         <div class="tab" data-tab="topicmap"><span class="mi">hub</span> <span id="tmTabLabel">Topic Map</span></div>
-        <div class="tab" data-tab="disc"><span class="mi">account_tree</span> Gap Graph</div>
+        <div class="tab" data-tab="disc" id="tabDisc" style="display:none"><span class="mi">account_tree</span> Gap Graph</div>
       </div>
 
       <!-- ===== PUBLICATIONS ===== -->
@@ -269,7 +269,7 @@
 <script src="js/shell.js?v=20261031b"></script>
 <script src="js/drone.js?v=20261124a"></script>
 <script src="js/disconnectivity.js?v=20261124a"></script>
-<script src="js/landscape.js?v=20261126a"></script>
+<script src="js/landscape.js?v=20261126b"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -286,8 +286,11 @@
   let topicInit=false, authorsInit=false, discInit=false, TOPIC=null;
   // Knowledge Landscape rollout: "dev" = developer and admin accounts only; "all" = everyone (one-line go-live).
   // A developer can compare with ?landscape=0 (the old Topic Map).
-  const LANDSCAPE_FOR="dev";
-  let LANDSCAPE=false, IS_DEV=false, _meDone;   // IS_DEV: developer or admin (sees developer-only tools)
+  // Knowledge Landscape for everyone (2026-11-26). Everyone gets the Topic Map's own way of finding topics and
+  // sub-areas (nearest peak; core / emerging / frontier bands); admins also get the New / Old toggle.
+  // The Gap Graph tab is admin-only for now.
+  const LANDSCAPE_FOR="all";
+  let LANDSCAPE=false, _meDone;
   const ME_READY=new Promise(r=>{ _meDone=r; });   // resolved by hydrate() once /me has answered (or failed)
   const tmName=()=>LANDSCAPE?'Knowledge Landscape':'Topic Map';
   // Label the tab from this browser's last answer, so it doesn't flash "Topic Map" while /me is on its way.
@@ -649,7 +652,7 @@
       return;
     }
     status.textContent='';
-    window.KnowledgeLandscape.render(host, tm, { lookup: paperFor, devToggle: IS_DEV, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
+    window.KnowledgeLandscape.render(host, tm, { lookup: paperFor, devToggle: IS_ADMIN, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
   }
   const drawTopic = tm => LANDSCAPE ? renderLandscape(tm) : renderTopic(tm);
   async function startTopic(){
@@ -657,7 +660,7 @@
     await ME_READY;
     try{
       // Knowledge Landscape needs the map's sub-areas; a map saved before they existed is rebuilt once (free).
-      const stale = LANDSCAPE && TOPIC && (TOPIC.points||[]).length && (TOPIC.clusters||[]).length && !TOPIC.clusters.some(c=>'subareas' in c);
+      const stale = LANDSCAPE && IS_ADMIN && TOPIC && (TOPIC.points||[]).length && (TOPIC.clusters||[]).length && !TOPIC.clusters.some(c=>'subareas' in c);
       if(TOPIC && !stale){ drawTopic(TOPIC); return; }
       if(stale){ $('landscapeHost').innerHTML=''; }
       $('topicStatus').innerHTML=loadBlock(stale?'Updating the knowledge landscape with its sub-areas…':LANDSCAPE?'Building the knowledge landscape & research gaps…':'Building the topic map & research gaps…');
@@ -708,6 +711,7 @@
   async function startDisc(){
     if(!SID){ $('discStatus').textContent='No session specified.'; return; }
     await ME_READY;
+    if(!IS_ADMIN){ discInit=false; setTab('topicmap'); return; }   // Gap Graph is admin-only for now
     try{
       $('discStatus').innerHTML=loadBlock('Loading the Gap Graph…');
       await ensureTopic();
@@ -766,7 +770,7 @@
     if(_meLoaded) return; _meLoaded=true;
     let me=null;
     try{ me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
-    IS_DEV = !!(me && (me.developer || me.is_admin));
+    $('tabDisc').style.display = IS_ADMIN ? '' : 'none';   // Gap Graph: admins only for now
     LANDSCAPE = params.get('landscape')!=='0' && (LANDSCAPE_FOR==='all' || !!(me && (me.developer || me.is_admin)));
     $('tmTabLabel').textContent=tmName(); $('tmHead').style.display=LANDSCAPE?'none':'';
     try{ localStorage.setItem('eratost_kl', LANDSCAPE && LANDSCAPE_FOR!=='all' ? '1' : '0'); }catch(_){}

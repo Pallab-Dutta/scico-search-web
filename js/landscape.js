@@ -215,7 +215,7 @@
     // emerging / frontier bands). The UI is the same either way.
     let mode = opts.mode;
     if (!mode) { try { mode = localStorage.getItem("eratost_kl_mode"); } catch (_) {} }
-    const OLD = opts.devToggle && mode === "old";
+    const OLD = opts.devToggle ? mode === "old" : (opts.mode || "old") === "old";   // without the toggle: old
     const clusters = tm.clusters || [], gaps = tm.gaps || [], points = tm.points || [];
     const known = new Set(clusters.map(c => c.id));
     const grid = tm.grid && tm.grid.length > 1 ? tm.grid : null;
