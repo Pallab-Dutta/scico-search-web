@@ -27,6 +27,9 @@
 .kl-mode button{font:inherit;color:${GREY};background:#fff;border:1.5px solid ${RULE};padding:3px 12px;cursor:pointer}
 .kl-mode button:first-of-type{border-radius:6px 0 0 6px}.kl-mode button:last-of-type{border-radius:0 6px 6px 0;border-left:0}
 .kl-mode button[aria-pressed="true"]{background:${INK};border-color:${INK};color:#fff}
+.kl-mode .kl-site{margin-left:14px}.kl-mode .kl-site b{color:${INK};font-weight:600}
+.kl-mode button.kl-apply{margin-left:10px;border-radius:6px;border:1.5px solid ${INK};color:${INK};font-weight:600}
+.kl-mode button.kl-apply:hover{background:${INK};color:#fff}
 /* Owner's sketch (v2): legend box | map + topic/gap rows | funnel + detail panel; hovered paper below;
    a clicked group's papers listed under it all. Nothing scrolls inside; nothing shows until it is needed. */
 .kl-grid{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr) 28px minmax(0,1fr);
@@ -213,9 +216,12 @@
     // Developer toggle: "new" = topics by contour + sub-areas as the topic's smaller hills (backend subareas);
     // "old" = the Topic Map's own mechanism (topic = nearest density peak; sub-areas = the backend's core /
     // emerging / frontier bands). The UI is the same either way.
+    // siteMode: what everyone without the toggle sees (admins set it with "Use for everyone").
+    const siteMode = opts.siteMode === "new" ? "new" : "old";
     let mode = opts.mode;
-    if (!mode) { try { mode = localStorage.getItem("eratost_kl_mode"); } catch (_) {} }
-    const OLD = opts.devToggle ? mode === "old" : (opts.mode || "old") === "old";   // without the toggle: old
+    if (!mode && opts.devToggle) { try { mode = localStorage.getItem("eratost_kl_mode"); } catch (_) {} }
+    mode = mode === "new" || mode === "old" ? mode : siteMode;
+    const OLD = mode === "old";
     const clusters = tm.clusters || [], gaps = tm.gaps || [], points = tm.points || [];
     const known = new Set(clusters.map(c => c.id));
     const grid = tm.grid && tm.grid.length > 1 ? tm.grid : null;
@@ -378,7 +384,9 @@
 
     const toggle = opts.devToggle ? `<div class="kl-mode" role="group" aria-label="How topics and sub-areas are found (developer)"><span>Sub-areas</span>` +
       `<button type="button" data-m="new" aria-pressed="${!OLD}" title="Topics by contour; sub-areas = each topic's smaller hills">New</button>` +
-      `<button type="button" data-m="old" aria-pressed="${OLD}" title="As the Topic Map: topics by nearest peak; sub-areas = core / emerging / frontier density bands">Old</button></div>` : "";
+      `<button type="button" data-m="old" aria-pressed="${OLD}" title="As the Topic Map: topics by nearest peak; sub-areas = core / emerging / frontier density bands">Old</button>` +
+      `<span class="kl-site">Everyone sees: <b>${siteMode === "new" ? "New" : "Old"}</b></span>` +
+      (mode !== siteMode && opts.onSiteMode ? `<button type="button" class="kl-apply">Use ${OLD ? "Old" : "New"} for everyone</button>` : "") + `</div>` : "";
     host.innerHTML = `<div class="kl"><h2 class="kl-h">Knowledge Landscape</h2>${toggle}<div class="kl-grid">` +
       `<div class="kl-legend"><div class="den"><b>Knowledge density</b><span class="kl-steps">${swatches}</span><div class="ends"><span>low</span><span>high</span></div></div>` +
       `<div class="qry"><b style="display:flex;align-items:center;gap:6px"><svg width="11" height="15" viewBox="-10 -28 20 29"><path d="${PIN}" fill="${INK}"/><circle cy="-18" r="3.6" fill="${PAPER}"/></svg>your query</b>` +
@@ -589,7 +597,14 @@
       }
       if (e.target.closest && e.target.closest(".kl-plist .x")) { clearAll(); return; }
     });
-    root.querySelectorAll(".kl-mode button").forEach(b => b.addEventListener("click", () => {
+    const apply1 = root.querySelector(".kl-mode .kl-apply");
+    if (apply1) apply1.addEventListener("click", async () => {
+      if (!window.confirm(`Show every user the ${OLD ? "Old" : "New"} way of finding topics and sub-areas?`)) return;
+      apply1.disabled = true; apply1.textContent = "Saving…";
+      try { await opts.onSiteMode(mode); render(host, tm, Object.assign({}, opts, { mode, siteMode: mode })); }
+      catch (e) { apply1.disabled = false; apply1.textContent = "Could not save, try again"; }
+    });
+    root.querySelectorAll(".kl-mode button[data-m]").forEach(b => b.addEventListener("click", () => {
       const m = b.dataset.m;
       try { localStorage.setItem("eratost_kl_mode", m); } catch (_) {}
       render(host, tm, Object.assign({}, opts, { mode: m }));

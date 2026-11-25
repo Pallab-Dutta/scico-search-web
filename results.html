@@ -262,14 +262,14 @@
 <script src="js/config.js?v=20261106b"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js?v=20261106a"></script>
-<script src="js/api.js?v=20261107a"></script>
+<script src="js/api.js?v=20261126a"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261103c"></script>
 <script src="js/shell.js?v=20261031b"></script>
 <script src="js/drone.js?v=20261124a"></script>
 <script src="js/disconnectivity.js?v=20261124a"></script>
-<script src="js/landscape.js?v=20261126c"></script>
+<script src="js/landscape.js?v=20261126d"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -290,7 +290,7 @@
   // sub-areas (nearest peak; core / emerging / frontier bands); admins also get the New / Old toggle.
   // The Gap Graph tab is admin-only for now.
   const LANDSCAPE_FOR="all";
-  let LANDSCAPE=false, _meDone;
+  let LANDSCAPE=false, SITE_MODE='old', _meDone;   // SITE_MODE: the landscape method everyone sees (admins set it)
   const ME_READY=new Promise(r=>{ _meDone=r; });   // resolved by hydrate() once /me has answered (or failed)
   const tmName=()=>LANDSCAPE?'Knowledge Landscape':'Topic Map';
   // Label the tab from this browser's last answer, so it doesn't flash "Topic Map" while /me is on its way.
@@ -652,7 +652,8 @@
       return;
     }
     status.textContent='';
-    window.KnowledgeLandscape.render(host, tm, { lookup: paperFor, devToggle: IS_ADMIN, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
+    window.KnowledgeLandscape.render(host, tm, { lookup: paperFor, devToggle: IS_ADMIN, siteMode: SITE_MODE,
+      onSiteMode: IS_ADMIN ? (m=>window.SciCoAPI.setLandscapeMode(m).then(r=>{ SITE_MODE=r.landscape_mode; return r; })) : null, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
   }
   const drawTopic = tm => LANDSCAPE ? renderLandscape(tm) : renderTopic(tm);
   async function startTopic(){
@@ -660,7 +661,7 @@
     await ME_READY;
     try{
       // Knowledge Landscape needs the map's sub-areas; a map saved before they existed is rebuilt once (free).
-      const stale = LANDSCAPE && IS_ADMIN && TOPIC && (TOPIC.points||[]).length && (TOPIC.clusters||[]).length && !TOPIC.clusters.some(c=>'subareas' in c);
+      const stale = LANDSCAPE && (IS_ADMIN || SITE_MODE==='new') && TOPIC && (TOPIC.points||[]).length && (TOPIC.clusters||[]).length && !TOPIC.clusters.some(c=>'subareas' in c);
       if(TOPIC && !stale){ drawTopic(TOPIC); return; }
       if(stale){ $('landscapeHost').innerHTML=''; }
       $('topicStatus').innerHTML=loadBlock(stale?'Updating the knowledge landscape with its sub-areas…':LANDSCAPE?'Building the knowledge landscape & research gaps…':'Building the topic map & research gaps…');
@@ -771,6 +772,7 @@
     let me=null;
     try{ me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
     $('tabDisc').style.display = IS_ADMIN ? '' : 'none';   // Gap Graph: admins only for now
+    SITE_MODE = me && me.landscape_mode==='new' ? 'new' : 'old';
     LANDSCAPE = params.get('landscape')!=='0' && (LANDSCAPE_FOR==='all' || !!(me && (me.developer || me.is_admin)));
     $('tmTabLabel').textContent=tmName(); $('tmHead').style.display=LANDSCAPE?'none':'';
     try{ localStorage.setItem('eratost_kl', LANDSCAPE && LANDSCAPE_FOR!=='all' ? '1' : '0'); }catch(_){}

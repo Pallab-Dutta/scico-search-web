@@ -36,6 +36,8 @@
       return me;
     },
     feedback(stars, comment) { return req("POST", "/feedback", { stars, comment: comment || "" }); },
+    // Admins: how the Knowledge Landscape finds topics and sub-areas for every user ("old" | "new").
+    setLandscapeMode(mode) { return req("POST", "/admin/landscape-mode", { mode }); },
     search(query, opts) {
       opts = opts || {};
       return req("POST", "/search", {
