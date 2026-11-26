@@ -274,14 +274,14 @@
 <script src="js/config.js?v=20261106b"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js?v=20261106a"></script>
-<script src="js/api.js?v=20261126c"></script>
+<script src="js/api.js?v=20261127a"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261103c"></script>
 <script src="js/shell.js?v=20261031b"></script>
 <script src="js/drone.js?v=20261124a"></script>
 <script src="js/disconnectivity.js?v=20261124a"></script>
-<script src="js/landscape.js?v=20261127c"></script>
+<script src="js/landscape.js?v=20261127d"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -302,7 +302,7 @@
   // sub-areas (nearest peak; core / emerging / frontier bands); admins also get the New / Old toggle.
   // The Gap Graph tab is admin-only for now.
   const LANDSCAPE_FOR="all";
-  let LANDSCAPE=false, SITE_MODE='old', _meDone;   // SITE_MODE: the landscape method everyone sees (admins set it)
+  let LANDSCAPE=false, SITE_MODE='old', NAMING='', _meDone;   // NAMING: the server's current naming version   // SITE_MODE: the landscape method everyone sees (admins set it)
   const ME_READY=new Promise(r=>{ _meDone=r; });   // resolved by hydrate() once /me has answered (or failed)
   const tmName=()=>LANDSCAPE?'Knowledge Landscape':'Topic Map';
   // Label the tab from this browser's last answer, so it doesn't flash "Topic Map" while /me is on its way.
@@ -707,6 +707,7 @@
       return;
     }
     status.textContent='';
+    refreshOldNames(tm);
     window.KnowledgeLandscape.render(host, tm, { lookup: paperFor, devToggle: IS_ADMIN, siteMode: SITE_MODE,
       onSiteMode: IS_ADMIN ? (m=>window.SciCoAPI.setLandscapeMode(m).then(r=>{ SITE_MODE=r.landscape_mode; return r; })) : null, 
       onRename: IS_ADMIN ? (async (m, onMsg)=>{ const { job_id }=await window.SciCoAPI.renameTopicMap(SID, m);
@@ -715,6 +716,23 @@
         const d=await window.SciCoAPI.getSession(SID); if(d.topic_map) TOPIC=d.topic_map; return TOPIC; }) : null, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
   }
   const drawTopic = tm => LANDSCAPE ? renderLandscape(tm) : renderTopic(tm);
+  // Maps named under an older naming version get the current names once, in the background (any user): the
+  // current names show at once and are replaced when the refresh finishes.
+  let namesRefreshing=false;
+  async function refreshOldNames(tm){
+    if(namesRefreshing || !NAMING || !SID || !(tm.points||[]).length) return;
+    if((tm.naming_info||{}).prompt===NAMING || tm.names_refresh_failed===NAMING) return;
+    namesRefreshing=true;
+    try{
+      const r=await window.SciCoAPI.refreshNames(SID);
+      if(!r || !r.job_id) return;
+      let failed=false;
+      await window.SciCoAPI.streamJob(r.job_id,{ onEvent(t){ if(t==='error') failed=true; } });
+      if(failed) return;
+      const d=await window.SciCoAPI.getSession(SID);
+      if(d.topic_map && (d.topic_map.points||[]).length){ TOPIC=d.topic_map; if(LANDSCAPE && $('landscapeHost').innerHTML) renderLandscape(TOPIC); }
+    }catch(_){ /* keep the current names */ }
+  }
   async function startTopic(){
     if(!SID){ $('topicStatus').textContent='No session specified.'; return; }
     await ME_READY;
@@ -832,6 +850,7 @@
     try{ me=await window.SciCoAPI.me(); IS_ADMIN=!!(me&&me.is_admin); }catch(_){ /* non-admin / not signed in */ }
     $('tabDisc').style.display = IS_ADMIN ? '' : 'none';   // Gap Graph: admins only for now
     SITE_MODE = me && me.landscape_mode==='new' ? 'new' : 'old';
+    NAMING = (me && me.naming_prompt) || '';
     LANDSCAPE = params.get('landscape')!=='0' && (LANDSCAPE_FOR==='all' || !!(me && (me.developer || me.is_admin)));
     $('tmTabLabel').textContent=tmName(); $('tmHead').style.display=LANDSCAPE?'none':'';
     try{ localStorage.setItem('eratost_kl', LANDSCAPE && LANDSCAPE_FOR!=='all' ? '1' : '0'); }catch(_){}

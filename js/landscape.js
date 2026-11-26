@@ -20,10 +20,10 @@
     const s = document.createElement("style");
     s.id = "kl-css";
     s.textContent = `
-.kl{color:${INK};--kl-paper:${PAPER};--kl-rule:${RULE};--kl-grey:${GREY}}
+.kl{color:${INK};padding-top:16px;--kl-paper:${PAPER};--kl-rule:${RULE};--kl-grey:${GREY}}
 .kl *{box-sizing:border-box}
 .kl-h{font-size:1.15rem;margin:16px 0 14px;text-align:center}
-.kl-mode{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 0;margin:-6px 0 12px;font-size:.78rem;color:${GREY}}
+.kl-mode{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 0;margin:0 0 12px;font-size:.78rem;color:${GREY}}
 .kl-mode select{font:inherit;margin-left:8px;padding:2px 4px;border:1.5px solid ${RULE};border-radius:6px;background:#fff}
 .kl-mode span{margin-right:8px}
 .kl-mode button{font:inherit;color:${GREY};background:#fff;border:1.5px solid ${RULE};padding:3px 12px;cursor:pointer}
@@ -406,7 +406,7 @@
       })() + `</span>` +
         `<select class="kl-namer" aria-label="Model for naming">` + NAMERS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("") + `</select>` +
         `<button type="button" class="kl-apply kl-rename">Rename</button>` : "") + `</div>` : "";
-    host.innerHTML = `<div class="kl"><h2 class="kl-h">Knowledge Landscape</h2>${toggle}<div class="kl-grid">` +
+    host.innerHTML = `<div class="kl">${toggle}<div class="kl-grid">` +   // no heading: the tab already says it
       `<div class="kl-legend"><div class="den"><b>Knowledge density</b><span class="kl-steps">${swatches}</span><div class="ends"><span>low</span><span>high</span></div></div>` +
       `<div class="qry"><b style="display:flex;align-items:center;gap:6px"><svg width="11" height="15" viewBox="-10 -28 20 29"><path d="${PIN}" fill="${INK}"/><circle cy="-18" r="3.6" fill="${PAPER}"/></svg>your query</b>` +
       `<div class="q">${qText ? esc(qText) : "the pin on the map"}</div></div></div>` +
