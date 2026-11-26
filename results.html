@@ -274,14 +274,14 @@
 <script src="js/config.js?v=20261106b"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js?v=20261106a"></script>
-<script src="js/api.js?v=20261127a"></script>
+<script src="js/api.js?v=20261127b"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261103c"></script>
 <script src="js/shell.js?v=20261031b"></script>
 <script src="js/drone.js?v=20261124a"></script>
 <script src="js/disconnectivity.js?v=20261124a"></script>
-<script src="js/landscape.js?v=20261127e"></script>
+<script src="js/landscape.js?v=20261127f"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -302,7 +302,7 @@
   // sub-areas (nearest peak; core / emerging / frontier bands); admins also get the New / Old toggle.
   // The Gap Graph tab is admin-only for now.
   const LANDSCAPE_FOR="all";
-  let LANDSCAPE=false, SITE_MODE='old', NAMING='', _meDone;   // NAMING: the server's current naming version   // SITE_MODE: the landscape method everyone sees (admins set it)
+  let LANDSCAPE=false, SITE_MODE='old', NAMING='', USER_PROJ='pca', PROJ_CACHED=[], _meDone;   // NAMING: the server's current naming version   // SITE_MODE: the landscape method everyone sees (admins set it)
   const ME_READY=new Promise(r=>{ _meDone=r; });   // resolved by hydrate() once /me has answered (or failed)
   const tmName=()=>LANDSCAPE?'Knowledge Landscape':'Topic Map';
   // Label the tab from this browser's last answer, so it doesn't flash "Topic Map" while /me is on its way.
@@ -713,7 +713,14 @@
       onRename: IS_ADMIN ? (async (m, onMsg)=>{ const { job_id }=await window.SciCoAPI.renameTopicMap(SID, m);
         let err=null; await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat' && onMsg) onMsg(d.message); if(t==='error') err=(d&&d.message)||'error'; } });
         if(err) throw new Error(err);   // a failed rename must say so, not quietly show the old names
-        const d=await window.SciCoAPI.getSession(SID); if(d.topic_map) TOPIC=d.topic_map; return TOPIC; }) : null, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
+        const d=await window.SciCoAPI.getSession(SID); if(d.topic_map) TOPIC=d.topic_map; return TOPIC; }) : null,
+      userProjection: USER_PROJ, projectionsCached: PROJ_CACHED,
+      onProjection: IS_ADMIN ? (async (p, onMsg)=>{ const { job_id }=await window.SciCoAPI.setProjection(SID, p);
+        let err=null; await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat' && onMsg) onMsg(d.message); if(t==='error') err=(d&&d.message)||'error'; } });
+        if(err) throw new Error(err);
+        const d=await window.SciCoAPI.getSession(SID);   // the Gap Graph follows the map: drop the drawn one
+        if(d.topic_map) TOPIC=d.topic_map; PROJ_CACHED=d.map_projections_cached||[]; discInit=false;   // the Gap Graph reloads for this map when next opened
+        return TOPIC; }) : null, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
   }
   const drawTopic = tm => LANDSCAPE ? renderLandscape(tm) : renderTopic(tm);
   // Maps named under an older naming version get the current names once, in the background (any user): the
@@ -851,6 +858,7 @@
     $('tabDisc').style.display = IS_ADMIN ? '' : 'none';   // Gap Graph: admins only for now
     SITE_MODE = me && me.landscape_mode==='new' ? 'new' : 'old';
     NAMING = (me && me.naming_prompt) || '';
+    USER_PROJ = (me && me.map_projection) || 'pca';
     LANDSCAPE = params.get('landscape')!=='0' && (LANDSCAPE_FOR==='all' || !!(me && (me.developer || me.is_admin)));
     $('tmTabLabel').textContent=tmName(); $('tmHead').style.display=LANDSCAPE?'none':'';
     try{ localStorage.setItem('eratost_kl', LANDSCAPE && LANDSCAPE_FOR!=='all' ? '1' : '0'); }catch(_){}
@@ -870,6 +878,7 @@
       const pub=data.publications||{};
       THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[]; VISIBLE=10;
       TOPIC=data.topic_map||null;  // render instantly if already cached on the session
+      PROJ_CACHED=data.map_projections_cached||[];   // admin projection toggle: maps already built for this search
       $('resQuery').textContent='"'+(data.base_query||'')+'"';
       $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
       CV_RUNS=data.converge_runs||[];

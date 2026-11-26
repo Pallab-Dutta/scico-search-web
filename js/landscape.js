@@ -405,7 +405,19 @@
           (ni.at ? ` · ${new Date(ni.at * 1000).toLocaleString()}` : "");
       })() + `</span>` +
         `<select class="kl-namer" aria-label="Model for naming">` + NAMERS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("") + `</select>` +
-        `<button type="button" class="kl-apply kl-rename">Rename</button>` : "") + `</div>` : "";
+        `<button type="button" class="kl-apply kl-rename">Rename</button>` : "") + `</div>` +
+      // Projection: compare PCA with t-SNE + UMAP on this search (each built once, then kept).
+      (opts.onProjection ? (() => {
+        const PN = { pca: "PCA", tsne_umap: "t-SNE + UMAP" };
+        const asked = tm.projection || (tm.method === "tsne_umap" ? "tsne_umap" : "pca"), ran = tm.method || "pca";
+        const cached = opts.projectionsCached || [];
+        return `<div class="kl-mode kl-proj" role="group" aria-label="Map projection (admin)"><span>Projection</span>` +
+          ["pca", "tsne_umap"].map(p => `<button type="button" data-p="${p}" aria-pressed="${asked === p}" title="${
+            p === asked ? "This map" : cached.includes(p) ? "Saved: switches at once" : "Builds this search's map once (about a minute)"}">${PN[p]}</button>`).join("") +
+          `<span class="kl-site">This map ran <b>${esc(PN[ran] || ran)}</b>` +
+          (ran !== asked ? ` <span style="color:#a23f3f">(${esc(PN[asked])} unavailable on the server)</span>` : "") +
+          ` · users get <b>${esc(PN[opts.userProjection] || "PCA")}</b></span><span class="kl-site kl-pnote"></span></div>`;
+      })() : "") : "";
     host.innerHTML = `<div class="kl">${toggle}<div class="kl-grid">` +   // no heading: the tab already says it
       `<div class="kl-legend"><div class="den"><b>Knowledge density</b><span class="kl-steps">${swatches}</span><div class="ends"><span>low</span><span>high</span></div></div>` +
       `<div class="qry"><b style="display:flex;align-items:center;gap:6px"><svg width="11" height="15" viewBox="-10 -28 20 29"><path d="${PIN}" fill="${INK}"/><circle cy="-18" r="3.6" fill="${PAPER}"/></svg>your query</b>` +
@@ -657,6 +669,14 @@
       try { await opts.onSiteMode(mode); render(host, tm, Object.assign({}, opts, { mode, siteMode: mode })); }
       catch (e) { apply1.disabled = false; apply1.textContent = "Could not save, try again"; }
     });
+    root.querySelectorAll(".kl-proj button[data-p]").forEach(b => b.addEventListener("click", async () => {
+      if (b.getAttribute("aria-pressed") === "true") return;
+      const note = root.querySelector(".kl-proj .kl-pnote");
+      root.querySelectorAll(".kl-proj button").forEach(x => { x.disabled = true; });
+      note.style.color = ""; note.textContent = "Switching…";
+      try { const t2 = await opts.onProjection(b.dataset.p, msg => { note.textContent = msg; }); render(host, t2 || tm, Object.assign({}, opts, { mode })); }
+      catch (e) { root.querySelectorAll(".kl-proj button").forEach(x => { x.disabled = false; }); note.style.color = "#a23f3f"; note.textContent = "Switch failed: " + ((e && e.message) || "error"); }
+    }));
     root.querySelectorAll(".kl-mode button[data-m]").forEach(b => b.addEventListener("click", () => {
       const m = b.dataset.m;
       try { localStorage.setItem("eratost_kl_mode", m); } catch (_) {}
