@@ -70,6 +70,8 @@
       return req("POST", "/sessions/" + encodeURIComponent(id) + "/disconnectivity" + q);
     },
     expand(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/expand"); },
+    // Admins: converge search (explore sparse map regions until the density converges).
+    converge(id, maxIter, tol) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/converge", { max_iter: maxIter, tol }); },
 
     /* Stream a job's SSE events. handlers: {onEvent(type,data), onError(err)} */
     async streamJob(jobId, handlers) {

@@ -48,6 +48,16 @@
   .morebtn.getmore{color:var(--red);border-color:var(--red-soft)}
   .morebtn.getmore:hover:not(:disabled){background:var(--bg-soft)}
   .morebtn .mi{font-size:1.15rem}
+  /* Admin: converge search */
+  .cvwrap{margin:26px 0 8px;border:1px dashed var(--line);border-radius:12px;padding:12px 16px;font-size:.86rem;background:#fff}
+  .cvwrap h4{margin:0 0 4px;font-size:.92rem;display:flex;align-items:center;gap:7px}
+  .cvwrap .cvsub{color:var(--muted);margin:0 0 10px;font-size:.8rem}
+  .cvrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+  .cvrow input{width:74px;font:inherit;padding:3px 6px;border:1px solid var(--line);border-radius:6px}
+  .cvlog{margin-top:10px;font-size:.8rem;color:#444;max-height:none}
+  .cvlog div{padding:3px 0;border-bottom:1px dashed var(--line)}
+  .cvlast{margin-top:10px;font-size:.8rem;color:var(--muted)}
+  .cvlast table{border-collapse:collapse;margin-top:4px}.cvlast td,.cvlast th{padding:2px 10px 2px 0;text-align:left;vertical-align:top}
   .morebtn .spin{animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   .morenote{color:var(--muted);font-size:.82rem;text-align:center}
@@ -202,6 +212,7 @@
         </div>
         <div id="paperList"></div>
         <div id="moreWrap" class="morewrap"></div>
+        <div id="convergeWrap" class="cvwrap" style="display:none"></div>
       </section>
 
       <!-- ===== TOPIC MAP (visual preview) ===== -->
@@ -262,7 +273,7 @@
 <script src="js/config.js?v=20261106b"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js?v=20261106a"></script>
-<script src="js/api.js?v=20261126a"></script>
+<script src="js/api.js?v=20261126b"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261103c"></script>
@@ -434,6 +445,49 @@
     }
   }
   $('sortSel').addEventListener('change', renderPapers);
+
+  // ---------- Converge search (admins, experiment) ----------
+  // Explore the map's low-knowledge regions round by round until the papers' density over the fixed 2D map
+  // converges (KL divergence below the tolerance), or the round limit. Backend: backend/converge.py.
+  let CONVERGING=false, CV_RUNS=[];
+  function cvLast(){
+    const r=CV_RUNS[CV_RUNS.length-1]; if(!r) return '';
+    const rows=(r.rounds||[]).map(x=>`<tr><td>${x.round}</td><td>${x.added} / ${x.found}</td><td>${Number(x.kl).toFixed(4)}</td><td>${(x.queries||[]).map(esc).join(' · ')}</td></tr>`).join('');
+    return `<div class="cvlast">Last run: ${esc(r.reason||'')} · ${r.added||0} papers added (max ${r.max_iter} rounds, tolerance ${r.tol})`+
+      (rows?`<table><tr><th>Round</th><th>Added / new</th><th>KL</th><th>Queries</th></tr>${rows}</table>`:'')+`</div>`;
+  }
+  function renderConverge(){
+    const host=$('convergeWrap');
+    if(!IS_ADMIN || !SID){ host.style.display='none'; return; }
+    host.style.display='';
+    host.innerHTML=`<h4><span class="mi">all_inclusive</span> Converge search <span style="font-weight:400;color:var(--muted)">(admin)</span></h4>`+
+      `<p class="cvsub">Explores the map's sparsely studied regions with new queries, round by round, until the papers' density on the fixed 2D map stops changing (KL divergence below the tolerance) or the round limit is reached. Only papers relevant to your question are added.</p>`+
+      `<div class="cvrow"><label>Max rounds <input type="number" id="cvMax" min="1" max="20" value="5"${CONVERGING?' disabled':''}></label>`+
+      `<label>Tolerance (KL) <input type="number" id="cvTol" min="0.0001" max="1" step="0.001" value="0.01"${CONVERGING?' disabled':''}></label>`+
+      `<button class="morebtn getmore" id="cvRun"${CONVERGING?' disabled':''}>${CONVERGING?EratostLoader.inline(ERA_LD)+' Converging…':'<span class="mi">play_arrow</span> Run converge search'}</button></div>`+
+      `<div class="cvlog" id="cvLog"></div>`+(CONVERGING?'':cvLast());
+    if(!CONVERGING) $('cvRun').addEventListener('click', runConverge);
+  }
+  async function runConverge(){
+    if(CONVERGING||!SID) return;
+    const maxIter=Math.max(1,Math.min(20,parseInt($('cvMax').value,10)||5));
+    const tol=Math.max(0.0001,Math.min(1,parseFloat($('cvTol').value)||0.01));
+    CONVERGING=true; renderConverge();
+    const log=$('cvLog'), line=m=>{ const d=document.createElement('div'); d.textContent=m; log.appendChild(d); };
+    try{
+      const { job_id }=await window.SciCoAPI.converge(SID, maxIter, tol);
+      await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') line(d.message); else if(t==='phase') line(d.label); } });
+      const data=await window.SciCoAPI.getSession(SID);
+      const pub=data.publications||{};
+      THRESHOLD=pub.threshold||THRESHOLD; PAPERS=pub.papers||[]; QDATA=data.query_logs||[]; CV_RUNS=data.converge_runs||[];
+      TOPIC=null; topicInit=false; discInit=false;   // new papers: the map and the Gap Graph rebuild on next open
+      $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
+      CONVERGING=false; VISIBLE=10; renderQrows(); renderPapers(); renderConverge();
+    }catch(err){
+      CONVERGING=false; renderConverge();
+      $('cvLog').textContent = err.code===401 ? 'Please sign in again.' : ('Converge search failed ('+(err.message||'error')+').');
+    }
+  }
 
   // ---------- Cite (downloads each format, with a remembered default — like Streamlit) ----------
   const CITE_KEY='scico_cite_default';
@@ -794,7 +848,8 @@
       TOPIC=data.topic_map||null;  // render instantly if already cached on the session
       $('resQuery').textContent='"'+(data.base_query||'')+'"';
       $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
-      renderQrows(); renderPapers();
+      CV_RUNS=data.converge_runs||[];
+      renderQrows(); renderPapers(); renderConverge();
     }catch(err){
       await loadMe();
       $('paperList').innerHTML='';
