@@ -36,7 +36,7 @@
    area: 100cqi = the .main container's width, set in results.html), so the topic/gap rows have room. */
 @media(min-width:761px){.kl{width:min(1160px,calc(100cqi - 56px));max-width:none;position:relative;left:50%;transform:translateX(-50%)}}
 .kl-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1.2fr) 28px minmax(0,1.05fr);
-  grid-template-areas:"legend legend . ." "map list conn panel" "paper paper . .";column-gap:0;row-gap:12px;align-items:start}
+  grid-template-areas:"legend . . ." "map list conn panel" "paper paper . .";column-gap:0;row-gap:12px;align-items:start}
 .kl-map{grid-area:map;position:relative;aspect-ratio:1/1;background:${PAPER};border-radius:8px;width:calc(100% - 14px)}
 .kl-map svg{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:manipulation}
 .kl-pt{cursor:pointer;transition:opacity .15s}
@@ -51,7 +51,9 @@
 .kl-q{cursor:pointer}
 .kl-q .pinb{transition:transform .15s}
 .kl-q.on .pinb{transform:scale(1.3)}
-.kl-list{grid-area:list;display:flex;flex-direction:column;gap:6px;align-self:stretch}
+/* The rows are centred on the MAP's centre (placeList in render, via margin-top): a list taller than the map rises
+   beside the legend (negative margin, which also keeps the map's row from growing), never above the legend's top. */
+.kl-list{grid-area:list;display:flex;flex-direction:column;gap:6px;align-self:start}
 .kl-row{flex:0 0 auto;border:1.5px solid ${RULE};border-radius:8px;background:#fff;transition:border-color .15s,background .15s,transform .15s}
 .kl-row:hover,.kl-row.on{transform:scale(1.02)}
 .kl-row>button{display:flex;align-items:center;gap:9px;width:100%;font:inherit;color:inherit;background:transparent;border:0;padding:8px 10px;cursor:pointer;text-align:left;border-radius:8px}
@@ -89,9 +91,9 @@
 .kl-grp .nm{flex:1}
 .kl-grp .n{font-size:.75rem;color:${GREY};white-space:nowrap}
 .kl-grp[disabled]{cursor:default;opacity:.55}
-.kl-legend{grid-area:legend;display:flex;align-items:stretch;border:1.5px solid ${RULE};border-radius:8px;background:#fff;font-size:.8rem;color:${GREY};width:100%}
+.kl-legend{grid-area:legend;display:flex;align-items:stretch;border:1.5px solid ${RULE};border-radius:8px;background:#fff;font-size:.8rem;color:${GREY};width:calc(100% - 14px)}   /* as wide as the map */
 .kl-legend>div{padding:8px 12px}
-.kl-legend .den{flex:1.55;border-right:1.5px solid ${RULE}}
+.kl-legend .den{flex:1.3;border-right:1.5px solid ${RULE}}
 .kl-legend .qry{flex:1;min-width:0;cursor:default;border-radius:0 7px 7px 0;transition:background .15s}
 .kl-legend .qry.on{background:#f1ece1;box-shadow:inset 0 0 0 1.5px ${INK}}
 .kl-legend b{display:block;font-weight:600;color:${INK};font-size:.82rem;margin-bottom:5px}
@@ -107,10 +109,11 @@
 .kl-plist .it.on{background:#f6f3ec}
 @media(max-width:760px){
   .kl-grid{grid-template-columns:1fr;grid-template-areas:"legend" "map" "paper" "list";row-gap:12px}
-  .kl-map{width:100%}
+  .kl-map{width:100%}.kl-legend{width:100%}
   .kl-conn,.kl-side{display:none}
   .kl-paper{display:none}.kl-paper.show{display:block}
   .kl-row:hover,.kl-row.on{transform:none}
+  .kl-list{margin-top:0!important}
   .kl-row.on .kl-body{display:block}.kl-row.on .chev{transform:rotate(180deg)}
 }
 @media(prefers-reduced-motion:reduce){.kl-gap.on .ring,.kl-row.flash{animation:none}}`;
@@ -523,6 +526,16 @@
       plist.querySelectorAll(".it").forEach(e => e.classList.toggle("on", +e.dataset.i === pi));
     }
 
+    // Rows centred on the map's centre (desktop); a list taller than the map may rise beside the legend.
+    const listEl = root.querySelector(".kl-list"), mapEl = root.querySelector(".kl-map"), legEl = root.querySelector(".kl-legend");
+    function placeList() {
+      if (mobile()) { listEl.style.marginTop = ""; return; }
+      const rise = mapEl.getBoundingClientRect().top - legEl.getBoundingClientRect().top;   // room beside the legend
+      listEl.style.marginTop = Math.round(Math.max(-rise, (mapEl.offsetHeight - listEl.offsetHeight) / 2)) + "px";
+    }
+    placeList();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (root.isConnected) { placeList(); drawConn(active()); } });
+
     // Leaving a row, region or marker clears the hover a moment later, so the pointer can cross the funnel
     // into the panel (to use its sub-areas) without the panel closing.
     let leaveT = null;
@@ -617,7 +630,7 @@
     host.__klDoc = e => { if (root.isConnected && !root.contains(e.target) && (st.pk != null || st.pg != null || st.pp != null)) clearAll(); };
     document.addEventListener("click", host.__klDoc);
     if (host.__klResize) window.removeEventListener("resize", host.__klResize);
-    host.__klResize = () => { if (root.isConnected) { shownKey = undefined; apply(); } };
+    host.__klResize = () => { if (root.isConnected) { placeList(); shownKey = undefined; apply(); } };
     window.addEventListener("resize", host.__klResize);
     // Esc releases everything too.
     if (host.__klKey) document.removeEventListener("keydown", host.__klKey);
