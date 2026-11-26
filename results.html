@@ -281,7 +281,7 @@
 <script src="js/shell.js?v=20261031b"></script>
 <script src="js/drone.js?v=20261124a"></script>
 <script src="js/disconnectivity.js?v=20261124a"></script>
-<script src="js/landscape.js?v=20261127a"></script>
+<script src="js/landscape.js?v=20261127b"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -709,7 +709,10 @@
     status.textContent='';
     window.KnowledgeLandscape.render(host, tm, { lookup: paperFor, devToggle: IS_ADMIN, siteMode: SITE_MODE,
       onSiteMode: IS_ADMIN ? (m=>window.SciCoAPI.setLandscapeMode(m).then(r=>{ SITE_MODE=r.landscape_mode; return r; })) : null, 
-      onRename: IS_ADMIN ? (async m=>{ const { job_id }=await window.SciCoAPI.renameTopicMap(SID, m); await window.SciCoAPI.streamJob(job_id,{}); const d=await window.SciCoAPI.getSession(SID); if(d.topic_map) TOPIC=d.topic_map; return TOPIC; }) : null, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
+      onRename: IS_ADMIN ? (async (m, onMsg)=>{ const { job_id }=await window.SciCoAPI.renameTopicMap(SID, m);
+        let err=null; await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat' && onMsg) onMsg(d.message); if(t==='error') err=(d&&d.message)||'error'; } });
+        if(err) throw new Error(err);   // a failed rename must say so, not quietly show the old names
+        const d=await window.SciCoAPI.getSession(SID); if(d.topic_map) TOPIC=d.topic_map; return TOPIC; }) : null, queryText: ($('resQuery').textContent||'').replace(/^"|"$/g,'') });
   }
   const drawTopic = tm => LANDSCAPE ? renderLandscape(tm) : renderTopic(tm);
   async function startTopic(){

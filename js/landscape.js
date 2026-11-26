@@ -630,8 +630,11 @@
     if (ren) ren.addEventListener("click", async () => {
       const m = root.querySelector(".kl-mode .kl-namer").value;
       ren.disabled = true; ren.textContent = "Renaming…";
-      try { const t2 = await opts.onRename(m); render(host, t2 || tm, Object.assign({}, opts, { mode })); }
-      catch (e) { ren.disabled = false; ren.textContent = "Could not rename, try again"; }
+      let note = root.querySelector(".kl-mode .kl-rnote");
+      if (!note) { note = document.createElement("span"); note.className = "kl-site kl-rnote"; ren.after(note); }
+      note.style.color = ""; note.textContent = "";
+      try { const t2 = await opts.onRename(m, msg => { note.textContent = msg; }); render(host, t2 || tm, Object.assign({}, opts, { mode })); }
+      catch (e) { ren.disabled = false; ren.textContent = "Rename"; note.style.color = "#a23f3f"; note.textContent = "Rename failed: " + ((e && e.message) || "error"); }
     });
     const apply1 = root.querySelector(".kl-mode .kl-apply:not(.kl-rename)");
     if (apply1) apply1.addEventListener("click", async () => {
