@@ -415,7 +415,7 @@
       `<g clip-path="url(#${uid})"><rect class="kl-bg" width="${V}" height="${V}" fill="${PAPER}"/>` +
       (grid ? `<image href="${fieldURL(f)}" x="0" y="0" width="${V}" height="${V}" preserveAspectRatio="none" pointer-events="none"/>` : "") +
       `<g stroke="${RULE}" stroke-width="1" pointer-events="none">${gridLines}</g>` +
-      `<g pointer-events="none">${regions}${lines}${outers}</g>${dots}${gapMarks}${star}</g>` +
+      `<g pointer-events="none">${regions}${lines}${outers}</g>${dots}<g class="kl-top" pointer-events="none"></g>${gapMarks}${star}</g>` +
       `<rect width="${V}" height="${V}" rx="6" fill="none" stroke="${RULE}" stroke-width="1.5" pointer-events="none"/></svg></div>` +
       `<div class="kl-list">${rowsHTML}` + (gaps.length ? "" : `<div class="kl-none">No prominent gap between topics: coverage is fairly uniform.</div>`) + `</div>` +
       `<div class="kl-conn"><svg preserveAspectRatio="none"><path/></svg></div>` +
@@ -515,7 +515,12 @@
         el.setAttribute("stroke", big || ring ? INK : PAPER);
         el.setAttribute("stroke-width", i === st.pp ? "2.5" : big ? "1.8" : ring ? "1.4" : "2");
       });
-      [st.pp, st.hp].forEach(x => { if (x != null) { const el = svg.querySelector(`.kl-pt[data-i="${x}"]`); if (el) el.parentNode.appendChild(el); } });
+      // The hovered / pinned dot is drawn again on a top layer (pointer-events none) instead of moving its element
+      // to the front: moving an element under the pointer mid-click makes some browsers drop the click.
+      svg.querySelector(".kl-top").innerHTML = [...new Set([st.pp, st.hp].filter(x => x != null))].map(x => {
+        const el = svg.querySelector(`.kl-pt[data-i="${x}"]`);
+        return el ? `<circle cx="${el.getAttribute("cx")}" cy="${el.getAttribute("cy")}" r="7" fill="${el.getAttribute("fill")}" stroke="${INK}" stroke-width="${x === st.pp ? 2.5 : 1.8}"/>` : "";
+      }).join("");
       // The hovered (or pinned) paper, only while there is one.
       paperBox.classList.toggle("show", pi != null);
       paperBox.innerHTML = pi == null ? "" : metaOf(pi);
@@ -581,9 +586,17 @@
       if (k !== mapKey) { mapKey = k; if (k) hoverKey(k); else leaveKey(); }
     });
     svg.addEventListener("mouseleave", () => { mapKey = null; st.hp = null; svg.style.cursor = ""; qOn(false); leaveKey(); apply(); });
+    // Pin on PRESS: pressing on a dot pins its paper at once, and the click that follows (whatever element the
+    // browser reports it on) can't release it or pin a topic instead.
+    let pressedDot = false;
+    svg.addEventListener("pointerdown", e => {
+      const pt = e.target.closest(".kl-pt");
+      pressedDot = !!pt;
+      if (pt) { st.pp = +pt.dataset.i; st.hp = null; apply(); }
+    });
     svg.addEventListener("click", e => {
       const pt = e.target.closest(".kl-pt"), m = e.target.closest(".kl-gap");
-      if (pt) { const i = +pt.dataset.i; st.pp = i; st.hp = null; apply(); return; }
+      if (pressedDot || pt) { pressedDot = false; if (pt) { st.pp = +pt.dataset.i; st.hp = null; apply(); } return; }
       if (m) { pinKey("g:" + m.dataset.g); return; }
       if (e.target.closest(".kl-q")) return;
       const [x, y] = toMap(e), c = regionAt(x, y);
