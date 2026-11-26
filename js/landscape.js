@@ -409,13 +409,13 @@
       // Projection: compare PCA with t-SNE + UMAP on this search (each built once, then kept).
       (opts.onProjection ? (() => {
         const PN = { pca: "PCA", tsne_umap: "t-SNE + UMAP" };
-        const asked = tm.projection || (tm.method === "tsne_umap" ? "tsne_umap" : "pca"), ran = tm.method || "pca";
+        const ran = tm.method || "pca", asked = PN[ran] ? ran : (tm.projection || "pca");   // the button = what ran
         const cached = opts.projectionsCached || [];
         return `<div class="kl-mode kl-proj" role="group" aria-label="Map projection (admin)"><span>Projection</span>` +
           ["pca", "tsne_umap"].map(p => `<button type="button" data-p="${p}" aria-pressed="${asked === p}" title="${
             p === asked ? "This map" : cached.includes(p) ? "Saved: switches at once" : "Builds this search's map once (about a minute)"}">${PN[p]}</button>`).join("") +
           `<span class="kl-site">This map ran <b>${esc(PN[ran] || ran)}</b>` +
-          (ran !== asked ? ` <span style="color:#a23f3f">(${esc(PN[asked])} unavailable on the server)</span>` : "") +
+          (tm.projection === "tsne_umap" && ran !== "tsne_umap" ? ` <span style="color:#a23f3f">(t-SNE + UMAP unavailable on the server)</span>` : "") +
           ` · users get <b>${esc(PN[opts.userProjection] || "PCA")}</b></span><span class="kl-site kl-pnote"></span></div>`;
       })() : "") : "";
     host.innerHTML = `<div class="kl">${toggle}<div class="kl-grid">` +   // no heading: the tab already says it
