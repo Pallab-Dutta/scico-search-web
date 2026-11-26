@@ -32,7 +32,10 @@
 .kl-mode button.kl-apply:hover{background:${INK};color:#fff}
 /* Owner's sketch (v2): legend box | map + topic/gap rows | funnel + detail panel; hovered paper below;
    a clicked group's papers listed under it all. Nothing scrolls inside; nothing shows until it is needed. */
-.kl-grid{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr) 28px minmax(0,1fr);
+/* Wide screens: the landscape uses up to 1160px of the page (centred on the results column, never past the main
+   area: 100cqi = the .main container's width, set in results.html), so the topic/gap rows have room. */
+@media(min-width:761px){.kl{width:min(1160px,calc(100cqi - 56px));max-width:none;position:relative;left:50%;transform:translateX(-50%)}}
+.kl-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1.2fr) 28px minmax(0,1.05fr);
   grid-template-areas:"legend legend . ." "map list conn panel" "paper paper . .";column-gap:0;row-gap:12px;align-items:start}
 .kl-map{grid-area:map;position:relative;aspect-ratio:1/1;background:${PAPER};border-radius:8px;width:calc(100% - 14px)}
 .kl-map svg{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:manipulation}
@@ -88,7 +91,7 @@
 .kl-grp[disabled]{cursor:default;opacity:.55}
 .kl-legend{grid-area:legend;display:flex;align-items:stretch;border:1.5px solid ${RULE};border-radius:8px;background:#fff;font-size:.8rem;color:${GREY};width:100%}
 .kl-legend>div{padding:8px 12px}
-.kl-legend .den{flex:1.75;border-right:1.5px solid ${RULE}}
+.kl-legend .den{flex:1.55;border-right:1.5px solid ${RULE}}
 .kl-legend .qry{flex:1;min-width:0;cursor:default;border-radius:0 7px 7px 0;transition:background .15s}
 .kl-legend .qry.on{background:#f1ece1;box-shadow:inset 0 0 0 1.5px ${INK}}
 .kl-legend b{display:block;font-weight:600;color:${INK};font-size:.82rem;margin-bottom:5px}
