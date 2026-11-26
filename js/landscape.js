@@ -410,10 +410,17 @@
       (opts.onProjection ? (() => {
         const PN = { pca: "PCA", tsne_umap: "t-SNE + UMAP" };
         const ran = tm.method || "pca", asked = PN[ran] ? ran : (tm.projection || "pca");   // the button = what ran
-        const cached = opts.projectionsCached || [];
-        return `<div class="kl-mode kl-proj" role="group" aria-label="Map projection (admin)"><span>Projection</span>` +
-          ["pca", "tsne_umap"].map(p => `<button type="button" data-p="${p}" aria-pressed="${asked === p}" title="${
-            p === asked ? "This map" : cached.includes(p) ? "Saved: switches at once" : "Builds this search's map once (about a minute)"}">${PN[p]}</button>`).join("") +
+        const cached = opts.projectionsCached || [];   // saved versions, "projection|text"
+        const TN = { title: "Title only", title_abstract: "Title + abstract" };
+        const text = tm.map_text || (opts.mapVariant || {}).map_text || "title_abstract";
+        const tip = (p, t) => (p === asked && t === text) ? "This map" : cached.includes(p + "|" + t) ? "Saved: switches at once"
+          : "Builds this search's map once (about a minute)" + (t === "title_abstract" ? "; abstracts an older search lacks are fetched from OpenAlex" : "");
+        const nAbs = tm.abstracts_used, nPts = (tm.points || []).length;
+        return `<div class="kl-mode kl-proj" role="group" aria-label="Map text (admin)"><span>Map text</span>` +
+          ["title", "title_abstract"].map(t => `<button type="button" data-p="${asked}" data-t="${t}" aria-pressed="${text === t}" title="${tip(asked, t)}">${TN[t]}</button>`).join("") +
+          `<span class="kl-site">${text === "title_abstract" && nAbs != null ? `<b>${nAbs}</b> of ${nPts} papers placed by title + abstract (the rest by title)` : text === "title" ? "every paper placed by its title" : "older map: papers with a saved abstract used it"}</span></div>` +
+          `<div class="kl-mode kl-proj" role="group" aria-label="Map projection (admin)"><span>Projection</span>` +
+          ["pca", "tsne_umap"].map(p => `<button type="button" data-p="${p}" data-t="${text}" aria-pressed="${asked === p}" title="${tip(p, text)}">${PN[p]}</button>`).join("") +
           `<span class="kl-site">This map ran <b>${esc(PN[ran] || ran)}</b>` +
           (tm.projection === "tsne_umap" && ran !== "tsne_umap" ? ` <span style="color:#a23f3f">(t-SNE + UMAP unavailable on the server)</span>` : "") +
           ` · users get <b>${esc(PN[opts.userProjection] || "PCA")}</b></span><span class="kl-site kl-pnote"></span></div>`;
@@ -674,7 +681,8 @@
       const note = root.querySelector(".kl-proj .kl-pnote");
       root.querySelectorAll(".kl-proj button").forEach(x => { x.disabled = true; });
       note.style.color = ""; note.textContent = "Switching…";
-      try { const t2 = await opts.onProjection(b.dataset.p, msg => { note.textContent = msg; }); render(host, t2 || tm, Object.assign({}, opts, { mode })); }
+      try { const r = await opts.onProjection(b.dataset.p, b.dataset.t, msg => { note.textContent = msg; });
+        render(host, (r && r.tm) || tm, Object.assign({}, opts, { mode }, r ? { projectionsCached: r.cached, mapVariant: r.variant } : {})); }
       catch (e) { root.querySelectorAll(".kl-proj button").forEach(x => { x.disabled = false; }); note.style.color = "#a23f3f"; note.textContent = "Switch failed: " + ((e && e.message) || "error"); }
     }));
     root.querySelectorAll(".kl-mode button[data-m]").forEach(b => b.addEventListener("click", () => {
