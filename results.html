@@ -453,16 +453,16 @@
   let CONVERGING=false, CV_RUNS=[];
   function cvLast(){
     const r=CV_RUNS[CV_RUNS.length-1]; if(!r) return '';
-    const rows=(r.rounds||[]).map(x=>`<tr><td>${x.round}</td><td>${x.added} / ${x.found}</td><td>${Number(x.kl).toFixed(4)}</td><td>${(x.queries||[]).map(esc).join(' · ')}</td></tr>`).join('');
+    const rows=(r.rounds||[]).map(x=>`<tr><td>${x.round}</td><td>${x.added} / ${x.found}</td><td>${x.added_from_citations!=null?x.added_from_citations:'–'}</td><td>${Number(x.kl).toFixed(4)}</td><td>${(x.queries||[]).map(esc).join(' · ')}</td></tr>`).join('');
     return `<div class="cvlast">Last run: ${esc(r.reason||'')} · ${r.added||0} papers added (max ${r.max_iter} rounds, tolerance ${r.tol})`+
-      (rows?`<table><tr><th>Round</th><th>Added / new</th><th>KL</th><th>Queries</th></tr>${rows}</table>`:'')+`</div>`;
+      (rows?`<table><tr><th>Round</th><th>Added / new</th><th>Via citations</th><th>KL</th><th>Queries</th></tr>${rows}</table>`:'')+`</div>`;
   }
   function renderConverge(){
     const host=$('convergeWrap');
     if(!IS_ADMIN || !SID){ host.style.display='none'; return; }
     host.style.display='';
     host.innerHTML=`<h4><span class="mi">all_inclusive</span> Converge search <span style="font-weight:400;color:var(--muted)">(admin)</span></h4>`+
-      `<p class="cvsub">Explores the map's sparsely studied regions with new queries, round by round, until the papers' density on the fixed 2D map stops changing (KL divergence below the tolerance) or the round limit is reached. Only papers relevant to your question are added.</p>`+
+      `<p class="cvsub">Explores the map's sparsely studied regions with new queries and with the papers that cite each region's bordering papers, round by round, until the papers' density on the fixed 2D map stops changing (KL divergence below the tolerance) or the round limit is reached. Only papers relevant to your question are added.</p>`+
       `<div class="cvrow"><label>Max rounds <input type="number" id="cvMax" min="1" max="20" value="5"${CONVERGING?' disabled':''}></label>`+
       `<label>Tolerance (KL) <input type="number" id="cvTol" min="0.0001" max="1" step="0.001" value="0.01"${CONVERGING?' disabled':''}></label>`+
       `<button class="morebtn getmore" id="cvRun"${CONVERGING?' disabled':''}>${CONVERGING?EratostLoader.inline(ERA_LD)+' Converging…':'<span class="mi">play_arrow</span> Run converge search'}</button></div>`+
