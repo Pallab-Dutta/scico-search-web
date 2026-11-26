@@ -10,6 +10,7 @@
 (function () {
   const PAPER = "#fbf7ef", RULE = "#e3e2de", INK = "#0b0b0b", GREY = "#52514e", UNCL = "#a3a29b";
   const COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#7E6BA8", "#C98A3E", "#4C9AA6"];
+  const NAMERS = [["", "Auto (Qwen first)"], ["qwen/qwen3.8-27b", "qwen3.8-27b"], ["openai/gpt-oss-20b", "gpt-oss-20b"], ["openai/gpt-oss-120b", "gpt-oss-120b"]];
   const LEVELS = 6, MAXA = 0.62, N = 200, V = 600;          // V: the map's SVG units (square)
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
   const clamp01 = v => Math.max(0, Math.min(1, v));
@@ -22,7 +23,8 @@
 .kl{color:${INK};--kl-paper:${PAPER};--kl-rule:${RULE};--kl-grey:${GREY}}
 .kl *{box-sizing:border-box}
 .kl-h{font-size:1.15rem;margin:16px 0 14px;text-align:center}
-.kl-mode{display:flex;justify-content:center;align-items:center;gap:0;margin:-6px 0 12px;font-size:.78rem;color:${GREY}}
+.kl-mode{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 0;margin:-6px 0 12px;font-size:.78rem;color:${GREY}}
+.kl-mode select{font:inherit;margin-left:8px;padding:2px 4px;border:1.5px solid ${RULE};border-radius:6px;background:#fff}
 .kl-mode span{margin-right:8px}
 .kl-mode button{font:inherit;color:${GREY};background:#fff;border:1.5px solid ${RULE};padding:3px 12px;cursor:pointer}
 .kl-mode button:first-of-type{border-radius:6px 0 0 6px}.kl-mode button:last-of-type{border-radius:0 6px 6px 0;border-left:0}
@@ -392,7 +394,11 @@
       `<button type="button" data-m="new" aria-pressed="${!OLD}" title="Topics by contour; sub-areas = each topic's smaller hills">New</button>` +
       `<button type="button" data-m="old" aria-pressed="${OLD}" title="As the Topic Map: topics by nearest peak; sub-areas = core / emerging / frontier density bands">Old</button>` +
       `<span class="kl-site">Everyone sees: <b>${siteMode === "new" ? "New" : "Old"}</b></span>` +
-      (mode !== siteMode && opts.onSiteMode ? `<button type="button" class="kl-apply">Use ${OLD ? "Old" : "New"} for everyone</button>` : "") + `</div>` : "";
+      (mode !== siteMode && opts.onSiteMode ? `<button type="button" class="kl-apply">Use ${OLD ? "Old" : "New"} for everyone</button>` : "") +
+      // Compare naming models on this same map: re-run only the names with the chosen model.
+      (opts.onRename ? `<span class="kl-site">Names by <b>${esc(tm.named_by || "unknown")}</b></span>` +
+        `<select class="kl-namer" aria-label="Model for naming">` + NAMERS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("") + `</select>` +
+        `<button type="button" class="kl-apply kl-rename">Rename</button>` : "") + `</div>` : "";
     host.innerHTML = `<div class="kl"><h2 class="kl-h">Knowledge Landscape</h2>${toggle}<div class="kl-grid">` +
       `<div class="kl-legend"><div class="den"><b>Knowledge density</b><span class="kl-steps">${swatches}</span><div class="ends"><span>low</span><span>high</span></div></div>` +
       `<div class="qry"><b style="display:flex;align-items:center;gap:6px"><svg width="11" height="15" viewBox="-10 -28 20 29"><path d="${PIN}" fill="${INK}"/><circle cy="-18" r="3.6" fill="${PAPER}"/></svg>your query</b>` +
@@ -613,7 +619,14 @@
       }
       if (e.target.closest && e.target.closest(".kl-plist .x")) { clearAll(); return; }
     });
-    const apply1 = root.querySelector(".kl-mode .kl-apply");
+    const ren = root.querySelector(".kl-mode .kl-rename");
+    if (ren) ren.addEventListener("click", async () => {
+      const m = root.querySelector(".kl-mode .kl-namer").value;
+      ren.disabled = true; ren.textContent = "Renaming…";
+      try { const t2 = await opts.onRename(m); render(host, t2 || tm, Object.assign({}, opts, { mode })); }
+      catch (e) { ren.disabled = false; ren.textContent = "Could not rename, try again"; }
+    });
+    const apply1 = root.querySelector(".kl-mode .kl-apply:not(.kl-rename)");
     if (apply1) apply1.addEventListener("click", async () => {
       if (!window.confirm(`Show every user the ${OLD ? "Old" : "New"} way of finding topics and sub-areas?`)) return;
       apply1.disabled = true; apply1.textContent = "Saving…";

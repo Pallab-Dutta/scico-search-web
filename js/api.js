@@ -70,6 +70,8 @@
       return req("POST", "/sessions/" + encodeURIComponent(id) + "/disconnectivity" + q);
     },
     expand(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/expand"); },
+    // Admins: re-name the saved map's topics / sub-areas / gaps with one Groq model (null = the naming pool).
+    renameTopicMap(id, model) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/topicmap/rename", { model: model || null }); },
     // Admins: converge search (explore sparse map regions until the density converges).
     converge(id, maxIter, tol) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/converge", { max_iter: maxIter, tol }); },
 
