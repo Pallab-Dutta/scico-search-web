@@ -396,7 +396,14 @@
       `<span class="kl-site">Everyone sees: <b>${siteMode === "new" ? "New" : "Old"}</b></span>` +
       (mode !== siteMode && opts.onSiteMode ? `<button type="button" class="kl-apply">Use ${OLD ? "Old" : "New"} for everyone</button>` : "") +
       // Compare naming models on this same map: re-run only the names with the chosen model.
-      (opts.onRename ? `<span class="kl-site">Names by <b>${esc(tm.named_by || "unknown")}</b></span>` +
+      (opts.onRename ? `<span class="kl-site">Names by <b>${esc(tm.named_by || "unknown")}</b>` + (() => {
+        const ni = tm.naming_info || {};   // how the names were made: prompt version, abstracts used, rounds
+        if (!ni.prompt) return " · older naming (before 2026-11-26)";
+        const kw = (ni.keyword_topics || []).length;
+        return ` · prompt ${esc(ni.prompt)} · ${ni.abstracts || 0} abstracts` + (ni.rounds > 1 ? ` · ${ni.rounds} rounds` : "") +
+          (kw ? ` · <span style="color:#a23f3f">${kw} topic(s) on keyword names</span>` : "") +
+          (ni.at ? ` · ${new Date(ni.at * 1000).toLocaleString()}` : "");
+      })() + `</span>` +
         `<select class="kl-namer" aria-label="Model for naming">` + NAMERS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("") + `</select>` +
         `<button type="button" class="kl-apply kl-rename">Rename</button>` : "") + `</div>` : "";
     host.innerHTML = `<div class="kl"><h2 class="kl-h">Knowledge Landscape</h2>${toggle}<div class="kl-grid">` +
