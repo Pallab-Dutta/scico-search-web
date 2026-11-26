@@ -565,7 +565,8 @@
     let mapKey = null;                                     // the region/marker the pointer is over on the map
     const qOn = on => { qPin.classList.toggle("on", on); qBox.classList.toggle("on", on); };
 
-    // Papers
+    // Papers: hover shows a paper while the pointer is on it; a click pins it (clicking it again keeps it pinned, so a
+    // double-click can't release it); a click outside the landscape, on empty map space, or Esc releases it.
     svg.addEventListener("mouseover", e => { const pt = e.target.closest(".kl-pt"); if (pt) { st.hp = +pt.dataset.i; apply(); } });
     svg.addEventListener("mouseout", e => { const pt = e.target.closest(".kl-pt"); if (pt && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(".kl-pt") === pt)) { st.hp = null; apply(); } });
     // Regions (hit-test on each topic's outermost own ring), gap markers and the query pin
@@ -582,7 +583,7 @@
     svg.addEventListener("mouseleave", () => { mapKey = null; st.hp = null; svg.style.cursor = ""; qOn(false); leaveKey(); apply(); });
     svg.addEventListener("click", e => {
       const pt = e.target.closest(".kl-pt"), m = e.target.closest(".kl-gap");
-      if (pt) { const i = +pt.dataset.i; st.pp = st.pp === i ? null : i; st.hp = null; apply(); return; }
+      if (pt) { const i = +pt.dataset.i; st.pp = i; st.hp = null; apply(); return; }
       if (m) { pinKey("g:" + m.dataset.g); return; }
       if (e.target.closest(".kl-q")) return;
       const [x, y] = toMap(e), c = regionAt(x, y);
