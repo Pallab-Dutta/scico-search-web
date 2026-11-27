@@ -281,7 +281,7 @@
 <script src="js/shell.js?v=20261031b"></script>
 <script src="js/drone.js?v=20261124a"></script>
 <script src="js/disconnectivity.js?v=20261124a"></script>
-<script src="js/landscape.js?v=20261127i"></script>
+<script src="js/landscape.js?v=20261127j"></script>
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
@@ -302,7 +302,7 @@
   // sub-areas (nearest peak; core / emerging / frontier bands); admins also get the New / Old toggle.
   // The Gap Graph tab is admin-only for now.
   const LANDSCAPE_FOR="all";
-  let LANDSCAPE=false, SITE_MODE='old', NAMING='', USER_PROJ='pca', PROJ_CACHED=[], MAP_VARIANT=null, _meDone;   // NAMING: the server's current naming version   // SITE_MODE: the landscape method everyone sees (admins set it)
+  let LANDSCAPE=false, SITE_MODE='old', NAMING='', USER_PROJ='pca', USER_TEXT='title', PROJ_CACHED=[], MAP_VARIANT=null, _meDone;   // NAMING: the server's current naming version   // SITE_MODE: the landscape method everyone sees (admins set it)
   const ME_READY=new Promise(r=>{ _meDone=r; });   // resolved by hydrate() once /me has answered (or failed)
   const tmName=()=>LANDSCAPE?'Knowledge Landscape':'Topic Map';
   // Label the tab from this browser's last answer, so it doesn't flash "Topic Map" while /me is on its way.
@@ -714,7 +714,7 @@
         let err=null; await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat' && onMsg) onMsg(d.message); if(t==='error') err=(d&&d.message)||'error'; } });
         if(err) throw new Error(err);   // a failed rename must say so, not quietly show the old names
         const d=await window.SciCoAPI.getSession(SID); if(d.topic_map) TOPIC=d.topic_map; return TOPIC; }) : null,
-      userProjection: USER_PROJ, projectionsCached: PROJ_CACHED, mapVariant: MAP_VARIANT,
+      userProjection: USER_PROJ, userMapText: USER_TEXT, projectionsCached: PROJ_CACHED, mapVariant: MAP_VARIANT,
       onProjection: IS_ADMIN ? (async (p, t, onMsg)=>{ const { job_id }=await window.SciCoAPI.setProjection(SID, p, t);
         let err=null; await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat' && onMsg) onMsg(d.message); if(t==='error') err=(d&&d.message)||'error'; } });
         if(err) throw new Error(err);
@@ -859,6 +859,7 @@
     SITE_MODE = me && me.landscape_mode==='new' ? 'new' : 'old';
     NAMING = (me && me.naming_prompt) || '';
     USER_PROJ = (me && me.map_projection) || 'pca';
+    USER_TEXT = (me && me.map_text) || 'title';
     LANDSCAPE = params.get('landscape')!=='0' && (LANDSCAPE_FOR==='all' || !!(me && (me.developer || me.is_admin)));
     $('tmTabLabel').textContent=tmName(); $('tmHead').style.display=LANDSCAPE?'none':'';
     try{ localStorage.setItem('eratost_kl', LANDSCAPE && LANDSCAPE_FOR!=='all' ? '1' : '0'); }catch(_){}

@@ -411,14 +411,15 @@
         const PN = { pca: "PCA", tsne_umap: "t-SNE + UMAP" };
         const ran = tm.method || "pca", asked = PN[ran] ? ran : (tm.projection || "pca");   // the button = what ran
         const cached = opts.projectionsCached || [];   // saved versions, "projection|text"
-        const TN = { title: "Title only", title_abstract: "Title + abstract", abstract: "Abstract only" };
+        const TN = { title: "Title only", title_abstract: "Title + abstract", abstract: "Abstract only", title_results: "Title + results" };
         const text = tm.map_text || (opts.mapVariant || {}).map_text || "title_abstract";
         const tip = (p, t) => (p === asked && t === text) ? "This map" : cached.includes(p + "|" + t) ? "Saved: switches at once"
           : "Builds this search's map once (about a minute)" + (t !== "title" ? "; abstracts an older search lacks are fetched from OpenAlex" : "");
         const nAbs = tm.abstracts_used, nPts = (tm.points || []).length;
         return `<div class="kl-mode kl-proj" role="group" aria-label="Map text (admin)"><span>Map text</span>` +
-          ["title", "title_abstract", "abstract"].map(t => `<button type="button" data-p="${asked}" data-t="${t}" aria-pressed="${text === t}" title="${tip(asked, t)}">${TN[t]}</button>`).join("") +
-          `<span class="kl-site">${text !== "title" && nAbs != null ? `<b>${nAbs}</b> of ${nPts} papers placed by ${text === "abstract" ? "abstract alone" : "title + abstract"} (the rest by title)` : text === "title" ? "every paper placed by its title" : "older map: papers with a saved abstract used it"}</span></div>` +
+          ["title", "title_abstract", "abstract", "title_results"].map(t => `<button type="button" data-p="${asked}" data-t="${t}" aria-pressed="${text === t}" title="${tip(asked, t)}">${TN[t]}</button>`).join("") +
+          `<span class="kl-site">${text !== "title" && nAbs != null ? `<b>${nAbs}</b> of ${nPts} papers placed by ${{ abstract: "abstract alone", title_results: "title + their abstract's result sentences" }[text] || "title + abstract"} (the rest by title)` : text === "title" ? "every paper placed by its title" : "older map: papers with a saved abstract used it"}` +
+          ` · users get <b>${esc(TN[opts.userMapText] || "Title only")}</b></span></div>` +
           `<div class="kl-mode kl-proj" role="group" aria-label="Map projection (admin)"><span>Projection</span>` +
           ["pca", "tsne_umap"].map(p => `<button type="button" data-p="${p}" data-t="${text}" aria-pressed="${asked === p}" title="${tip(p, text)}">${PN[p]}</button>`).join("") +
           `<span class="kl-site">This map ran <b>${esc(PN[ran] || ran)}</b>` +
