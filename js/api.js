@@ -76,6 +76,8 @@
     refreshNames(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/topicmap/refresh-names"); },
     // Admins: switch this search's map between projections ("pca" | "tsne_umap"); both are kept with the search.
     setProjection(id, projection, mapText) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/topicmap/projection", { projection, map_text: mapText || null }); },
+    // Admins (test): score title-matched papers again on title + abstract.
+    stage2(id) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/stage2"); },
     // Admins: converge search (explore sparse map regions until the density converges).
     converge(id, maxIter, tol) { return req("POST", "/sessions/" + encodeURIComponent(id) + "/converge", { max_iter: maxIter, tol }); },
 

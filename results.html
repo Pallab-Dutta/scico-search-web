@@ -39,6 +39,10 @@
   .pactions a{display:inline-flex;align-items:center;gap:5px;color:var(--slate);font-size:.84rem;cursor:pointer}
   .pactions a:hover{color:var(--btn)}.pactions .mi{font-size:1.05rem}
   .paper.below{opacity:.6}
+  .s2row{flex-wrap:wrap;gap:6px 10px;font-size:.82rem;color:var(--grey,#666)}.s2row b{color:var(--ink)}
+  .s2row input{width:64px;font:inherit;padding:2px 4px}.s2row button{font:inherit;padding:2px 10px;border:1.5px solid #ccc;background:#fff;border-radius:6px;cursor:pointer}
+  .s2row button[aria-pressed="true"]{background:#0b0b0b;border-color:#0b0b0b;color:#fff}
+  .s2tag{font-size:.78rem;color:#a23f3f;margin-left:6px}
   /* "See more" / "Get more" pagination controls (mirror the Streamlit buttons) */
   .morewrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin:22px 0 4px}
   .morebtn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:#fff;
@@ -211,6 +215,7 @@
           <select id="sortSel"><option value="ai">AI Score</option><option value="impact">Impact</option><option value="year">Year</option><option value="cite">Citations</option></select>
           <span id="showCount"></span>
         </div>
+        <div class="tools s2row" id="s2row" style="display:none"></div>
         <div id="paperList"></div>
         <div id="moreWrap" class="morewrap"></div>
         <div id="convergeWrap" class="cvwrap" style="display:none"></div>
@@ -274,7 +279,7 @@
 <script src="js/config.js?v=20261106b"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js?v=20261106a"></script>
-<script src="js/api.js?v=20261127c"></script>
+<script src="js/api.js?v=20261127d"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="js/logo.js?v=20261031b"></script>
 <script src="js/loader.js?v=20261103c"></script>
@@ -364,10 +369,42 @@
     host.querySelectorAll('.qbtn').forEach(b=>b.addEventListener('click',()=>openPanel(+b.dataset.q)));
   }
   let SHOWN=[];
+  // Admin test: second stage. Papers past the TITLE cutoff are scored again on title + abstract (ai_score_ta);
+  // with the stage on, those below the title + abstract cutoff count as dropped (dimmed, listed after the kept ones).
+  let STAGE2=null, S2={ on:false, cut:0.70 };
+  try{ Object.assign(S2, JSON.parse(localStorage.getItem('eratost_s2')||'{}')); }catch(_){}
+  const s2Dropped = p => IS_ADMIN && S2.on && Number(p.ai_score)>=THRESHOLD && p.ai_score_ta!=null && Number(p.ai_score_ta)<S2.cut;
+  function renderStage2(){
+    const row=$('s2row'); if(!row) return;
+    if(!IS_ADMIN){ row.style.display='none'; return; }
+    row.style.display='';
+    const passed=PAPERS.filter(p=>Number(p.ai_score)>=THRESHOLD), scored=passed.filter(p=>p.ai_score_ta!=null);
+    const dropped=passed.filter(s2Dropped).length;
+    row.innerHTML=`<span>Second stage (admin test): title + abstract</span>`+
+      `<button type="button" data-s2="off" aria-pressed="${!S2.on}">Off</button><button type="button" data-s2="on" aria-pressed="${S2.on}">On</button>`+
+      `<span>cutoff <input type="number" id="s2cut" min="0" max="1" step="0.01" value="${S2.cut}"></span>`+
+      (STAGE2 ? `<span><b>${scored.length}</b> of ${passed.length} title-matched papers scored`+(S2.on?` · <b>${dropped}</b> dropped, <b>${passed.length-dropped}</b> kept`:'')+`</span>`
+              : `<span>not scored yet</span>`)+
+      `<button type="button" id="s2run">${STAGE2?'Score again':'Score on title + abstract'}</button><span id="s2note"></span>`;
+    const save=()=>{ try{ localStorage.setItem('eratost_s2', JSON.stringify(S2)); }catch(_){} renderPapers(); renderStage2(); };
+    row.querySelectorAll('[data-s2]').forEach(b=>b.addEventListener('click',()=>{ S2.on=b.dataset.s2==='on'; save(); }));
+    $('s2cut').addEventListener('change',e=>{ const v=Number(e.target.value); if(v>0&&v<1){ S2.cut=v; save(); } });
+    $('s2run').addEventListener('click', async ()=>{
+      const btn=$('s2run'), note=$('s2note'); btn.disabled=true; note.textContent='Starting…';
+      try{
+        const { job_id }=await window.SciCoAPI.stage2(SID); let err=null;
+        await window.SciCoAPI.streamJob(job_id,{ onEvent(t,d){ if(t==='query_stat') note.textContent=d.message; if(t==='error') err=(d&&d.message)||'error'; } });
+        if(err) throw new Error(err);
+        const d=await window.SciCoAPI.getSession(SID); PAPERS=(d.publications||{}).papers||PAPERS; STAGE2=d.stage2||null;
+        renderPapers(); renderStage2();
+      }catch(e){ btn.disabled=false; note.style.color='#a23f3f'; note.textContent='Failed: '+((e&&e.message)||'error'); }
+    });
+  }
   function paperHTML(p,i){
-    const low=Number(p.ai_score)<THRESHOLD;
+    const drop=s2Dropped(p), low=Number(p.ai_score)<THRESHOLD || drop;
     return `<div class="paper${low?' below':''}"><div class="ptitle${low?' low':''}"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}>${esc(p.title)}</a></div>`+
-      `<div class="pmeta">${esc(p.authors)}${p.publisher?`<span class="sep">|</span><span class="mi">book_ribbon</span> ${esc(p.publisher)}`:''}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}<span class="sep">|</span><span class="mi">psychology</span> ${aiScoreHTML(p)}</div>`+
+      `<div class="pmeta">${esc(p.authors)}${p.publisher?`<span class="sep">|</span><span class="mi">book_ribbon</span> ${esc(p.publisher)}`:''}<span class="sep">|</span><span class="mi">event</span> ${esc(p.year)}<span class="sep">|</span><span class="mi">trending_up</span> Citations: ${p.citation_count||0}<span class="sep">|</span><span class="mi">psychology</span> ${aiScoreHTML(p)}`+
+      (IS_ADMIN && p.ai_score_ta!=null ? `<span class="sep">|</span>title + abstract ${Number(p.ai_score_ta).toFixed(2)}`+(drop?`<span class="s2tag">dropped by the second stage</span>`:'') : '')+`</div>`+
       `<div class="pactions"><a ${p.link?`href="${esc(p.link)}" target="_blank" rel="noopener"`:""}><span class="mi">open_in_new</span> Open</a>`+
       `<a class="cite-btn" data-i="${i}"><span class="mi">format_quote</span> Cite<span class="cite-fmt"></span></a>`+
       `<a class="cite-caret" data-i="${i}" title="Citation options"><span class="mi">expand_more</span></a></div></div>`;
@@ -389,8 +426,11 @@
     // "AI Score" sort uses the recency-nudged score (parity with the Streamlit rank_key); red
     // membership still keys off raw ai_score vs THRESHOLD, so recency only reorders the reds.
     else list.sort((a,b)=>((b.ai_score_ranked??b.ai_score)||0)-((a.ai_score_ranked??a.ai_score)||0));
+    if(sort==='ai' && IS_ADMIN && S2.on){   // second stage on: kept papers first, then the dropped, then the rest
+      const g=p=>Number(p.ai_score)<THRESHOLD?2:s2Dropped(p)?1:0; list=list.map((p,i)=>[p,i]).sort((a,b)=>g(a[0])-g(b[0])||a[1]-b[1]).map(x=>x[0]);
+    }
 
-    const passed=PAPERS.filter(p=>Number(p.ai_score)>=THRESHOLD).length;
+    const passed=PAPERS.filter(p=>Number(p.ai_score)>=THRESHOLD && !s2Dropped(p)).length;
     let showCount, showSeeMore;
     if(passed<=10){ showCount=10; showSeeMore=false; }
     else { showCount=VISIBLE; showSeeMore=VISIBLE<passed; }
@@ -750,7 +790,7 @@
       // Users' maps use the users' setting (titles + PCA): a map built another way (e.g. title + abstract, or
       // t-SNE + UMAP before 2026-11-27) is rebuilt once. Admins keep whatever they switched to.
       const offDefault = !IS_ADMIN && TOPIC && (TOPIC.points||[]).length && MAP_VARIANT &&
-        (MAP_VARIANT.projection!==USER_PROJ || MAP_VARIANT.map_text!==USER_TEXT);
+        (MAP_VARIANT.projection!==USER_PROJ || MAP_VARIANT.map_text!==USER_TEXT || !MAP_VARIANT.research_only);
       if(TOPIC && !stale && !offDefault){ drawTopic(TOPIC); return; }
       if(stale || offDefault){ $('landscapeHost').innerHTML=''; }
       $('topicStatus').innerHTML=loadBlock(offDefault?'Updating the knowledge landscape…':stale?'Updating the knowledge landscape with its sub-areas…':LANDSCAPE?'Building the knowledge landscape & research gaps…':'Building the topic map & research gaps…');
@@ -888,8 +928,8 @@
       PROJ_CACHED=data.map_projections_cached||[]; MAP_VARIANT=data.map_variant||null;   // admin projection toggle: maps already built for this search
       $('resQuery').textContent='"'+(data.base_query||'')+'"';
       $('resSummary').textContent=`${pub.total_matched||0} papers matched · ${pub.total_scored||0} scored · ${QDATA.length} queries · match threshold ${THRESHOLD}`;
-      CV_RUNS=data.converge_runs||[];
-      renderQrows(); renderPapers(); renderConverge();
+      CV_RUNS=data.converge_runs||[]; STAGE2=data.stage2||null;
+      renderQrows(); renderPapers(); renderConverge(); renderStage2();
       _sessionDone();
     }catch(err){
       await loadMe();
